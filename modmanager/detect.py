@@ -50,7 +50,7 @@ def describe(root, game):
 def _installdir(lib, game):
     """Folder name from Steam's appmanifest (handles renamed installs); falls back to the default."""
     try:
-        t = (lib / "steamapps" / f"appmanifest_{game.app_id}.acf").read_text(errors="replace")
+        t = (lib / "steamapps" / f"appmanifest_{game.app_id}.acf").read_text(encoding="utf-8", errors="replace")
         m = re.search(r'"installdir"\s+"([^"]+)"', t)
         if m:
             return m.group(1)

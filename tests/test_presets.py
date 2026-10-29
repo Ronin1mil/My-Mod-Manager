@@ -45,7 +45,7 @@ class Validation(unittest.TestCase):
         files = sorted((Path(presets.BUILTIN)).glob("*.json"))
         self.assertTrue(files)
         for f in files:
-            d = json.loads(f.read_text())
+            d = json.loads(f.read_text(encoding="utf-8"))
             presets.validate(d, d["game"])
             self.assertIn(d["game"], games.GAMES)
             self.assertTrue(d["id"].startswith(d["game"]), f.name)

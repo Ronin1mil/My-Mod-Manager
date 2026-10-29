@@ -40,6 +40,7 @@ On GitHub press **Code → Download ZIP**, unzip it, and double-click `Start Mod
 - **Problems with one-click fixes**: missing or disabled dependency (enables it and what it needs), wrong order, dependency loops, incompatible mods, duplicate names, mods built for another game version, missing files, damaged metadata.
 - **Conflicts with the winner shown**: whole-file overrides, same definition in different files (`REPLACE:` winners marked intentional, `INJECT:` listed separately as *patches*), `replace_path` wiping earlier mods, duplicate localization keys.
 - **Base-game comparison**: what each mod overrides in the vanilla game (toggle in Settings; base files are only parsed where a mod defines the same keys, so it stays fast).
+- **Import the launcher's playsets**: the sidebar **Import** menu (and an automatic import when a game opens) brings in the playsets that already exist in the game's own Paradox launcher; see [docs/16-launcher-import.md](docs/16-launcher-import.md).
 - **Presets**: curated playsets as plain JSON (for example a RICE stack for CK3); one click turns one into a playset and lists what is not installed yet. See [docs/11-presets-and-downloads.md](docs/11-presets-and-downloads.md).
 - **Getting Workshop mods**: *Open in Steam* (you press Subscribe) or, optionally, `steamcmd` with an account you already logged in. No password is ever handled by this app.
 - **Install `.zip` mods** by drag and drop (checked for unsafe contents); **uninstall** and **upgrades** keep the old version in a backup folder.

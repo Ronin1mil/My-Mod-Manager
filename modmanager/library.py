@@ -14,7 +14,7 @@ class Library:
         self.path = Path(path) if path else config_dir(game) / "library.json"
         self.data = {"entries": {}, "scanned_once": False}
         try:
-            d = json.loads(self.path.read_text())
+            d = json.loads(self.path.read_text(encoding="utf-8-sig"))
             if isinstance(d, dict) and isinstance(d.get("entries"), dict):
                 self.data = d
         except (OSError, ValueError):
@@ -22,7 +22,7 @@ class Library:
 
     def save(self):
         tmp = self.path.with_suffix(f".{uuid.uuid4().hex[:8]}.tmp")
-        tmp.write_text(json.dumps(self.data, indent=1))
+        tmp.write_text(json.dumps(self.data, indent=1), encoding="utf-8")
         tmp.replace(self.path)
 
     def merge(self, mods, now=None):

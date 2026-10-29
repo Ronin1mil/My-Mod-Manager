@@ -41,7 +41,7 @@ def _id_list(v, what):
 
 def _atomic_write(path, text):
     tmp = path.with_suffix(f".{uuid.uuid4().hex[:8]}.tmp")
-    tmp.write_text(text)
+    tmp.write_text(text, encoding="utf-8")
     tmp.replace(path)
 
 
@@ -231,7 +231,7 @@ class GlobalSettings:
         self.path = Path(path) if path else config_dir() / "settings.json"
         self.data = {}
         try:
-            d = json.loads(self.path.read_text())
+            d = json.loads(self.path.read_text(encoding="utf-8-sig"))
             if isinstance(d, dict):
                 self.data = d
         except (OSError, ValueError):

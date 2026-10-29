@@ -92,7 +92,7 @@ def steam_libraries(extra=()):
     libs = list(roots)
     for r in roots:
         try:
-            libs += parse_library_folders_vdf((r / "steamapps" / "libraryfolders.vdf").read_text(errors="replace"))
+            libs += parse_library_folders_vdf((r / "steamapps" / "libraryfolders.vdf").read_text(encoding="utf-8", errors="replace"))
         except OSError:
             pass
     libs += drive_guesses()

@@ -6,8 +6,9 @@ The new Import menu brings in the playsets that already exist in each game's own
 - Pressing Import again adds only what is new (or what you deleted here); the automatic import never brings back a playset you deleted on purpose
 - Settings → Playing has the same two switches (import automatically, show the Import button)
 - New tests build launcher databases (including an older layout and a damaged file) and drive the menu in a browser
+- Also in this release (version 0.5.1 was never published on its own): a mod folder Windows cannot open (WinError 448) no longer stops a whole game from loading; the error log moved to `Documents/Mod Manager/ModManager-errors.log`; a new app icon; eight Steam Workshop collections as ready-made presets (Victoria 3, Crusader Kings III, Europa Universalis V); the collection importer refuses a collection for another game; and every file the app reads or writes is now explicitly UTF-8, so names with accents or other scripts cannot break it on Windows
 
-## 0.5.1 - one unreadable folder no longer breaks loading
+## 0.5.1 - one unreadable folder no longer breaks loading (shipped inside 0.7.0)
 Fixes a crash where one mod folder Windows could not open stopped a whole game from loading, moves the error log into its own folder, and brings a new icon. It also adds eight Steam Workshop collections as ready-made presets (four for Victoria 3, three for Crusader Kings III, one for Europa Universalis V).
 
 

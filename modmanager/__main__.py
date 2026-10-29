@@ -5,7 +5,7 @@ import sys
 # The Windows app has no console: print() and argparse must not fail on a missing stdout/stderr
 for _n in ("stdout", "stderr"):
     if getattr(sys, _n) is None:
-        setattr(sys, _n, open(os.devnull, "w"))
+        setattr(sys, _n, open(os.devnull, "w", encoding="utf-8"))
 
 from modmanager import __version__, games
 
@@ -37,7 +37,7 @@ if a.list_games:
 if a.probe_window:
     import json
     from modmanager import window
-    with open(a.probe_window, "w") as f:
+    with open(a.probe_window, "w", encoding="utf-8") as f:
         json.dump(window.probe(), f)
     raise SystemExit(0)
 if a.check_update:
