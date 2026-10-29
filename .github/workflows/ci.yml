@@ -32,6 +32,8 @@ jobs:
   e2e:
     name: Browser end-to-end
     runs-on: ubuntu-24.04
+    env:
+      BROWSER: "true"  # a steam:// URL must never open anything on a CI machine
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -49,10 +51,6 @@ jobs:
       - run: node tests/e2e/features.mjs
       - run: node tests/e2e/culture.mjs
       - run: node tests/e2e/switch.mjs
-        env:
-          BROWSER: "true"
-        env:
-          BROWSER: "true"  # a steam:// URL must never open anything on a CI machine
 
   build:
     name: Build app (${{ matrix.name }})
