@@ -10,3 +10,6 @@
 The release title and the notes shown on the Releases page are taken from that CHANGELOG section by `.github/scripts/release-notes.sh`. **The release job fails if the version has no section**, so a release cannot go out without notes.
 
 To fix wording of releases that already exist, edit `CHANGELOG.md`, push, and run the workflow with **refresh_notes** ticked: it rewrites the title and notes of every release that has a changelog section.
+
+## macOS and Linux builds (saved for later)
+Releases contain Windows files only. The `build` matrix in `.github/workflows/ci.yml` keeps the Linux and macOS entries as a comment; paste them back to build `Mod-Manager-linux` and `Mod-Manager-macos` again (they were building before, the macOS runner was sometimes unavailable). Unit tests still run on Ubuntu and Windows.

@@ -74,10 +74,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Windows and macOS get a native window (pywebview); Linux opens a Chrome/Edge app window or the browser
+          # Windows only for now. macOS and Linux builds are saved for later (see docs/15-releasing.md); to bring them
+          # back, add these two entries here:
+          #   - {os: ubuntu-22.04, name: Mod-Manager-linux, sep: ":", webview: false, flags: ""}
+          #   - {os: macos-latest, name: Mod-Manager-macos, sep: ":", webview: true, flags: "--collect-all webview"}
           - {os: windows-latest, name: Mod-Manager-windows.exe, sep: ";", webview: true, flags: "--windowed --icon installer/icon.ico --collect-all webview"}
-          - {os: ubuntu-22.04, name: Mod-Manager-linux, sep: ":", webview: false, flags: ""}
-          - {os: macos-latest, name: Mod-Manager-macos, sep: ":", webview: true, flags: "--collect-all webview"}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

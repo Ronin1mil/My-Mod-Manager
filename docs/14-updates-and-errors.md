@@ -1,7 +1,7 @@
 # Self-update and the error log
 
 ## Self-update (downloaded app only)
-- Built by CI (`build` job): one file per platform, named `Mod-Manager-windows.exe`, `Mod-Manager-macos`, `Mod-Manager-linux`. Pushing a tag `vX.Y.Z` (must equal `modmanager.__version__`) publishes them with `SHA256SUMS.txt`.
+- Built by CI (`build` job): currently Windows only: `Mod-Manager-windows.exe` and the installer. The `Mod-Manager-macos` / `Mod-Manager-linux` builds are saved for later (the updater still knows those names). Pushing a tag `vX.Y.Z` (must equal `modmanager.__version__`) publishes them with `SHA256SUMS.txt`.
 - Windows also gets `Mod-Manager-Setup.exe` (Inno Setup, `installer/ModManager.iss`): per-user install to `%LOCALAPPDATA%\\Programs\\Mod Manager`, Start-menu entry, optional desktop shortcut, uninstaller. Per-user so the in-app update can replace the program without administrator rights. CI installs it silently, starts the installed app and uninstalls it. Not code-signed.
 - **Update now** (banner, only when `can_self_update` is true, i.e. running the packaged app):
   1. latest release via the GitHub API (same check as before; user-initiated),
