@@ -7,12 +7,13 @@ import json
 import os
 import tempfile
 import threading
+import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from . import __version__, collections, compare, detect, games as gamesmod, install, launch, order, presets, saves, scan, update, updates
-from . import errorlog, workshop
+from . import errorlog, selfupdate, workshop
 from .library import Library
 from .paths import LOGO_TYPES, config_dir, find_first, find_logo, game_version, user_dirs, workshop_dirs
 from .store import GlobalSettings, Store, write_load_file
@@ -388,6 +389,8 @@ class Hub:
         self._update_cache = None
         self.update_pending = False
         self.client_errors = 0
+        self.updater = selfupdate.Updater()
+        self.updater_forced = False  # tests
         self.update_fetch = None  # tests inject a fake GitHub here
 
     @classmethod
@@ -407,7 +410,7 @@ class Hub:
 
     def index(self):
         s = self.settings.get()
-        return {"log_file": str(errorlog.log_path()), "games": [g.public() for g in self.games.values()], "last_game": s["last_game"],
+        return {"log_file": str(errorlog.log_path()), "can_self_update": selfupdate.can_self_update() or self.updater_forced, "games": [g.public() for g in self.games.values()], "last_game": s["last_game"],
                 "version": __version__, "settings": s, "update": self._update_cache[1] if self._update_cache else None,
                 "update_pending": self.update_pending}
 
@@ -525,7 +528,7 @@ def make_handler(hub):
 
         def do_POST(self):
             parts = self.path.strip("/").split("/")
-            if parts[-1] in ("install", "update-check", "downloads", "import-collection", "mod-updates"):
+            if parts[-1] in ("install", "update-check", "downloads", "import-collection", "mod-updates", "self-update"):
                 return self._post()  # slow network/disk work must not hold the lock
             with hub.lock:
                 self._post()
@@ -537,6 +540,8 @@ def make_handler(hub):
                 parts, app = self._route()
                 if parts == ["api", "games"]:
                     return self._send(200, hub.index())
+                if parts == ["api", "self-update"]:
+                    return self._send(200, hub.updater.status())
                 if app is not None:
                     if parts == ["api", "state"]:
                         return self._send(200, app.state())
@@ -588,6 +593,8 @@ def make_handler(hub):
             try:
                 parts, app = self._route()
                 if app is None:  # app-wide routes
+                    if parts == ["api", "self-update"]:
+                        return self._send(200, hub.updater.start())
                     if parts == ["api", "client-error"]:
                         return self._send(200, hub.client_error(self._body()))
                     if parts == ["api", "update-check"]:
@@ -691,7 +698,15 @@ def serve(port=8765, open_browser=True, overrides=None, initial_game=None, **kw)
     import webbrowser
     hub = Hub(overrides=overrides)
     hub.check_on_launch()  # no-op unless the user enabled "check for updates on launch"
-    srv = ThreadingHTTPServer(("127.0.0.1", port), make_handler(hub))
+    srv = None
+    for attempt in range(40):  # a freshly updated copy waits for the old one to release the port
+        try:
+            srv = ThreadingHTTPServer(("127.0.0.1", port), make_handler(hub))
+            break
+        except OSError:
+            if not os.environ.get("MODMANAGER_RESTARTED") or attempt == 39:
+                raise
+            time.sleep(0.5)
     url = f"http://127.0.0.1:{port}/" + (f"#{initial_game}" if initial_game else "")
     print(f"Mod Manager {__version__} running at {url}  (Ctrl+C to quit)")
     print("  games: " + ", ".join(f"{g.id} ({g.name})" for g in hub.games.values()))

@@ -80,7 +80,8 @@ def check_for_update(current=__version__, fetch=None, repo=REPO):
         status, rel = fetch(f"{API}/repos/{repo}/releases/latest")
         if status == 200 and isinstance(rel, dict) and parse_version(rel.get("tag_name")):
             tag = rel["tag_name"]
-            assets = [{"name": a["name"][:100], "url": a["browser_download_url"], "size": int(a.get("size") or 0)}
+            assets = [{"name": a["name"][:100], "url": a["browser_download_url"], "size": int(a.get("size") or 0),
+                       "api_url": f"{API}/repos/{repo}/releases/assets/{int(a['id'])}" if str(a.get("id", "")).isdigit() else ""}
                       for a in rel.get("assets") or []
                       if isinstance(a, dict) and isinstance(a.get("name"), str)
                       and str(a.get("browser_download_url", "")).startswith(LINK_PREFIX)]

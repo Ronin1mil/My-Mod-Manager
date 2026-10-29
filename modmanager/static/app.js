@@ -275,13 +275,33 @@ document.addEventListener('click', guard(async e => {
   }
 }));
 
+// Replace this app with the newest release (downloaded app only), then reload once the new copy answers.
+async function selfUpdate() {
+  if (!confirm('Download the newest version and restart Mod Manager? Your playsets and settings are kept.')) return;
+  let st = await app('self-update', {});
+  for (let i = 0; i < 600 && ['working', 'restarting'].includes(st.status); i++) {
+    toast(st.message || 'Updating…');
+    await new Promise(r => setTimeout(r, 1000));
+    try { st = await app('self-update'); } catch (e) { if (st.status === 'restarting') break; throw e; }  // old copy exited
+  }
+  if (st.status === 'error') throw new Error(st.message);
+  if (st.status === 'current') return toast(st.message);
+  toast('Restarting…');
+  for (let i = 0; i < 60; i++) {   // wait for the new copy, then load it
+    await new Promise(r => setTimeout(r, 1000));
+    try { const r = await fetch('/api/games'); if (r.ok) return location.reload(); } catch (e) { /* not up yet */ }
+  }
+  throw new Error('Mod Manager did not come back. Start it again from its icon; the update itself was installed.');
+}
 function banner() {
   const b = $('banner'), u = GI.update; b.className = '';
   if (!u || !u.update_available || GI.settings.dismissed_update === u.latest) { b.hidden = true; b.innerHTML = ''; return; }
   const link = u.url.startsWith(REPO_LINK) ? u.url : REPO_LINK + 'releases';
   b.hidden = false;
   b.innerHTML = `<span class="grow"><b>Version ${esc(u.latest)} is available</b> <span class="mut">(you have ${esc(GI.version)})</span></span>
+    ${GI.can_self_update ? '<button class="sm pri" id="bn-now">Update now</button>' : ''}
     <a href="${esc(link)}" target="_blank" rel="noopener noreferrer">View release</a><button class="sm" id="bn-dismiss">Dismiss</button>`;
+  if ($('bn-now')) $('bn-now').onclick = guard(selfUpdate);
   $('bn-dismiss').onclick = guard(async () => { GI.settings = await app('settings', {dismissed_update: u.latest}); banner(); });
 }
 $('appcfg').onclick = () => openPaths(false);

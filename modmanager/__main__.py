@@ -44,6 +44,9 @@ from modmanager import errorlog
 from modmanager.server import serve
 
 errorlog.install_hooks()
+from modmanager import selfupdate
+
+selfupdate.cleanup_old()
 print(f"Errors are written to {errorlog.log_path()}")
 try:
     serve(a.port, not a.no_browser, overrides={a.game: per_game} if a.game else None, initial_game=a.game)
