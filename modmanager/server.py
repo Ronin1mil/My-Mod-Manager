@@ -233,17 +233,32 @@ class GameApp:
         self.rescan()
         return {"backup": where}
 
-    def launch(self, pid):
+    def launch(self, pid, only=None):
+        """Start the game. `only` = a subset of this playset's enabled mods to launch with (the playset itself
+        is not changed); the reply says how many problems that subset has so the UI can warn."""
         ps = self.store.get(pid)
         if not self.user_dir:
             raise ValueError(f"{self.game.name} user directory not found")
         ids = self.store.export(pid, self.mods)
+        problems = None
+        if only is not None:
+            if not isinstance(only, list) or not all(isinstance(i, str) for i in only):
+                raise ValueError("'only' must be a list of mod ids.")
+            want = set(only)
+            if not want <= set(ids):
+                raise ValueError("Some chosen mods are not enabled in this playset.")
+            if not want:
+                raise ValueError("Choose at least one mod to launch with.")
+            ids = [i for i in ids if i in want]
+            problems = sum(1 for i in order.compute_order(self.mods, ids, False, self.game_version)["issues"]
+                           if i["severity"] == "error")
         f = write_load_file(self.game, self.user_dir, self.mods, ids)
         saves_note = None
         if ps["separate_saves"]:
             saves_note = saves.activate(self.user_dir / saves.SAVES_DIR_NAME, self.cfg / "saves" / pid)
         res = launch.start(self.game, self.game_exe, launch.validate_launch_args(ps["launch_args"]))
-        return {"written": len(ids), "file": f.name, "saves": saves_note, **res}
+        return {"written": len(ids), "file": f.name, "saves": saves_note, "partial": only is not None,
+                "problems": problems, **res}
 
 
 class Hub:
@@ -471,7 +486,7 @@ def make_handler(hub):
                     if act == "save-preset":
                         return self._send(200, app.save_preset(pid, str(b.get("id", "")), str(b.get("name", ""))))
                     if act == "launch":
-                        res = app.launch(pid)
+                        res = app.launch(pid, b.get("only"))
                         hub.settings.update(last_game=app.game.id)
                         return self._send(200, res)
                 self._send(404, {"error": "not found"})
@@ -490,7 +505,7 @@ def make_handler(hub):
             name = os.path.basename(self.headers.get("X-Filename", "mod.zip"))
             stage = app.cfg / "staging"
             stage.mkdir(parents=True, exist_ok=True)
-            fd, tmp = tempfile.mkstemp(dir=stage, suffix=".zip")
+            fd, tmp = tempfile.mkstemp(dir=stage, suffix=".upload")
             try:
                 with os.fdopen(fd, "wb") as f:  # stream to disk, never hold the upload in memory
                     left = n

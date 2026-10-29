@@ -8,6 +8,7 @@ import re
 import shutil
 import stat
 import struct
+import tarfile
 import tempfile
 import time
 import zipfile
@@ -108,6 +109,72 @@ def _extract_zip(archive, dest):
     return files
 
 
+TAR_EXT = (".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz")
+ARCHIVE_EXT = (".zip",) + TAR_EXT
+
+
+def archive_stem(name):
+    n = Path(name).name
+    for ext in sorted(ARCHIVE_EXT, key=len, reverse=True):
+        if n.lower().endswith(ext):
+            return n[:-len(ext)]
+    return n
+
+
+def extract_tar(archive, dest):
+    """Same rules as zips; additionally only plain files and folders are allowed (no links or devices)."""
+    try:
+        return _extract_tar(archive, dest)
+    except UnsafeArchive:
+        raise
+    except (tarfile.TarError, zlib.error, EOFError, OSError, OverflowError, UnicodeError, ValueError, LookupError) as e:
+        raise UnsafeArchive(f"the archive is damaged or uses an unsupported format ({type(e).__name__})")
+
+
+def _extract_tar(archive, dest):
+    dest = Path(dest).resolve()
+    files, total, count = [], 0, 0
+    with tarfile.open(archive, "r:*") as tf:
+        for ti in tf:
+            count += 1
+            if count > MAX_ENTRIES:
+                raise UnsafeArchive("archive has too many files")
+            rel = safe_relative(ti.name)
+            if not rel:
+                continue
+            if ti.isdir():
+                (dest / rel).mkdir(parents=True, exist_ok=True)
+                continue
+            if not ti.isreg():
+                raise UnsafeArchive(f"'{rel}' is a link or special file, which mods never need")
+            if PurePosixPath(rel).suffix.lower() in BLOCKED_EXT:
+                raise UnsafeArchive(f"'{rel}' is an executable or script. mods never need these, "
+                                    "so the archive was rejected.")
+            if ti.size > MAX_ENTRY:
+                raise UnsafeArchive(f"'{rel}' is too large")
+            out = (dest / rel).resolve()
+            if dest not in out.parents:
+                raise UnsafeArchive(f"path escapes the target folder: {rel}")
+            out.parent.mkdir(parents=True, exist_ok=True)
+            written = 0
+            src = tf.extractfile(ti)
+            with src, open(out, "wb") as dst:
+                while chunk := src.read(1024 * 256):
+                    written += len(chunk)
+                    total += len(chunk)
+                    if written > MAX_ENTRY or total > MAX_TOTAL:
+                        raise UnsafeArchive("archive expands to too much data")
+                    dst.write(chunk)
+            files.append(rel)
+    return files
+
+
+def extract_archive(archive, dest, name):
+    if str(name).lower().endswith(".zip"):
+        return extract_zip(archive, dest)
+    return extract_tar(archive, dest)
+
+
 def find_mod_roots(base, depth=3):
     """Folders that look like a mod (have metadata.json or descriptor.mod)."""
     base, roots = Path(base), []
@@ -155,20 +222,21 @@ def install_archive(archive, user_dir, archive_name="mod.zip", cfg=None):
     """Install a zip into <user_dir>/mod and write its .mod descriptor.
     Returns {installed: [{folder, name, upgraded}], warnings: []}."""
     from .descriptor import parse_metadata
-    if not str(archive_name).lower().endswith(".zip"):
-        raise ValueError("Only .zip archives are supported (extract 7z/rar mods and re-zip them).")
+    if not str(archive_name).lower().endswith(ARCHIVE_EXT):
+        raise ValueError("Supported archives: .zip, .tar, .tar.gz/.tgz, .tar.bz2, .tar.xz. "
+                         "For .7z or .rar, extract the mod and re-pack it as .zip.")
     mod_dir = Path(user_dir) / "mod"
     mod_dir.mkdir(parents=True, exist_ok=True)
     stage = Path(cfg or config_dir()) / "staging"
     stage.mkdir(parents=True, exist_ok=True)
     tmp = Path(tempfile.mkdtemp(dir=stage))
     try:
-        extract_zip(archive, tmp)
+        extract_archive(archive, tmp, archive_name)
         roots = find_mod_roots(tmp)
         if not roots:
             raise ValueError("This archive does not contain a mod "
                              "(no .metadata/metadata.json or descriptor.mod found).")
-        stem = re.sub(r"\.zip$", "", Path(archive_name).name, flags=re.I)
+        stem = archive_stem(archive_name)
         report = {"installed": [], "warnings": []}
         for root in roots:
             folder = _folder_name(root, tmp, stem)

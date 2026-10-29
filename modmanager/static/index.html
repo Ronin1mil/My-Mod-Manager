@@ -18,7 +18,7 @@
    <span class="grow"></span>
    <label class="chk" title="Keep dependencies loading first automatically"><input type="checkbox" id="auto"> Auto-sort</label>
    <button id="sortnow" title="Reorder so dependencies load first">Sort now</button>
-   <button id="installbtn">Install mod…</button><input type="file" id="installf" accept=".zip" hidden>
+   <button id="installbtn">Install mod…</button><input type="file" id="installf" accept=".zip,.tar,.gz,.tgz,.bz2,.tbz2,.xz,.txz" hidden>
    <button id="rescan">Refresh</button>
    <button id="cfg">Playset settings</button>
   </header>
@@ -28,12 +28,13 @@
   <footer id="play">
    <div id="status" class="mut"></div>
    <span class="grow"></span>
+   <button id="launchpart" title="Start the game with only some of this playset's mods">Launch part…</button>
    <button id="launch" class="pri big">▶ Play</button>
   </footer>
  </section>
  <aside id="drawer"></aside>
 </div>
-<div id="drop">Drop a .zip mod to install it</div>
+<div id="drop">Drop a mod archive (.zip, .tar.gz, …) to install it</div>
 <div id="toast" role="status"></div>
 <dialog id="dlg"></dialog>
 <script src="/app.js"></script>

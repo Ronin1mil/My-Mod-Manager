@@ -194,7 +194,8 @@ def find_conflicts(mods, order, files_cache=None, def_dirs=DEFAULT_DEF_DIRS, van
     """order: list of mod ids, first loads first (later wins). `vanilla` = (game folder, only-dirs)
     treats the base game as the first mod; results involving it carry `vanilla: True`.
 
-    Returns list of {kind, severity, path, mods:[ids in load order], winner}.
+    Returns list of {kind, severity, path, mods:[ids in load order], winner}; definition conflicts also carry
+    `files` {mod id: [file that defines the key]} so the UI can show which file each mod overrides it in.
       file         identical relative path in several mods (whole file is overridden)
       definition   same key defined in different files of different mods
       patch        INJECT:/TRY_INJECT: onto a key (info: these merge rather than override)
@@ -265,8 +266,12 @@ def find_conflicts(mods, order, files_cache=None, def_dirs=DEFAULT_DEF_DIRS, van
             ordered = [i for i in order if i in ids]
             winner = ordered[-1]
             intentional = any(md and md.startswith("REPLACE") for i, md in entries if i == winner)
+            files = {}
+            for rel, es in by_file.items():
+                for i, _ in es:
+                    files.setdefault(i, []).append(rel)
             out.append({"kind": "definition", "severity": "info" if intentional else "warn",
-                        "path": f"{cat}: {k}", "mods": ordered, "winner": winner})
+                        "path": f"{cat}: {k}", "mods": ordered, "winner": winner, "files": files})
     for (cat, k), ids in sorted(seen_patch.items()):
         ordered = [i for i in order if i in set(ids)]
         out.append({"kind": "patch", "severity": "info", "path": f"{cat}: {k}", "mods": ordered,

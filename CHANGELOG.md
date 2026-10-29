@@ -11,6 +11,10 @@ One app for Crusader Kings III, Europa Universalis V and Victoria 3, replacing `
 - Cycles reported in manual mode too; damaged metadata reported per mod
 - Presets (JSON) with a draft, **unverified** RICE stack for CK3; Workshop download via Steam page or optional steamcmd
 - Presets: import a public Steam Workshop collection by link (one keyless request to api.steampowered.com, only when you press Import; nothing is downloaded); draft CK3 presets for Cultures Expanded and Princes of Darkness
+- Conflicts: definition clashes now show which file each mod defines the key in
+- Problems tab is now **Warnings**, with a gear that hides chosen kinds of warning (per game, saved in the browser)
+- **Launch part…** starts the game with only the mods you tick (dependency helper; the playset is not changed)
+- Install mods from `.tar`, `.tar.gz/.tgz`, `.tar.bz2`, `.tar.xz` as well as `.zip`, with the same safety rules (no links, scripts, traversal, bombs). `.7z`/`.rar` need non-standard-library code and are not supported
 - Playsets imported (copied) from the standalone managers on first start; their share files still import; share files carry the game
 - Enable all / disable all / prune; rolling `.bak` of the playset file; damaged playset file never overwritten
 - App-wide settings split from per-game settings; `MODMANAGER_CONFIG_DIR`; `MODMANAGER_GITHUB_TOKEN`

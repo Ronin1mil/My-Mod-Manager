@@ -57,7 +57,7 @@ try {
   assert.ok(n.indexOf('Lib') < n.indexOf('A') && n.indexOf('A') < n.indexOf('B'), `valid order, got ${n}`);
   assert.deepEqual([...n].sort(), ['A', 'B', 'C', 'D', 'Lib']);
   assert.match(await page.textContent('#status'), /5 mods active/);
-  assert.equal(await page.locator('#tabs button', { hasText: 'Problems' }).textContent(), 'Problems');
+  assert.equal(await page.locator('#tabs button', { hasText: 'Warnings' }).textContent(), 'Warnings');
 
   // --- auto-sort ON: dragging a mod ABOVE its dependency is undone (the list stays valid)
   const before = await names();
@@ -74,11 +74,19 @@ try {
   n = await names();
   assert.equal(n[0], 'B', `manual drag is honoured, got ${n}`);
   assert.deepEqual((await apiOrder())[0], 'B', 'server stored the manual order');
-  assert.match(await page.textContent('#tabs'), /Problems \(\d+\)/);
+  assert.match(await page.textContent('#tabs'), /Warnings \(\d+\)/);
   assert.match(await page.textContent('#status'), /error/);
   await page.click('[data-tab=problems]');
   await page.waitForSelector('text=B must load after A');
   assert.ok(await page.locator('[data-fix=autosort]').count() >= 1);
+  // warning settings: hiding "Wrong load order" removes it and the badge; showing all brings it back
+  await page.click('#warn-cfg');
+  await page.uncheck('[data-wc=wrong_order]');
+  await page.click('#w-close');
+  await page.waitForSelector('text=hidden by your warning settings');
+  assert.equal(await page.locator('text=B must load after A').count(), 0);
+  await page.click('#warn-cfg'); await page.click('#w-all'); await page.click('#w-close');
+  await page.waitForSelector('text=B must load after A');
 
   // arrow buttons move by one
   await page.click('[data-tab=order]');
@@ -97,7 +105,7 @@ try {
   n = await names();
   assert.ok(n.indexOf('Lib') < n.indexOf('A') && n.indexOf('A') < n.indexOf('B'));
   await page.click('[data-tab=problems]');
-  await page.waitForSelector('text=No problems found');
+  await page.waitForSelector('text=No problems found', {timeout: 3000}).catch(async e => { console.log('VIEW:', await page.textContent('#view')); throw e; });
 
   // --- disabling a dependency raises the one-click enable fix, which also restores a valid order
   await page.click('[data-tab=order]');
@@ -125,6 +133,17 @@ try {
   assert.match(await page.textContent('#drawer'), /Loads after A \(dependency\)/);
   await page.locator('#view .nm', { hasText: /^B$/ }).click();
   await page.waitForSelector('#drawer:not(.open)');
+
+  // --- launch part: dialog lists enabled mods, dependency helper ticks what is needed
+  page.removeAllListeners('dialog'); page.on('dialog', d => d.accept());
+  await page.click('#launchpart');
+  await page.waitForSelector('#dlg[open] [data-lp]');
+  await page.click('#lp-none');
+  await page.check('[data-lp="local:B"]');
+  await page.waitForSelector('text=Needed but not ticked');
+  await page.click('#lp-deps');
+  assert.equal(await page.locator('[data-lp]:checked').count(), 3);  // B + A + Lib
+  await page.click('#lp-cancel');
 
   // --- order and disabled state survive a reload
   await row('C').locator('[data-tog]').uncheck();

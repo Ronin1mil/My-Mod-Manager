@@ -65,6 +65,12 @@ async function patch(fields) {
   render(); analyse();
   if (tab === 'compare') loadCompare();
 }
+const WARN_CODES = {missing_module: 'Mod files missing', version_mismatch: 'Game version mismatch', metadata_error: 'Damaged mod metadata',
+  missing_dependency: 'Missing dependency', disabled_dependency: 'Disabled dependency', incompatible: 'Incompatible mods',
+  duplicate: 'Duplicate mod names', cycle: 'Dependency cycle', wrong_order: 'Wrong load order'};
+const wkey = () => 'mm-warn-' + G;
+const hiddenCodes = () => { try { return JSON.parse(localStorage.getItem(wkey()) || '[]'); } catch { return []; } };
+const visIssues = () => { const h = hiddenCodes(); return A ? A.issues.filter(i => !h.includes(i.code)) : []; };
 const issuesOf = id => (A ? A.issues.filter(i => i.module === id) : []);
 function worst(id) {
   const is = issuesOf(id);
@@ -77,13 +83,13 @@ function badges(m) {
 }
 
 function render() {
-  const p = cur(), errs = A ? A.issues.filter(i => i.severity === 'error').length : 0;
+  const p = cur(), errs = visIssues().filter(i => i.severity === 'error').length;
   $('pslist').innerHTML = S.playsets.map(x => `<div class="ps ${x.id === S.active ? 'on' : ''}" data-ps="${esc(x.id)}"><span>${esc(x.name)}</span><span class="mut">${x.mods.length - x.disabled.length}</span></div>`).join('');
   $('title').textContent = p.name;
   $('auto').checked = p.auto_sort;
   $('sortnow').style.display = p.auto_sort ? 'none' : '';
-  const nIss = A ? A.issues.length : 0, nCon = A ? A.conflicts.filter(x => x.severity !== 'info' && !x.vanilla).length : 0;
-  $('tabs').innerHTML = [['order', 'Load order'], ['library', `Library (${S.mods.length})`], ['problems', `Problems${nIss ? ` (${nIss})` : ''}`], ['conflicts', `Conflicts${nCon ? ` (${nCon})` : ''}`], ['compare', 'Compare'], ['presets', 'Presets']]
+  const nIss = visIssues().length, nCon = A ? A.conflicts.filter(x => x.severity !== 'info' && !x.vanilla).length : 0;
+  $('tabs').innerHTML = [['order', 'Load order'], ['library', `Library (${S.mods.length})`], ['problems', `Warnings${nIss ? ` (${nIss})` : ''}`], ['conflicts', `Conflicts${nCon ? ` (${nCon})` : ''}`], ['compare', 'Compare'], ['presets', 'Presets']]
     .map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('');
   const active = p.mods.length - p.disabled.length;
   $('status').innerHTML = `${esc(GNAME())}${S.game_version ? ` ${esc(S.game_version)}` : ''} · ${active} mod${active === 1 ? '' : 's'} active` +
@@ -116,7 +122,7 @@ function viewLibrary(p) {
       const inn = p.mods.includes(m.id);
       return `<div class="row ${m.id === sel ? 'sel' : ''}"><span class="nm" data-sel="${esc(m.id)}" title="${esc(m.root)}">${esc(m.name)}</span>${badges(m)}
         <button class="sm" data-add="${esc(m.id)}" ${inn || !m.exists ? 'disabled' : ''}>${inn ? '✓ Added' : '+ Add'}</button></div>`;
-    }).join('') || `<div class="empty">No mods found.<br>${S.user_dir ? 'Drop a .zip here to install one, or check the folders in Settings.' : esc(GNAME()) + ' user folder not found. Set it in Settings → Game folders.'}</div>`);
+    }).join('') || `<div class="empty">No mods found.<br>${S.user_dir ? 'Drop a mod archive (.zip, .tar.gz) here to install one, or check the folders in Settings.' : esc(GNAME()) + ' user folder not found. Set it in Settings → Game folders.'}</div>`);
   const qi = $('q');
   qi.oninput = () => { q = qi.value; const pos = qi.selectionStart; viewLibrary(cur()); const n = $('q'); n.focus(); n.setSelectionRange(pos, pos); };
   $('addall').onclick = guard(async () => {
@@ -132,8 +138,11 @@ function fixBtn(i) {
 }
 function viewProblems() {
   if (!A) return;
-  $('view').innerHTML = A.issues.map(i => `<div class="row static"><span class="${i.severity === 'error' ? 'err' : 'warn'}">${i.severity === 'error' ? '✖' : '▲'}</span>
-    <span class="nm" style="white-space:normal;cursor:default">${esc(i.message)}</span>${fixBtn(i)}</div>`).join('') || '<div class="empty ok">No problems found. Ready to play.</div>';
+  const vis = visIssues(), hid = A.issues.length - vis.length;
+  const head = `<div class="cmp-bar"><span class="mut">Everything wrong with the load order of <b>${esc(cur().name)}</b>${hid ? ` · ${hid} hidden by your warning settings` : ''}</span>
+    <span class="grow"></span><button class="sm" id="warn-cfg" title="Choose which warnings are shown" aria-label="Warning settings">⚙</button></div>`;
+  $('view').innerHTML = head + (vis.map(i => `<div class="row static"><span class="${i.severity === 'error' ? 'err' : 'warn'}">${i.severity === 'error' ? '✖' : '▲'}</span>
+    <span class="nm" style="white-space:normal;cursor:default">${esc(i.message)}</span>${fixBtn(i)}</div>`).join('') || '<div class="empty ok">No problems found. Ready to play.</div>');
 }
 function viewConflicts() {
   if (!A) return;
@@ -141,7 +150,7 @@ function viewConflicts() {
   const chips = [['all', 'All'], ...Object.keys(KINDS).filter(k => ct[k]).map(k => [k, `${KINDS[k]} (${ct[k]})`])]
     .map(([k, l]) => `<button data-f="${k}" class="${flt === k ? 'on' : ''}">${l}</button>`).join('');
   const rows = A.conflicts.filter(x => flt === 'all' || (flt === 'vanilla' ? x.vanilla : flt === x.kind && !x.vanilla)).map(x => `<div class="row static"><span class="${x.severity}">${x.vanilla ? 'Base game' : KINDS[x.kind]}</span>
-    <span class="nm" style="white-space:normal;cursor:default"><code>${esc(x.path)}</code> — ${x.mods.map(i => i === x.winner ? `<b class="ok">${esc(nameOf(i))}</b>` : esc(nameOf(i))).join(' → ')}</span></div>`).join('');
+    <span class="nm" style="white-space:normal;cursor:default"><code>${esc(x.path)}</code> — ${x.mods.map(i => (i === x.winner ? `<b class="ok">${esc(nameOf(i))}</b>` : esc(nameOf(i))) + (x.files && x.files[i] ? ` <span class="mut">(${x.files[i].map(f => esc(f.split('/').pop())).join(', ')})</span>` : '')).join(' → ')}</span></div>`).join('');
   $('view').innerHTML = `<div class="chips">${chips}</div>` + (rows || `<div class="empty ok">No conflicts.${S.include_vanilla ? '' : '<br><span class="mut">Comparison with the base game is off (Settings → Game folders).</span>'}</div>`) + (A.truncated ? '<div class="mut">List truncated.</div>' : '');
 }
 
@@ -430,9 +439,64 @@ $('cfg').onclick = () => {
   });
 };
 
+document.addEventListener('click', e => { if (e.target.id === 'warn-cfg') openWarnCfg(); });
+function openWarnCfg() {
+  const d = $('dlg'), h = hiddenCodes();
+  d.innerHTML = `<h2 style="margin-top:0">Warning settings</h2><p class="mut">Untick a kind of warning to hide it for ${esc(GNAME())}. Hidden warnings are still real; they just stop counting and showing. Saved in this browser.</p>
+    ${Object.entries(WARN_CODES).map(([c, l]) => `<label style="display:flex;gap:8px;align-items:center;color:var(--ink);font-size:14px"><input type="checkbox" data-wc="${c}" ${h.includes(c) ? '' : 'checked'}> ${esc(l)}</label>`).join('')}
+    <div class="dlg-btns"><button id="w-all">Show all</button><span><button id="w-close" class="pri">Done</button></span></div>`;
+  d.querySelectorAll('[data-wc]').forEach(c => c.onchange = () => {
+    const hid = [...d.querySelectorAll('[data-wc]')].filter(x => !x.checked).map(x => x.dataset.wc);
+    try { localStorage.setItem(wkey(), JSON.stringify(hid)); } catch {}
+    render();
+  });
+  $('w-all').onclick = () => { d.querySelectorAll('[data-wc]').forEach(c => c.checked = true); try { localStorage.removeItem(wkey()); } catch {} render(); };
+  $('w-close').onclick = () => d.close();
+  d.showModal();
+}
+
+$('launchpart').onclick = guard(async () => {
+  const p = cur(), ids = p.mods.filter(id => !p.disabled.includes(id) && M(id));
+  if (!ids.length) return toast('This playset has no enabled mods.');
+  const d = $('dlg');
+  d.innerHTML = `<h2 style="margin-top:0">Launch part of this playset</h2><p class="mut">Choose which mods to start ${esc(GNAME())} with. The playset itself is not changed.</p>
+    <div class="acts"><button class="sm" id="lp-all">All</button><button class="sm" id="lp-none">None</button>
+    <button class="sm" id="lp-deps" title="Also tick everything the ticked mods need">+ Their dependencies</button></div>
+    <div style="max-height:46vh;overflow:auto;margin-top:8px">${ids.map(id => `<label style="display:flex;gap:8px;align-items:center;color:var(--ink);font-size:14px;margin:4px 0"><input type="checkbox" data-lp="${esc(id)}" checked> ${esc(nameOf(id))}</label>`).join('')}</div>
+    <div id="lp-warn" class="warn" style="margin-top:8px"></div>
+    <div class="dlg-btns"><button id="lp-cancel">Cancel</button><button id="lp-go" class="pri">▶ Launch selected</button></div>`;
+  const boxes = () => [...d.querySelectorAll('[data-lp]')];
+  const chosen = () => boxes().filter(b => b.checked).map(b => b.dataset.lp);
+  const check = () => {
+    const have = new Set(chosen()), miss = [];
+    have.forEach(id => (M(id).dependencies || []).forEach(dep => {
+      const dm = S.mods.find(o => o.name === dep || String(o.remote_id) === dep || 'ugc_' + o.remote_id === dep);
+      if (dm && !have.has(dm.id) && !miss.includes(dm.name)) miss.push(dm.name);
+    }));
+    $('lp-warn').textContent = miss.length ? `Needed but not ticked: ${miss.join(', ')}` : '';
+  };
+  d.onchange = check;
+  $('lp-all').onclick = () => { boxes().forEach(b => b.checked = true); check(); };
+  $('lp-none').onclick = () => { boxes().forEach(b => b.checked = false); check(); };
+  $('lp-deps').onclick = () => {
+    for (let n = 0; n < 20; n++) { const before = chosen().length;
+      chosen().forEach(id => (M(id).dependencies || []).forEach(dep => { const dm = S.mods.find(o => o.name === dep || String(o.remote_id) === dep || 'ugc_' + o.remote_id === dep); const b = dm && boxes().find(x => x.dataset.lp === dm.id); if (b) b.checked = true; }));
+      if (chosen().length === before) break; }
+    check();
+  };
+  $('lp-cancel').onclick = () => d.close();
+  $('lp-go').onclick = guard(async () => {
+    const only = chosen(); if (!only.length) return toast('Tick at least one mod.');
+    d.close();
+    const r = await api(`playsets/${p.id}/launch`, {only});
+    toast(`Started ${GNAME()} with ${r.written} of ${ids.length} mods.` + (r.problems ? ` ${r.problems} problem(s) in that selection.` : ''));
+  });
+  check(); d.showModal();
+});
+
 $('launch').onclick = guard(async () => {
-  const p = cur(), errs = A ? A.issues.filter(i => i.severity === 'error').length : 0;
-  if (errs && !confirm(`This playset has ${errs} error${errs === 1 ? '' : 's'} (see Problems). Launch anyway?`)) return;
+  const p = cur(), errs = visIssues().filter(i => i.severity === 'error').length;
+  if (errs && !confirm(`This playset has ${errs} error${errs === 1 ? '' : 's'} (see Warnings). Launch anyway?`)) return;
   const r = await api(`playsets/${p.id}/launch`, {});
   toast(`Wrote ${r.written} mods to ${r.file} and started ${GNAME()}${r.via === 'steam' ? ' through Steam' : ''}.` +
     (r.saves && r.saves.startsWith('linked_after_backup') ? ' Your old save folder was kept as a backup.' : ''));
