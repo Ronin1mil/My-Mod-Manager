@@ -2,6 +2,7 @@
 import json
 import os
 import re
+from collections import defaultdict
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -277,12 +278,14 @@ def list_files(root, only=()):
     return out
 
 
+_TOKEN = re.compile(r'#[^\n]*|("[^"]*"|[{}]|[^\s{}="#]+|=)')
+
+
 def top_level_keys(text):
     """Names defined at brace depth 0 as (key, mode). mode is None for a plain definition
     or the patch prefix ('REPLACE', 'INJECT', ...) for `PREFIX:key = {`."""
     keys, depth = [], 0
-    tok = re.compile(r'#[^\n]*|("[^"]*"|[{}]|[^\s{}="#]+|=)')
-    toks = [m.group(1) for m in tok.finditer(text) if m.group(1)]
+    toks = [t for t in _TOKEN.findall(text) if t]  # findall runs in C; a comment matches with an empty group
     for j, t in enumerate(toks):
         if t == "{":
             depth += 1
@@ -313,14 +316,15 @@ _parse_cache = {}
 
 
 def _cached(path, fn):
-    """Memoize a per-file parse on (path, mtime, size) so re-analysis stays fast on big mod lists."""
-    st = Path(path).stat()
-    key = (str(path), st.st_mtime_ns, st.st_size, fn.__name__)
+    """Memoize a per-file parse (as a frozenset, each key once) on (path, mtime, size) so re-analysis stays fast on
+    big mod lists. `path` is a string from list_files."""
+    st = os.stat(path)
+    key = (path, st.st_mtime_ns, st.st_size, fn.__name__)
     hit = _parse_cache.get(key)
     if hit is None:
         if len(_parse_cache) > 300_000:
             _parse_cache.clear()
-        hit = _parse_cache[key] = fn(_read(path))
+        hit = _parse_cache[key] = frozenset(fn(_read(path)))
     return hit
 
 
@@ -355,9 +359,18 @@ def find_conflicts(mods, order, files_cache=None, def_dirs=DEFAULT_DEF_DIRS, van
     if vanilla:
         mods[VANILLA] = {"exists": True, "root": str(vanilla[0]), "replace_path": [], "only": tuple(vanilla[1] or ())}
         order = [VANILLA] + order
-    seen_files, seen_defs, seen_patch, seen_loc, replaced = {}, {}, {}, {}, []
+    seen_files, seen_defs, seen_patch, seen_loc = defaultdict(list), defaultdict(list), defaultdict(list), defaultdict(list)
+    replaced = []
     loaded = []  # (mid, files)
     van_files = {}
+    dir_cat = {}  # script category per directory (it only depends on the folders of the path)
+
+    def category(rel):
+        d = rel.rpartition("/")[0]
+        if d not in dir_cat:
+            dir_cat[d] = def_category(rel, def_dirs)
+        return dir_cat[d]
+
     for mid in order:
         m = mods.get(mid)
         if not m or not m["exists"]:
@@ -377,41 +390,46 @@ def find_conflicts(mods, order, files_cache=None, def_dirs=DEFAULT_DEF_DIRS, van
                 replaced.append({"kind": "replace", "severity": "warn", "path": f"{rp}/ ({n} files)",
                                  "mods": hit + [mid], "winner": mid})
         loaded.append((mid, files))
+        if mid == VANILLA:  # parsed lazily below, only where a mod defines the same keys
+            van_files = files
+            for rel in files:
+                seen_files[rel].append(mid)
+            continue
         for rel, p in files.items():
-            seen_files.setdefault(rel, []).append(mid)
-            if mid == VANILLA:  # parsed lazily below, only where a mod defines the same keys
-                van_files = files
-                continue
-            cat = def_category(rel, def_dirs) if rel.endswith(".txt") else None
+            seen_files[rel].append(mid)
+            cat = category(rel) if rel.endswith(".txt") else None
             if cat:
-                for k, mode in set(_cached(p, top_level_keys)):
+                for k, mode in _cached(p, top_level_keys):
                     if mode and "INJECT" in mode:
-                        seen_patch.setdefault((cat, k), []).append(mid)
+                        seen_patch[(cat, k)].append(mid)
                     else:
-                        seen_defs.setdefault((cat, k), {}).setdefault(rel, []).append((mid, mode))
-            elif mid != VANILLA and "localization" in rel.split("/")[:2] and rel.endswith(".yml") \
-                    and "/replace/" not in rel:
-                for lang, k in set(_cached(p, loc_keys)):
-                    seen_loc.setdefault((lang, k), {}).setdefault(rel, []).append(mid)
+                        seen_defs[(cat, k)].append((mid, rel, mode))
+            elif "localization" in rel.split("/")[:2] and rel.endswith(".yml") and "/replace/" not in rel:
+                for lang, k in _cached(p, loc_keys):
+                    seen_loc[(lang, k)].append((mid, rel))
     if van_files:
         wanted = {c for c, _ in seen_defs}
         for rel, p in van_files.items():
-            cat = def_category(rel, def_dirs) if rel.endswith(".txt") else None
+            cat = category(rel) if rel.endswith(".txt") else None
             if cat in wanted:
-                for k, mode in set(_cached(p, top_level_keys)):
+                for k, mode in _cached(p, top_level_keys):
                     if not (mode and "INJECT" in mode) and (cat, k) in seen_defs:
-                        seen_defs[(cat, k)].setdefault(rel, []).append((VANILLA, mode))
+                        seen_defs[(cat, k)].append((VANILLA, rel, mode))
     out = []
     for rel, ids in sorted(seen_files.items()):
         if len(ids) > 1:
             out.append({"kind": "file", "severity": "warn", "path": rel, "mods": ids, "winner": ids[-1]})
-    for (cat, k), by_file in sorted(seen_defs.items()):
-        entries = [e for v in by_file.values() for e in v]
-        ids = {i for i, _ in entries}
+    for (cat, k), entries in sorted(seen_defs.items()):
+        if len(entries) < 2:  # nearly every key: one mod defines it, nothing to compare
+            continue
+        ids = {i for i, _, _ in entries}
+        by_file = {}  # which mods define the key in which file (only built for the few keys that are shared)
+        for i, rel, md in entries:
+            by_file.setdefault(rel, []).append((i, md))
         if len(ids) > 1 and len(by_file) > 1:  # same-file clashes are already 'file' conflicts
             ordered = [i for i in order if i in ids]
             winner = ordered[-1]
-            intentional = any(md and md.startswith("REPLACE") for i, md in entries if i == winner)
+            intentional = any(md and md.startswith("REPLACE") for i, _, md in entries if i == winner)
             files = {}
             for rel, es in by_file.items():
                 for i, _ in es:
@@ -422,9 +440,12 @@ def find_conflicts(mods, order, files_cache=None, def_dirs=DEFAULT_DEF_DIRS, van
         ordered = [i for i in order if i in set(ids)]
         out.append({"kind": "patch", "severity": "info", "path": f"{cat}: {k}", "mods": ordered,
                     "winner": ordered[-1]})
-    for (lang, k), by_file in sorted(seen_loc.items()):
-        ids = {i for v in by_file.values() for i in v}
-        if len(ids) > 1 and len(by_file) > 1 and not any(len(v) > 1 for v in by_file.values()):
+    for (lang, k), entries in sorted(seen_loc.items()):
+        if len(entries) < 2:
+            continue
+        ids = {i for i, _ in entries}
+        rels = {r for _, r in entries}
+        if len(ids) > 1 and len(rels) > 1 and len(rels) == len(entries):  # every file counted once
             ordered = [i for i in order if i in ids]
             out.append({"kind": "localization", "severity": "info", "path": f"{lang}: {k}",
                         "mods": ordered, "winner": ordered[-1]})
