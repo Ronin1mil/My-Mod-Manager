@@ -110,10 +110,11 @@ try {
   assert.match(await page.textContent('#view'), /Set steamcmd in Settings/);   // no steamcmd configured -> no download button
   await page.click('[data-tab=problems]');
   await page.waitForSelector('text=its files were not found');
-  // the other games have no CK3 preset
+  // each game lists only its own presets: EU5 shows its collection and none of CK3's
   await page.selectOption('#game', 'eu5');
   await page.click('[data-tab=presets]');
-  await page.waitForSelector('text=No presets for Europa Universalis V');
+  await page.waitForSelector('text=Roman Empire Collection');
+  assert.doesNotMatch(await page.textContent('#view'), /RICE|Cultures Expanded|Seastar|Ultra Historical/);
 
   assert.deepEqual(errors.filter(e => !/status of 4\d\d/.test(e)), [], 'no console/page errors');
   console.log('games e2e ok');
