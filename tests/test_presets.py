@@ -83,7 +83,7 @@ class Loading(unittest.TestCase):
         (d / "b.json").write_text(json.dumps(doc(game="eu5")))
         (d / "c.json").write_text("x" * (presets.MAX_FILE + 1))
         (d / "d.json").write_bytes(b"\xff\xfe\x00")
-        self.assertEqual(set(presets.load_all(games.CK3)), {"ck3-rice-stack"})
+        self.assertEqual(set(presets.load_all(games.CK3)), {"ck3-rice-stack", "ck3-culture-expanded", "ck3-princes-of-darkness"})
 
     def test_save_user_preset_roundtrip_and_playset_conversion(self):
         mkworkshop(self.r / "ws", 111, "One")
