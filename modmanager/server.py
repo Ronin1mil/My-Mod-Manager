@@ -12,7 +12,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from . import __version__, collections, compare, detect, games as gamesmod, install, launch, order, presets, saves, scan, update, updates
-from . import workshop
+from . import errorlog, workshop
 from .library import Library
 from .paths import LOGO_TYPES, config_dir, find_first, find_logo, game_version, user_dirs, workshop_dirs
 from .store import GlobalSettings, Store, write_load_file
@@ -130,21 +130,39 @@ class GameApp:
                 "setup_needed": not s["setup_done"] and not (self.game_root and self.user_dir),
                 "imported_from": d.get("imported_from", "")}
 
-    def analyse(self, pid):
+    def analyse(self, pid, conflicts=True):
+        """Problems with the load order (fast) and, unless conflicts=False, the file/definition conflicts (slow:
+        reads every mod's files). The page asks for the fast part first and the conflicts afterwards."""
         ps = self.store.get(pid)
         enabled = [m for m in ps["mods"] if m not in ps["disabled"]]
         res = order.compute_order(self.mods, enabled, ps["auto_sort"], self.game_version)
+        out = {"issues": res["issues"], "notes": res["notes"], "conflicts": [], "counts": {}, "truncated": False,
+               "pending": not conflicts}
+        if conflicts:
+            out.update(self.conflicts_job(pid, res["order"])())
+        return out
+
+    def conflicts_job(self, pid, ordr=None):
+        """Snapshot what the scan needs (quick, done under the app lock) and return the slow part as a function
+        that can run without holding it, so switching games or editing a playset never waits for a scan."""
+        if ordr is None:
+            ps = self.store.get(pid)
+            enabled = [m for m in ps["mods"] if m not in ps["disabled"]]
+            ordr = order.compute_order(self.mods, enabled, ps["auto_sort"], self.game_version)["order"]
+        mods, files, defs = dict(self.mods), self.files, self.game.def_dirs
         van = None
         if self.game_dir and self.game_dir.is_dir() and self.store.settings()["include_vanilla"]:
             van = (self.game_dir, self.game.vanilla_only)
-        conflicts = scan.find_conflicts(self.mods, res["order"], self.files, self.game.def_dirs, van)
-        counts = {}
-        for c in conflicts:
-            k = "vanilla" if c.get("vanilla") else c["kind"]
-            counts[k] = counts.get(k, 0) + 1
-        cap = scan.MAX_PER_KIND * 4
-        return {"issues": res["issues"], "notes": res["notes"], "conflicts": conflicts[:cap],
-                "counts": counts, "truncated": len(conflicts) > cap}
+
+        def run():
+            conflicts = scan.find_conflicts(mods, ordr, files, defs, van)
+            counts = {}
+            for c in conflicts:
+                k = "vanilla" if c.get("vanilla") else c["kind"]
+                counts[k] = counts.get(k, 0) + 1
+            cap = scan.MAX_PER_KIND * 4
+            return {"conflicts": conflicts[:cap], "counts": counts, "truncated": len(conflicts) > cap, "pending": False}
+        return run
 
     def compare(self, a, b):
         res = compare.compare_playsets(self.mods, self.store.get(a), self.store.get(b))
@@ -228,11 +246,19 @@ class GameApp:
         enabled = [m for m in ps["mods"] if m not in ps["disabled"] and m in self.mods]
         return order.compute_order(self.mods, enabled, ps["auto_sort"], self.game_version)["order"]
 
-    def mod_tree(self, pid, mid):
+    def tree_job(self, pid, mid=None):
+        """Snapshot the load order now; the file listing (slow on first use) runs outside the lock."""
+        ordr = self._load_order(pid)
+        if mid is not None and mid not in self.mods:
+            raise ValueError("Unknown mod.")
+        mods = dict(self.mods)
+        return (lambda: self.mod_tree(pid, mid, ordr, mods)) if mid is not None else (lambda: self.result_tree(pid, ordr, mods))
+
+    def mod_tree(self, pid, mid, ordr=None, mods=None):
         """Files of one mod, each with the other enabled mods that also provide it (later in order wins)."""
         if mid not in self.mods:
             raise ValueError("Unknown mod.")
-        ordr = self._load_order(pid)
+        ordr = ordr if ordr is not None else self._load_order(pid)
         pos = {m: i for i, m in enumerate(ordr)}
         mine = self._files_of(mid)
         others = {}
@@ -249,9 +275,9 @@ class GameApp:
                         "overrides": [o for o in oth if o not in later]})
         return {"files": out, "total": len(mine), "truncated": len(mine) > MAX_TREE}
 
-    def result_tree(self, pid):
+    def result_tree(self, pid, ordr=None, mods=None):
         """The merged file list of the whole playset: for each path, which mod supplies the winning copy."""
-        ordr = self._load_order(pid)
+        ordr = ordr if ordr is not None else self._load_order(pid)
         win, count = {}, {}
         for i, m in enumerate(ordr):
             for rel in self._files_of(m):
@@ -361,6 +387,7 @@ class Hub:
         self._cache_lock = threading.Lock()
         self._update_cache = None
         self.update_pending = False
+        self.client_errors = 0
         self.update_fetch = None  # tests inject a fake GitHub here
 
     @classmethod
@@ -380,7 +407,7 @@ class Hub:
 
     def index(self):
         s = self.settings.get()
-        return {"games": [g.public() for g in self.games.values()], "last_game": s["last_game"],
+        return {"log_file": str(errorlog.log_path()), "games": [g.public() for g in self.games.values()], "last_game": s["last_game"],
                 "version": __version__, "settings": s, "update": self._update_cache[1] if self._update_cache else None,
                 "update_pending": self.update_pending}
 
@@ -395,6 +422,15 @@ class Hub:
             with self._cache_lock:
                 self._update_cache = (time.time(), res)
         return res
+
+    def client_error(self, b):
+        """The web page reports a script error or a failed request; it goes into the same log file."""
+        if self.client_errors >= 200:  # a broken page must not be able to fill the disk
+            return {"logged": False}
+        self.client_errors += 1
+        f = lambda k, n: str(b.get(k, ""))[:n] if isinstance(b, dict) else ""
+        path = errorlog.write("page", f("message", 1000), f("stack", 8000), f"{f('game', 20)} {f('where', 200)}".strip())
+        return {"logged": bool(path), "log_file": path}
 
     def check_on_launch(self):
         """If (and only if) the user turned the setting on, check in the background; returns the thread."""
@@ -459,8 +495,33 @@ def make_handler(hub):
             return parts, None
 
         def do_GET(self):
+            p = self.path.split("?")[0].strip("/").split("/")
+            if len(p) >= 4 and p[0] == "api" and p[2] in ("conflicts", "tree") and p[1] in hub.games:
+                return self._heavy_get(p)
             with hub.lock:
                 self._get()
+
+        def _heavy_get(self, p):
+            """Slow read-only views: snapshot under the lock, compute outside it."""
+            if not self._host_ok():
+                return self._send(403, {"error": "bad host"})
+            try:
+                with hub.lock:
+                    app = hub.app(p[1])
+                    if p[2] == "conflicts":
+                        job = app.conflicts_job(p[3])
+                    elif len(p) == 4:
+                        job = app.tree_job(p[3])
+                    else:
+                        job = app.tree_job(p[3], urllib.parse.unquote(p[4]))
+                return self._send(200, job())
+            except KeyError:
+                return self._send(404, {"error": "no such playset"})
+            except ValueError as e:
+                return self._send(400, {"error": str(e)})
+            except Exception as e:
+                errorlog.write_exception("server", e, self.path.split("?")[0])
+                return self._send(500, {"error": f"{type(e).__name__}: {e}", "log_file": str(errorlog.log_path())})
 
         def do_POST(self):
             parts = self.path.strip("/").split("/")
@@ -480,7 +541,8 @@ def make_handler(hub):
                     if parts == ["api", "state"]:
                         return self._send(200, app.state())
                     if parts[:2] == ["api", "analyse"] and len(parts) == 3:
-                        return self._send(200, app.analyse(parts[2]))
+                        fast = "fast=1" in self.path.partition("?")[2].split("&")
+                        return self._send(200, app.analyse(parts[2], conflicts=not fast))
                     if parts[:2] == ["api", "tree"] and len(parts) == 3:
                         return self._send(200, app.result_tree(parts[2]))
                     if parts[:2] == ["api", "tree"] and len(parts) == 4:
@@ -508,6 +570,10 @@ def make_handler(hub):
                 return self._send(404, {"error": "no such playset"})
             except ValueError as e:
                 return self._send(400, {"error": str(e)})
+            except Exception as e:  # never drop the connection: tell the page and keep a log entry
+                where = self.path.split("?")[0]
+                errorlog.write_exception("server", e, where)
+                return self._send(500, {"error": f"{type(e).__name__}: {e}", "log_file": str(errorlog.log_path())})
             name = "index.html" if parts == [""] else parts[0] if len(parts) == 1 else None
             if name in STATIC_TYPES:  # fixed allow-list, never a path from the request
                 return self._send(200, (STATIC / name).read_bytes(), STATIC_TYPES[name])
@@ -522,6 +588,8 @@ def make_handler(hub):
             try:
                 parts, app = self._route()
                 if app is None:  # app-wide routes
+                    if parts == ["api", "client-error"]:
+                        return self._send(200, hub.client_error(self._body()))
                     if parts == ["api", "update-check"]:
                         return self._send(200, hub.check_update(bool(self._body().get("force"))))
                     if parts == ["api", "settings"]:
@@ -593,7 +661,8 @@ def make_handler(hub):
             except (ValueError, install.UnsafeArchive) as e:
                 self._send(400, {"error": str(e)})
             except Exception as e:  # surface to UI rather than hang the request
-                self._send(500, {"error": str(e)})
+                errorlog.write_exception("server", e, f"POST {self.path.split('?')[0]}")
+                self._send(500, {"error": f"{type(e).__name__}: {e}", "log_file": str(errorlog.log_path())})
 
         def _install(self, app):
             n = self._length(MAX_UPLOAD)

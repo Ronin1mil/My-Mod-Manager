@@ -111,23 +111,35 @@ def _info(mid, desc, root, source, remote_id):
 
 
 def list_files(root, only=()):
-    """Regular files of a mod as {posix relative path: Path}. Symlinks are never followed, so a mod
-    cannot make the scanner read outside its own folder or loop forever. `only` limits the walk to
-    those top-level folders (used for the base game)."""
-    root = Path(root)
+    """Regular files of a mod as {posix relative path: absolute path string}. Symlinks are never followed, so a
+    mod cannot make the scanner read outside its own folder or loop forever. `only` limits the walk to
+    those top-level folders (used for the base game). Uses os.scandir: no per-file stat calls, which is
+    what made big mod lists slow on Windows."""
     out = {}
-    for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
-        rel_dir = Path(dirpath).relative_to(root)
-        if not rel_dir.parts:
-            dirnames[:] = [d for d in dirnames if d not in SKIP_TOP and (not only or d in only)]
-            if only:
-                continue  # files directly in the root are not base content
-        for f in filenames:
-            p = Path(dirpath) / f
-            rel = rel_dir / f
-            if p.is_symlink() or (len(rel.parts) == 1 and rel.name.lower() in SKIP_ROOT_FILES):
+    root = str(root)
+
+    def walk(path, rel, top):
+        try:
+            it = list(os.scandir(path))
+        except OSError:
+            return
+        for e in it:
+            try:
+                if e.is_symlink():
+                    continue
+                name = e.name
+                if e.is_dir(follow_symlinks=False):
+                    if top and (name in SKIP_TOP or (only and name not in only)):
+                        continue
+                    walk(e.path, rel + name + "/", False)
+                elif e.is_file(follow_symlinks=False):
+                    if top and (only or name.lower() in SKIP_ROOT_FILES):
+                        continue  # files directly in the root are not base content / are metadata
+                    out[rel + name] = e.path
+            except OSError:
                 continue
-            out[rel.as_posix()] = p
+
+    walk(root, "", True)
     return out
 
 

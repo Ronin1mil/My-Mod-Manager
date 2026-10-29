@@ -15,7 +15,7 @@ from modmanager.server import GameApp, Hub, make_handler
 from modmanager.store import GlobalSettings, Store
 
 ALL = list(games.GAMES.values())
-APP_WIDE = ("/api/settings", "/api/update-check", "/api/games")
+APP_WIDE = ("/api/client-error", "/api/settings", "/api/update-check", "/api/games")
 
 
 def mkmod(user, folder, name=None, deps=(), files=None, incompatible=(), meta_id="", layout=".metadata",

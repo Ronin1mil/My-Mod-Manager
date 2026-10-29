@@ -3,17 +3,31 @@ let G = null, GI = null, S = null, A = null, C = null, P = null, cmpWith = null,
 const REPO_LINK = 'https://github.com/Ronin1mil/My-Mod-Manager/';
 const $ = i => document.getElementById(i);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+let gen = 0, logFile = '', reported = 0;
+class Stale extends Error {}   // an answer for a game/playset the user has already left; dropped silently
+const report = (message, stack, where) => {
+  if (reported++ > 20) return;
+  try { fetch('/api/client-error', {method: 'POST', headers: {'Content-Type': 'application/json'}, keepalive: true,
+    body: JSON.stringify({message: String(message), stack: String(stack || ''), where: where || '', game: G || ''})})
+    .then(r => r.json()).then(j => { if (j.log_file) logFile = j.log_file; }).catch(() => {}); } catch (e) { /* nothing more to do */ }
+};
 const call = async (url, b) => {
-  const r = await fetch(url, b === undefined ? {} : {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(b)});
-  const j = await r.json();
-  if (!r.ok) { const e = new Error(j.error || 'Request failed'); e.body = j; throw e; }
+  let r, j;
+  try {
+    r = await fetch(url, b === undefined ? {} : {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(b)});
+    j = await r.json();
+  } catch (err) {  // server gone, or an answer that is not JSON
+    const e = new Error(`Could not reach Mod Manager (${err.message}). Is its window still open?`);
+    e.network = true; throw e;
+  }
+  if (!r.ok) { const e = new Error(j.error || 'Request failed'); e.body = j; e.status = r.status; if (j.log_file) logFile = j.log_file; throw e; }
   return j;
 };
-const api = (p, b) => call(`/api/${G}/${p}`, b);   // current game
+const api = async (p, b) => { const g = gen, r = await call(`/api/${G}/${p}`, b); if (g !== gen) throw new Stale(); return r; };   // current game
 const app = (p, b) => call('/api/' + p, b);        // app-wide
 const GNAME = () => (S && S.game ? S.game.name : G);
 const M = id => S.mods.find(m => m.id === id);
-const cur = () => S.playsets.find(p => p.id === S.active);
+const cur = () => (S && S.playsets ? S.playsets.find(p => p.id === S.active) : null);
 const nameOf = id => { const m = M(id); return id === '__vanilla__' ? 'Base game' : m ? m.name : id; };
 const KINDS = {file: 'File', definition: 'Definition', patch: 'Patch', replace: 'Replace path', localization: 'Localization', vanilla: 'Base game'};
 let toastT, U = null, T = null, tq = '';
@@ -50,7 +64,22 @@ function toast(msg, bad) {
   const t = $('toast'); t.textContent = msg; t.className = 'on' + (bad ? ' bad' : '');
   clearTimeout(toastT); toastT = setTimeout(() => t.className = '', 4500);
 }
-const guard = fn => async (...a) => { try { await fn(...a); } catch (e) { toast(e.message, true); } };
+const guard = fn => async (...a) => { try { await fn(...a); } catch (e) { if (!(e instanceof Stale)) fail(e, fn.name); } };
+// Show the real error where the user can see it, and keep a copy in the log file (see the Documents folder).
+function fail(e, where) {
+  if (e instanceof Stale) return;
+  toast(e.message, true);
+  if (e.status >= 500 || !e.status) report(e.message, e.stack, where);
+  if (e.status >= 500 || e.network) showFatal(e);
+}
+function showFatal(e) {
+  const b = $('banner'); if (!b) return;
+  b.hidden = false; b.className = 'bad';
+  b.innerHTML = `<b>Something went wrong:</b> ${esc(e.message)}<br><span class="mut">Details were saved to <code>${esc(logFile || 'your Documents folder (ModManager-errors.log)')}</code>.</span> <button class="sm" id="bn-x">Hide</button>`;
+  $('bn-x').onclick = () => { b.hidden = true; };
+}
+window.addEventListener('error', ev => { if (ev.error instanceof Stale) return; report(ev.message, ev.error && ev.error.stack, `${ev.filename}:${ev.lineno}`); showFatal(new Error(ev.message)); });
+window.addEventListener('unhandledrejection', ev => { const e = ev.reason; if (e instanceof Stale) { ev.preventDefault(); return; } report((e && e.message) || e, e && e.stack, 'promise'); });
 
 async function load(rescanMsg) {
   T = null; P = null;
@@ -61,8 +90,7 @@ async function load(rescanMsg) {
     const d = S.diff, bits = [d.added && `${d.added} new`, d.updated && `${d.updated} updated`, d.removed && `${d.removed} removed`].filter(Boolean);
     toast(bits.length ? `Scan: ${bits.join(', ')} (${d.total} mods)` : `Scan: no changes (${d.total} mods)`);
   }
-  $('logo').innerHTML = S.has_logo ? `<img src="/api/${G}/logo" alt="${esc(GNAME())}"><span class="sub">Mod Manager</span>`
-    : `<span class="wm">${esc(GNAME())}</span><span class="sub">Mod Manager</span>`;
+  logoSeen[G] = !!S.has_logo; setLogo(G, GNAME(), S.has_logo);
   document.title = GNAME() + ' Mod Manager';
   render(); analyse(); banner(); pollUpdate();
   if (S.setup_needed && !setupShown) { setupShown = true; openPaths(true); }
@@ -85,12 +113,17 @@ function pollUpdate() {
   setTimeout(guard(async () => { const st = await app('games'); GI.update = st.update; GI.update_pending = st.update_pending; GI.settings = st.settings; banner(); pollUpdate(); }), 1000);
 }
 async function analyse() {
-  const id = S.active, r = await api('analyse/' + id);
-  if (id !== S.active) return;
-  A = r; render();
+  const id = S.active, r = await api('analyse/' + id + '?fast=1');   // load-order problems: quick
+  if (!S || id !== S.active) return;
+  const keep = A && A.pid === id ? A : null;
+  A = {...r, pid: id, conflicts: keep ? keep.conflicts : [], counts: keep ? keep.counts : {}, pending: true};
+  render();
+  const c = await api('conflicts/' + id);                          // file/definition conflicts: slow, loaded behind
+  if (!S || id !== S.active || !A) return;
+  Object.assign(A, c, {pending: false}); render();
 }
 async function patch(fields) {
-  const p = cur();
+  const p = cur(); if (!p) return;
   Object.assign(p, await api(`playsets/${p.id}/update`, fields));
   render(); analyse();
   if (tab === 'compare') loadCompare();
@@ -113,13 +146,14 @@ function badges(m) {
 }
 
 function render() {
-  const p = cur(), errs = visIssues().filter(i => i.severity === 'error').length;
+  if (!S || !cur()) return;
+  const p = cur(), errs = visIssues().filter(i => i.severity === 'error').length; if (!p) return;
   $('pslist').innerHTML = S.playsets.map(x => `<div class="ps ${x.id === S.active ? 'on' : ''}" data-ps="${esc(x.id)}"><span>${esc(x.name)}</span><span class="mut">${x.mods.length - x.disabled.length}</span></div>`).join('');
   $('title').textContent = p.name;
   $('auto').checked = p.auto_sort;
   $('sortnow').style.display = p.auto_sort ? 'none' : '';
-  const nIss = visIssues().length, nCon = A ? A.conflicts.filter(x => x.severity !== 'info' && !x.vanilla).length : 0;
-  $('tabs').innerHTML = [['order', 'Load order'], ['library', `Library (${S.mods.length})`], ['problems', `Warnings${nIss ? ` (${nIss})` : ''}`], ['conflicts', `Conflicts${nCon ? ` (${nCon})` : ''}`], ['files', 'Files'], ['compare', 'Compare'], ['presets', 'Presets']]
+  const nIss = visIssues().length, nCon = A && !A.pending ? A.conflicts.filter(x => x.severity !== 'info' && !x.vanilla).length : 0;
+  $('tabs').innerHTML = [['order', 'Load order'], ['library', `Library (${S.mods.length})`], ['problems', `Warnings${nIss ? ` (${nIss})` : ''}`], ['conflicts', `Conflicts${A && A.pending ? ' …' : nCon ? ` (${nCon})` : ''}`], ['files', 'Files'], ['compare', 'Compare'], ['presets', 'Presets']]
     .map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('');
   const active = p.mods.length - p.disabled.length;
   $('status').innerHTML = `${esc(GNAME())}${S.game_version ? ` ${esc(S.game_version)}` : ''} · ${active} mod${active === 1 ? '' : 's'} active` +
@@ -177,6 +211,7 @@ function viewProblems() {
 }
 function viewConflicts() {
   if (!A) return;
+  if (A.pending) { $('view').innerHTML = '<div class="empty">Reading mod files to look for conflicts…<br><span class="mut">This can take a little while the first time with many mods.</span></div>'; return; }
   const ct = A.counts || {};
   const chips = [['all', 'All'], ...Object.keys(KINDS).filter(k => ct[k]).map(k => [k, `${KINDS[k]} (${ct[k]})`])]
     .map(([k, l]) => `<button data-f="${k}" class="${flt === k ? 'on' : ''}">${l}</button>`).join('');
@@ -223,7 +258,7 @@ function wireCmp() {
   if (sel) sel.onchange = guard(async () => { cmpWith = sel.value; C = null; render(); await loadCompare(); });
 }
 document.addEventListener('click', guard(async e => {
-  const t = e.target, act = t.dataset && t.dataset.cmp, p = cur();
+  const t = e.target, act = t.dataset && t.dataset.cmp, p = cur(); if (!p) return;
   if (!act) return;
   if (act === 'add') await patch({mods: [...p.mods, t.dataset.id]});
   if (act === 'addall') await patch({mods: [...p.mods, ...C.only_b.filter(id => !p.mods.includes(id))]});
@@ -241,7 +276,7 @@ document.addEventListener('click', guard(async e => {
 }));
 
 function banner() {
-  const b = $('banner'), u = GI.update;
+  const b = $('banner'), u = GI.update; b.className = '';
   if (!u || !u.update_available || GI.settings.dismissed_update === u.latest) { b.hidden = true; b.innerHTML = ''; return; }
   const link = u.url.startsWith(REPO_LINK) ? u.url : REPO_LINK + 'releases';
   b.hidden = false;
@@ -327,7 +362,8 @@ function drawer() {
   const d = $('drawer'), m = sel && M(sel);
   d.className = m ? 'open' : '';
   if (!m) { d.innerHTML = ''; return; }
-  const p = cur(), idx = p.mods.indexOf(m.id), note = A && A.notes[m.id];
+  const p = cur(); if (!p) return;
+  const idx = p.mods.indexOf(m.id), note = A && A.notes[m.id];
   const deps = m.dependencies.map(x => {
     const dm = S.mods.find(o => o.name === x || String(o.remote_id) === x || 'ugc_' + o.remote_id === x);
     const st = !dm ? '<span class="b err">not installed</span>' : p.mods.includes(dm.id) && !p.disabled.includes(dm.id) ? '<span class="b ok">enabled</span>' : '<span class="b warn">not enabled</span>';
@@ -348,7 +384,7 @@ function drawer() {
 
 // ---- actions ----
 document.addEventListener('click', guard(async e => {
-  const t = e.target, p = cur(), ds = t.dataset;
+  const t = e.target, p = cur(), ds = t.dataset; if (!p) return;
   const psRow = t.closest('[data-ps]');
   if (psRow) { await api(`playsets/${psRow.dataset.ps}/activate`, {}); sel = null; return load(); }
   if (ds.tab) { tab = ds.tab; render(); if (tab === 'compare') await loadCompare(); if (tab === 'files') await loadFiles(); }
@@ -393,14 +429,14 @@ document.addEventListener('click', guard(async e => {
   }
 }));
 document.addEventListener('change', guard(async e => {
-  const t = e.target, p = cur();
+  const t = e.target, p = cur(); if (!p) return;
   if (t.dataset.tog) { const id = t.dataset.tog; await patch({disabled: t.checked ? p.disabled.filter(x => x !== id) : [...p.disabled, id]}); }
 }));
 const view = $('view');
 view.addEventListener('dragstart', e => { const r = e.target.closest('[data-i]'); if (r) { drag = +r.dataset.i; r.classList.add('drag'); } });
 view.addEventListener('dragover', e => { if (drag !== null) e.preventDefault(); });
 view.addEventListener('drop', guard(async e => {
-  const r = e.target.closest('[data-i]'), p = cur();
+  const r = e.target.closest('[data-i]'), p = cur(); if (!p) return;
   if (r && drag !== null) { e.preventDefault(); const m = [...p.mods], [x] = m.splice(drag, 1); m.splice(+r.dataset.i, 0, x); drag = null; await patch({mods: m}); }
 }));
 view.addEventListener('dragend', () => { drag = null; render(); });
@@ -442,7 +478,7 @@ document.addEventListener('keydown', e => {
 });
 
 $('cfg').onclick = () => {
-  const p = cur(), d = $('dlg');
+  const p = cur(), d = $('dlg'); if (!p) return;
   d.innerHTML = `<h2 style="margin-top:0">Playset settings</h2>
     <label>Name</label><input type="text" id="c-name" maxlength="60" value="${esc(p.name)}">
     <label>Notes</label><textarea id="c-notes" maxlength="2000">${esc(p.notes)}</textarea>
@@ -495,7 +531,8 @@ function openWarnCfg() {
 }
 
 $('launchpart').onclick = guard(async () => {
-  const p = cur(), ids = p.mods.filter(id => !p.disabled.includes(id) && M(id));
+  const p = cur(); if (!p) return;
+  const ids = p.mods.filter(id => !p.disabled.includes(id) && M(id));
   if (!ids.length) return toast('This playset has no enabled mods.');
   const d = $('dlg');
   d.innerHTML = `<h2 style="margin-top:0">Launch part of this playset</h2><p class="mut">Choose which mods to start ${esc(GNAME())} with. The playset itself is not changed.</p>
@@ -544,7 +581,7 @@ async function launchCall(p, body) {
   }
 }
 $('launch').onclick = guard(async () => {
-  const p = cur(), errs = visIssues().filter(i => i.severity === 'error').length;
+  const p = cur(), errs = visIssues().filter(i => i.severity === 'error').length; if (!p) return;
   if (errs && !confirm(`This playset has ${errs} error${errs === 1 ? '' : 's'} (see Warnings). Launch anyway?`)) return;
   const r = await launchCall(p, {}); if (!r) return;
   toast(`Wrote ${r.written} mods to ${r.file} and started ${GNAME()}${r.via === 'steam' ? ' through Steam' : ''}.` +
@@ -554,18 +591,25 @@ function applyTheme(g) {
   const root = document.documentElement.style;
   Object.entries(g.theme || {}).forEach(([k, v]) => root.setProperty(k, v));
 }
+const logoSeen = {};
+function setLogo(id, name, has) {   // one place decides logo vs. name, so switching games never flips between them
+  const html = has ? `<img src="/api/${id}/logo" alt="${esc(name)}"><span class="sub">Mod Manager</span>`
+    : `<span class="wm">${esc(name)}</span><span class="sub">Mod Manager</span>`;
+  if ($('logo').dataset.k !== id + has) { $('logo').innerHTML = html; $('logo').dataset.k = id + has; }
+}
 async function useGame(id, first) {
-  G = id; S = A = C = P = null; sel = null; tab = 'order'; cmpWith = null; lastMissing = []; setupShown = false;
+  gen++; G = id; S = A = C = P = null; sel = null; tab = 'order'; cmpWith = null; lastMissing = []; setupShown = false;
   try { localStorage.setItem('mm-game', id); } catch (e) { /* storage may be blocked */ }
   if (location.hash.slice(1) !== id) history.replaceState(null, '', '#' + id);
   const g = GI.games.find(x => x.id === id);
   applyTheme(g);
   $('game').value = id;
-  $('logo').innerHTML = `<span class="wm">${esc(g.name)}</span><span class="sub">Mod Manager</span>`;
+  setLogo(g.id, g.name, logoSeen[g.id]);
   document.title = g.name + ' Mod Manager';
   await load(first);
 }
 $('game').onchange = guard(() => useGame($('game').value, true));
+window.addEventListener('hashchange', () => { const w = location.hash.slice(1); if (GI && w !== G && GI.games.some(g => g.id === w)) useGame(w, true).catch(e => fail(e, 'hash')); });
 (async () => {
   GI = await app('games');
   $('ver').textContent = 'v' + GI.version;
@@ -574,4 +618,4 @@ $('game').onchange = guard(() => useGame($('game').value, true));
   try { want = want || localStorage.getItem('mm-game') || ''; } catch (e) { /* ignore */ }
   want = GI.games.some(g => g.id === want) ? want : (GI.games.some(g => g.id === GI.last_game) ? GI.last_game : GI.games[0].id);
   await useGame(want, true);
-})().catch(e => toast(e.message, true));
+})().catch(e => fail(e, 'startup'));

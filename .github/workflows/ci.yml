@@ -48,6 +48,9 @@ jobs:
       - run: node tests/e2e/games.mjs
       - run: node tests/e2e/features.mjs
       - run: node tests/e2e/culture.mjs
+      - run: node tests/e2e/switch.mjs
+        env:
+          BROWSER: "true"
         env:
           BROWSER: "true"  # a steam:// URL must never open anything on a CI machine
 

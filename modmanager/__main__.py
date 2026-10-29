@@ -40,5 +40,18 @@ if a.fetch_logo:
     from modmanager.paths import fetch_logo
     print("Saved", fetch_logo(games.get(a.game)))
 
+from modmanager import errorlog
 from modmanager.server import serve
-serve(a.port, not a.no_browser, overrides={a.game: per_game} if a.game else None, initial_game=a.game)
+
+errorlog.install_hooks()
+print(f"Errors are written to {errorlog.log_path()}")
+try:
+    serve(a.port, not a.no_browser, overrides={a.game: per_game} if a.game else None, initial_game=a.game)
+except KeyboardInterrupt:
+    pass
+except BaseException as e:  # a failed start (port in use, bad folder, ...) must leave a readable trace
+    if isinstance(e, SystemExit):
+        raise
+    errorlog.write_exception("startup", e)
+    print(f"\nMod Manager could not start: {type(e).__name__}: {e}\nDetails: {errorlog.log_path()}")
+    raise SystemExit(1)

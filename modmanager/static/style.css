@@ -8,7 +8,7 @@ input[type=checkbox]{padding:0;accent-color:var(--acc)}
 #app{display:grid;grid-template-columns:220px 1fr auto;height:100vh}
 #side{background:var(--side);border-right:1px solid var(--line);padding:14px 10px;overflow:auto}
 .logo{margin:0 0 16px;padding-bottom:12px;border-bottom:1px solid var(--line);text-align:center}
-.logo img{display:block;width:100%;aspect-ratio:638/240;object-fit:cover;object-position:center 50%;filter:drop-shadow(0 2px 6px rgba(0,0,0,.6))}
+.logo img{display:block;width:100%;height:auto;max-height:96px;object-fit:contain;filter:drop-shadow(0 2px 6px rgba(0,0,0,.6))}
 .logo .wm{display:block;font:italic 600 34px/1 var(--serif);color:var(--acc);text-shadow:0 0 1px #000,0 2px 8px rgba(0,0,0,.55)}
 .logo .wm{font-size:26px}
 #game{width:100%;margin:0 0 14px}
@@ -65,3 +65,5 @@ dialog input[type=text],dialog textarea{width:100%}dialog textarea{min-height:90
 dialog h3.sec{font:600 13px var(--serif);color:var(--acc);margin:18px 0 0;border-top:1px solid var(--line);padding-top:12px}
 
 .tree details{margin-left:14px}.tree summary{cursor:pointer;padding:2px 0}.tree .tf{margin-left:30px;font-size:13px;padding:1px 0}.tree{font-size:13px;margin-top:6px}
+
+#banner.bad{background:#3a1414;border-color:#8c2a2a;color:#ffd9d9}#banner code{word-break:break-all}

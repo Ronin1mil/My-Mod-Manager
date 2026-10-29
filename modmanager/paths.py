@@ -71,7 +71,19 @@ def drive_guesses():
     if sys.platform != "win32":
         return []
     names = ("SteamLibrary", "Steam", "Games/Steam", "Games/SteamLibrary", "Program Files (x86)/Steam")
-    return [Path(f"{d}:/") / n for d in "CDEFGHIJKLMNOPQRSTUVWXYZ" for n in names if Path(f"{d}:/").exists()]
+    return [Path(f"{d}:/") / n for d in _fixed_drives() for n in names]
+
+
+def _fixed_drives():
+    """Letters of local hard drives only. Probing every letter can stall for seconds on disconnected
+    network drives or empty card readers, which made start-up slow."""
+    try:
+        import ctypes
+        mask = ctypes.windll.kernel32.GetLogicalDrives()
+        return [c for i, c in enumerate("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+                if mask & (1 << i) and ctypes.windll.kernel32.GetDriveTypeW(f"{c}:\\") == 3]
+    except Exception:
+        return [d for d in "CDEFGHIJKLMNOPQRSTUVWXYZ" if Path(f"{d}:/").exists()]
 
 
 def steam_libraries(extra=()):

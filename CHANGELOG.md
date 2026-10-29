@@ -20,6 +20,9 @@ One app for Crusader Kings III, Europa Universalis V and Victoria 3, replacing `
 - Mod update check (Library tab, button only): Steam's last-updated time vs Steam's own local record; Workshop mods only
 - Files tab: merged file tree of the playset with the winning mod per file; per-mod file tree in the details drawer showing what overrides what
 - Fixed: Rescan on the Presets tab did not rescan the folders (installed counts stayed stale); preset ids re-checked against Steam's API, which caught and removed a wrong id ("Unique Building Plus")
+- **Error log**: unexpected server errors, crashes and web-page script errors are written to `Documents/ModManager-errors.log` (follows OneDrive-redirected Documents); the page shows a red banner with the path
+- Fixed: clicking while a game was still loading showed "Cannot read properties of null (reading 'playsets')"; switching games quickly could mix up logos/names (stale answers are now discarded)
+- Faster: conflict scanning no longer blocks loading (load-order problems appear first, conflicts load behind), runs outside the global lock, file listing uses `os.scandir`, Windows drive probing limited to local drives
 - Playsets imported (copied) from the standalone managers on first start; their share files still import; share files carry the game
 - Enable all / disable all / prune; rolling `.bak` of the playset file; damaged playset file never overwritten
 - App-wide settings split from per-game settings; `MODMANAGER_CONFIG_DIR`; `MODMANAGER_GITHUB_TOKEN`
