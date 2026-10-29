@@ -1,6 +1,6 @@
 # Mount & Blade II: Bannerlord
 
-Bannerlord does not use Paradox's load files or `.mod` descriptors. Everything below comes from the open-source Bannerlord tooling of other mod managers and has **not been checked against a real install** (`verified` stays false; the app says so).
+Bannerlord does not use Paradox's load files or `.mod` descriptors. Everything below comes from the open-source Bannerlord tooling of [BUTR](https://github.com/BUTR) ([Bannerlord.ModuleManager](https://github.com/BUTR/Bannerlord.ModuleManager), [Bannerlord.LauncherManager](https://github.com/BUTR/Bannerlord.LauncherManager)) and the [Bannerlord modding docs](https://docs.bannerlordmodding.com/), and has **not been checked against a real install** (`verified` stays false; the app says so).
 
 ## What a mod is
 A **module**: a folder with a `SubModule.xml`. Modules live in

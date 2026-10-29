@@ -83,6 +83,33 @@ GAME=ck3 node tests/e2e/ui.mjs                      # the same flow on CK3
 ```
 Set `MODMANAGER_CONFIG_DIR` to keep the config somewhere else (tests do).
 
+## Sources and credits
+Where facts in this project come from. Nothing here is copied code; the open-source projects were read to learn file layouts.
+
+**File formats and behaviour**
+- Paradox launcher database (`launcher-v2.sqlite`: tables `playsets`, `playsets_mods`, `mods` and their columns): read from the source of [Irony Mod Manager](https://github.com/bcssov/IronyModManager), which already imports from it. See [docs/16-launcher-import.md](docs/16-launcher-import.md).
+- Bannerlord modules (`SubModule.xml` elements, dependency and load-order rules, official module ids), the `_MODULES_*…*_MODULES_` launch argument, the executable path and the Workshop folder layout: read from the BUTR projects [Bannerlord.ModuleManager](https://github.com/BUTR/Bannerlord.ModuleManager) and [Bannerlord.LauncherManager](https://github.com/BUTR/Bannerlord.LauncherManager), and the [Bannerlord modding documentation](https://docs.bannerlordmodding.com/). See [docs/17-bannerlord.md](docs/17-bannerlord.md).
+- Workshop collections and mod update times: [Steam Web API](https://steamcommunity.com/dev) (`ISteamRemoteStorage`), keyless public endpoints.
+- Game logos: downloaded on your PC from Steam's public art server; the logos belong to their owners.
+- Paradox game folder layouts, load files and mod descriptors (`dlc_load.json`, `content_load.json`, `.mod`, `metadata.json`): the games' own files and the author's earlier standalone CK3, EU5 and VIC3 managers, which this project replaces.
+
+**Built-in presets** are lists of mods other people made and published on the Steam Workshop; the ids come from each collection's public page. The mods belong to their authors.
+- Crusader Kings III: [A Game of Thrones The Definitive Collection (AGOT 0.4.40)](https://steamcommunity.com/sharedfiles/filedetails/?id=3631494889) (28 mods)
+- Crusader Kings III: [RICE + Cultures Expanded (draft)](https://steamcommunity.com/sharedfiles/filedetails/?id=2829397295) (3 mods)
+- Crusader Kings III: [Princes of Darkness (draft)](https://steamcommunity.com/sharedfiles/filedetails/?id=2216659254) (1 mod)
+- Crusader Kings III: [RICE stack (draft)](https://steamcommunity.com/sharedfiles/filedetails/?id=2273832430) (4 mods)
+- Crusader Kings III: [Seastar's AGOT Collection 1.19.0.6 Updated](https://steamcommunity.com/sharedfiles/filedetails/?id=3608639287) (93 mods)
+- Crusader Kings III: [Small Maps](https://steamcommunity.com/sharedfiles/filedetails/?id=3814492113) (15 mods)
+- Europa Universalis V: [Roman Empire Collection](https://steamcommunity.com/sharedfiles/filedetails/?id=3608056145) (27 mods)
+- Victoria 3: [Community Flavor Playlist](https://steamcommunity.com/sharedfiles/filedetails/?id=3385177152) (44 mods)
+- Victoria 3: [Ultra Historical Mod Series](https://steamcommunity.com/sharedfiles/filedetails/?id=2918558673) (9 mods)
+- Victoria 3: [zw's Automated Vic3](https://steamcommunity.com/sharedfiles/filedetails/?id=3373559506) (7 mods)
+- Victoria 3: [zw's Vic3 Mods](https://steamcommunity.com/sharedfiles/filedetails/?id=3373555715) (22 mods)
+
+**Tools used to build and ship**: [PyInstaller](https://pyinstaller.org/) (single-file apps), [Inno Setup](https://jrsoftware.org/isinfo.php) (Windows installer), [pywebview](https://pywebview.flowrl.com/) (the native window on Windows and macOS), [Playwright](https://playwright.dev/) (browser tests), GitHub Actions.
+
+This project was written with the help of an AI coding assistant (see the note at the top).
+
 ## Docs
 | File | Purpose |
 |---|---|
