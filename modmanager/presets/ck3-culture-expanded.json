@@ -5,11 +5,21 @@
   "game": "ck3",
   "name": "RICE + Cultures Expanded (draft)",
   "status": "unverified",
-  "description": "RICE plus Ethnicities & Portraits Expanded and Cultures Expanded, the mods that build on them. DRAFT: ids come from Workshop page text read on 2026-10-29; the page reader also showed a 'removed/incompatible' notice that may be an artifact of not being signed in, so confirm each page in Steam. Cultures Expanded has a newer successor listed on its old page (2995407293, not included until confirmed). Check the Problems tab after applying.",
+  "description": "Ids checked against Steam's Workshop API on 2026-10-29: each exists and belongs to Crusader Kings III (all public). Not tested in a game. A newer 'Cultures Expanded - Standalone Version' exists (2995407293) that does not need EPE; this preset uses the EPE edition.",
   "source": "https://steamcommunity.com/sharedfiles/filedetails/?id=2829397295",
   "mods": [
-    {"workshop_id": "2273832430", "name": "Regional Immersion and Cultural Enrichment (RICE)"},
-    {"workshop_id": "2507209632", "name": "Ethnicities and Portraits Expanded (EPE)", "note": "required by Cultures Expanded"},
-    {"workshop_id": "2829397295", "name": "Cultures Expanded"}
+    {
+      "workshop_id": "2273832430",
+      "name": "Regional Immersion and Cultural Enrichment (RICE)"
+    },
+    {
+      "workshop_id": "2507209632",
+      "name": "Ethnicities and Portraits Expanded (EPE)",
+      "note": "required by Cultures Expanded"
+    },
+    {
+      "workshop_id": "2829397295",
+      "name": "Cultures Expanded"
+    }
   ]
 }

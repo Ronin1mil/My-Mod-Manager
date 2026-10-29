@@ -54,7 +54,7 @@ class Validation(unittest.TestCase):
         p = presets.load_all(games.CK3)["ck3-rice-stack"]
         self.assertEqual(p["status"], "unverified")
         self.assertIn("2273832430", [m["workshop_id"] for m in p["mods"]])
-        self.assertIn("DRAFT", p["description"])
+        self.assertIn("unverified", p["description"])
         self.assertNotIn("ck3-rice-stack", presets.load_all(games.EU5))  # presets are per game
 
 
@@ -223,16 +223,16 @@ class PresetApi(GameCase):
         mkworkshop(self.ws(), 2273832430, "RICE")
         s, lst, _ = self.req("GET", "/api/presets")
         rice = [p for p in lst if p["id"] == "ck3-rice-stack"][0]
-        self.assertEqual((s, rice["installed"], rice["total"], rice["status"]), (200, 0, 5, "unverified"))
+        self.assertEqual((s, rice["installed"], rice["total"], rice["status"]), (200, 0, 4, "unverified"))
         self.post("/api/rescan")
         rice = [p for p in self.req("GET", "/api/presets")[1] if p["id"] == "ck3-rice-stack"][0]
         self.assertEqual(rice["installed"], 1)
         s, res, _ = self.post("/api/presets/ck3-rice-stack/apply")
-        self.assertEqual((s, res["status"], len(res["missing"])), (200, "unverified", 4))
+        self.assertEqual((s, res["status"], len(res["missing"])), (200, "unverified", 3))
         ps = [p for p in self.req("GET", "/api/state")[1]["playsets"] if p["id"] == res["id"]][0]
-        self.assertEqual(sorted(ps["mods"]), sorted(f"ws:{m}" for m in ("2273832430", "2507209632", "2227658180", "2573060053", "2243307127")))
+        self.assertEqual(sorted(ps["mods"]), sorted(f"ws:{m}" for m in ("2273832430", "2507209632", "2227658180", "2243307127")))
         an = self.req("GET", f"/api/analyse/{res['id']}")[1]
-        self.assertEqual(sum(i["code"] == "missing_module" for i in an["issues"]), 4)  # clearly "not installed", not silent
+        self.assertEqual(sum(i["code"] == "missing_module" for i in an["issues"]), 3)  # clearly "not installed", not silent
 
     def test_unknown_preset_and_other_games_presets(self):
         self.assertEqual(self.post("/api/presets/nope/apply")[0], 404)

@@ -53,7 +53,7 @@ function toast(msg, bad) {
 const guard = fn => async (...a) => { try { await fn(...a); } catch (e) { toast(e.message, true); } };
 
 async function load(rescanMsg) {
-  T = null;
+  T = null; P = null;
   S = await api('state');
   if (!S.playsets.length) { await api('playsets', {name: 'Default'}); return load(); }
   if (!cur()) { S.active = S.playsets[0].id; await api(`playsets/${S.active}/activate`, {}); }
@@ -379,7 +379,7 @@ document.addEventListener('click', guard(async e => {
     $('d-files').innerHTML = '<div class="mut">' + r.total + ' files' + (r.truncated ? ' (first ' + r.files.length + ')' : '') + '</div><div id="d-ft"></div>';
     mountTree($('d-ft'), r.files.map(f => ({path: f.path, tag: f.overridden_by ? `<span class="b warn">overridden by ${esc(nameOf(f.overridden_by))}</span>` : f.overrides.length ? `<span class="b ok">wins over ${f.overrides.length}</span>` : ''})));
   }
-  if (ds.dl === 'rescan') { await load(true); lastMissing = lastMissing.filter(m => !S.mods.some(x => String(x.remote_id) === m.workshop_id)); render(); }
+  if (ds.dl === 'rescan') { await api('rescan', {}); await load(true); lastMissing = lastMissing.filter(m => !S.mods.some(x => String(x.remote_id) === m.workshop_id)); render(); }
   if (ds.dl === 'steam' || ds.dl === 'steamcmd') {
     const r = await api('downloads', {ids: lastMissing.map(m => m.workshop_id), method: ds.dl});
     if (ds.dl === 'steam') toast('Opened in Steam. Press Subscribe on each, then Rescan once Steam has finished.');

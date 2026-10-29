@@ -5,13 +5,27 @@
   "game": "ck3",
   "name": "RICE stack (draft)",
   "status": "unverified",
-  "description": "Regional Immersion and Cultural Enrichment (RICE) with companions its Workshop page lists. DRAFT: the ids were read from Workshop page text on 2026-10-29 and have not been checked against a live install. Open each in Steam, confirm it is the right, current mod for your game version, and edit this file (or copy it to <config>/ck3/presets/) before relying on it. Auto-sort puts dependencies first; check the Problems tab.",
+  "description": "Regional Immersion and Cultural Enrichment (RICE) with companions its Workshop page lists. Ids checked against Steam's Workshop API on 2026-10-29: each exists and belongs to Crusader Kings III. Not tested in a game, so the status stays unverified. 'Unique Building Plus' was removed: the id I first had for it does not exist. Auto-sort puts dependencies first; check the Warnings tab.",
   "source": "https://steamcommunity.com/sharedfiles/filedetails/?id=2273832430",
   "mods": [
-    {"workshop_id": "2273832430", "name": "Regional Immersion and Cultural Enrichment (RICE)"},
-    {"workshop_id": "2507209632", "name": "Ethnicities and Portraits Expanded (EPE)", "note": "optional per RICE page; ensures RICE uses new ethnicities"},
-    {"workshop_id": "2227658180", "name": "Very Immersive Events and Tales (VIET)", "note": "companion listed on RICE page"},
-    {"workshop_id": "2573060053", "name": "Unique Building Plus", "note": "companion listed on RICE page"},
-    {"workshop_id": "2243307127", "name": "The Fallen Eagle", "note": "adds special content; no compatch needed per RICE page"}
+    {
+      "workshop_id": "2273832430",
+      "name": "Regional Immersion and Cultural Enrichment (RICE)"
+    },
+    {
+      "workshop_id": "2507209632",
+      "name": "Ethnicities and Portraits Expanded (EPE)",
+      "note": "optional per RICE page; ensures RICE uses new ethnicities"
+    },
+    {
+      "workshop_id": "2227658180",
+      "name": "Very Immersive Events and Tales (VIET)",
+      "note": "companion listed on RICE page"
+    },
+    {
+      "workshop_id": "2243307127",
+      "name": "The Fallen Eagle",
+      "note": "adds special content; no compatch needed per RICE page"
+    }
   ]
 }
