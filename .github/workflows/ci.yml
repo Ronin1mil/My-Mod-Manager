@@ -90,10 +90,53 @@ jobs:
           name: ${{ matrix.name }}
           path: dist/${{ matrix.name }}
 
+  installer:
+    name: Windows installer
+    needs: [build]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: Mod-Manager-windows.exe
+          path: dist
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup -y --no-progress
+      - name: Build the installer
+        shell: pwsh
+        run: |
+          $v = python -c "import modmanager; print(modmanager.__version__)"
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$v" installer\ModManager.iss
+          Get-ChildItem dist
+      - name: Install it silently, start the installed app, uninstall
+        shell: pwsh
+        env:
+          MODMANAGER_CONFIG_DIR: ${{ runner.temp }}\cfg
+          MODMANAGER_LOG_DIR: ${{ runner.temp }}\log
+        run: |
+          $dir = "$env:RUNNER_TEMP\mm-installed"
+          Start-Process dist\Mod-Manager-Setup.exe -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/DIR=$dir" -Wait
+          if (-not (Test-Path "$dir\Mod-Manager.exe")) { throw "installer did not install the app" }
+          & "$dir\Mod-Manager.exe" --version
+          $p = Start-Process "$dir\Mod-Manager.exe" -ArgumentList "--no-browser","--port","8798" -PassThru
+          $ok = $false
+          for ($i = 0; $i -lt 30; $i++) {
+            try { $r = Invoke-RestMethod http://127.0.0.1:8798/api/games; if ($r.can_self_update) { $ok = $true; break } } catch { }
+            Start-Sleep 1
+          }
+          Stop-Process $p -Force
+          if (-not $ok) { throw "installed app did not start or cannot self-update" }
+          Start-Process "$dir\unins000.exe" -ArgumentList "/VERYSILENT" -Wait
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Mod-Manager-Setup.exe
+          path: dist/Mod-Manager-Setup.exe
+
   release:
     name: Publish GitHub release (tags only)
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [unit, e2e, build]
+    needs: [unit, e2e, build, installer]
     runs-on: ubuntu-24.04
     permissions:
       contents: write

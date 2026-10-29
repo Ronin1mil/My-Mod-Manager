@@ -2,6 +2,7 @@
 
 ## Self-update (downloaded app only)
 - Built by CI (`build` job): one file per platform, named `Mod-Manager-windows.exe`, `Mod-Manager-macos`, `Mod-Manager-linux`. Pushing a tag `vX.Y.Z` (must equal `modmanager.__version__`) publishes them with `SHA256SUMS.txt`.
+- Windows also gets `Mod-Manager-Setup.exe` (Inno Setup, `installer/ModManager.iss`): per-user install to `%LOCALAPPDATA%\\Programs\\Mod Manager`, Start-menu entry, optional desktop shortcut, uninstaller. Per-user so the in-app update can replace the program without administrator rights. CI installs it silently, starts the installed app and uninstalls it. Not code-signed.
 - **Update now** (banner, only when `can_self_update` is true, i.e. running the packaged app):
   1. latest release via the GitHub API (same check as before; user-initiated),
   2. download `SHA256SUMS.txt` and this platform's file: https only, `github.com` / `api.github.com` / `*.githubusercontent.com`, 300 MB cap, the optional `MODMANAGER_GITHUB_TOKEN` is never forwarded to the CDN,
