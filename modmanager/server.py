@@ -710,8 +710,11 @@ def make_handler(hub):
     return H
 
 
-def serve(port=8765, open_browser=True, overrides=None, initial_game=None, **kw):
+def serve(port=8765, open_browser=True, overrides=None, initial_game=None, window=False, **kw):
+    """Run the app. `open_browser` shows the page; with `window` it gets its own window and closing it ends the app,
+    otherwise it opens in the default browser and runs until Ctrl+C."""
     import webbrowser
+    from . import window as windowmod
     hub = Hub(overrides=overrides)
     hub.check_on_launch()  # no-op unless the user enabled "check for updates on launch"
     srv = None
@@ -724,9 +727,25 @@ def serve(port=8765, open_browser=True, overrides=None, initial_game=None, **kw)
                 raise
             time.sleep(0.5)
     url = f"http://127.0.0.1:{port}/" + (f"#{initial_game}" if initial_game else "")
+    mode = "window" if open_browser and window else "browser" if open_browser else "none"
+    os.environ["MODMANAGER_MODE"] = mode  # an updated copy restarts the same way
     print(f"Mod Manager {__version__} running at {url}  (Ctrl+C to quit)")
     print("  games: " + ", ".join(f"{g.id} ({g.name})" for g in hub.games.values()))
-    if open_browser:
+    if mode == "window":
+        threading.Thread(target=srv.serve_forever, daemon=True, name="server").start()
+        result = windowmod.show(url)
+        if result == "closed":
+            srv.shutdown()
+            srv.server_close()
+            return
+        if result is None:
+            webbrowser.open(url)  # no window backend here: the browser it is
+        try:
+            while True:  # "detached" or browser: keep serving until Ctrl+C
+                time.sleep(3600)
+        except KeyboardInterrupt:
+            return
+    if mode == "browser":
         webbrowser.open(url)
     try:
         srv.serve_forever()

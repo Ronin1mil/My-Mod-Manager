@@ -146,7 +146,9 @@ def restart(exe, argv):
     flags = 0
     if sys.platform == "win32":
         flags = 0x00000008 | 0x00000200  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
-    args = [str(exe)] + [a for a in argv if a != "--no-browser"] + ["--no-browser"]
+    args = [str(exe)] + [a for a in argv if a != "--no-browser"]
+    if os.environ.get("MODMANAGER_MODE") != "window":  # a window closes with the old copy, so the new one opens its own
+        args.append("--no-browser")                       # a browser tab is still open and reloads itself
     subprocess.Popen(args, env=env, close_fds=True, creationflags=flags, cwd=str(Path(exe).parent))
 
 

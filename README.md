@@ -1,13 +1,15 @@
 # My Mod Manager
 
-One mod manager for Paradox grand strategy games: **Crusader Kings III**, **Europa Universalis V** and **Victoria 3**. Pick a playset, see *why* two mods fight, press **Play**, and the game starts with exactly that playset's mods. Python standard library only (3.8+), and a local web UI.
+One mod manager for Paradox grand strategy games: **Crusader Kings III**, **Europa Universalis V** and **Victoria 3**. Pick a playset, see *why* two mods fight, press **Play**, and the game starts with exactly that playset's mods. Python standard library only (3.8+), and its own app window.
 
 This repository replaces the three standalone managers (`ck3-mod-manager`, `eu5-mod-manager`, `vic3-mod-manager`). Their playsets are imported automatically on first start, see [docs/10-migration.md](docs/10-migration.md).
 
 > **Made with AI.** This project was written with the help of an AI coding assistant (Claude by Anthropic) at the direction of its maintainer. It is tested against fake installs only (see Status below), so use it with that in mind and keep backups of your saves.
 
 ```bash
-python -m modmanager                       # opens http://127.0.0.1:8765, pick the game in the sidebar
+python -m modmanager                       # opens the app window (served on 127.0.0.1:8765), pick the game in the sidebar
+python -m modmanager --browser             # use the default browser instead of the app window
+python -m modmanager --no-browser          # only run the server
 python -m modmanager --game eu5            # open a specific game first
 python -m modmanager --game ck3 --user-dir "D:/Docs/Paradox Interactive/Crusader Kings III" \
                                 --workshop-dir "D:/Steam/steamapps/workshop/content/1158310"
@@ -23,6 +25,9 @@ Open the repository's **Releases** page. On Windows download **`Mod-Manager-Setu
 Unsigned apps trigger a warning the first time: Windows SmartScreen ("More info" → "Run anyway"), macOS ("System Settings → Privacy & Security → Open Anyway"). See `docs/14-updates-and-errors.md`.
 
 If something goes wrong, the details are written to **`Documents/ModManager-errors.log`** (the red banner in the app shows the exact path). Send that file when reporting a problem.
+
+## Window
+The app opens in its own window and closing the window quits it. On Windows and macOS that is a native window around the system web view (Windows needs the Edge WebView2 runtime, which Windows 11 and current Windows 10 already have). Without it the app falls back to an Edge/Chrome "app" window, then to your default browser (`--browser` forces the browser). Under the hood it is still a small server on `127.0.0.1` that only this PC can reach. The native window is built and probed in CI but has **not** been opened on a real Windows or macOS desktop yet.
 
 ## Quick start (no Git)
 On GitHub press **Code → Download ZIP**, unzip it, and double-click `Start Mod Manager.bat` (Windows) or `Start Mod Manager.command` (macOS/Linux). You need Python 3.8+ installed.

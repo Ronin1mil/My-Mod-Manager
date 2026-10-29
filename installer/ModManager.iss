@@ -18,6 +18,7 @@ OutputBaseFilename=Mod-Manager-Setup
 Compression=lzma2
 SolidCompression=yes
 UninstallDisplayIcon={app}\Mod-Manager.exe
+SetupIconFile=icon.ico
 WizardStyle=modern
 
 [Tasks]

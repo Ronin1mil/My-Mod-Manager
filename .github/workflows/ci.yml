@@ -65,9 +65,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {os: windows-latest, name: Mod-Manager-windows.exe, sep: ";"}
-          - {os: ubuntu-22.04, name: Mod-Manager-linux, sep: ":"}
-          - {os: macos-latest, name: Mod-Manager-macos, sep: ":"}
+          # Windows and macOS get a native window (pywebview); Linux opens a Chrome/Edge app window or the browser
+          - {os: windows-latest, name: Mod-Manager-windows.exe, sep: ";", webview: true, flags: "--windowed --icon installer/icon.ico --collect-all webview"}
+          - {os: ubuntu-22.04, name: Mod-Manager-linux, sep: ":", webview: false, flags: ""}
+          - {os: macos-latest, name: Mod-Manager-macos, sep: ":", webview: true, flags: "--collect-all webview"}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -75,9 +76,12 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install pyinstaller
+      - name: Install the native window library
+        if: matrix.webview
+        run: pip install pywebview
       - name: Build single-file app
         shell: bash
-        run: pyinstaller --onefile --noconfirm --name "${{ matrix.name }}" --add-data "modmanager/static${{ matrix.sep }}modmanager/static" --add-data "modmanager/presets${{ matrix.sep }}modmanager/presets" modmanager/__main__.py
+        run: pyinstaller --onefile --noconfirm ${{ matrix.flags }} --name "${{ matrix.name }}" --add-data "modmanager/static${{ matrix.sep }}modmanager/static" --add-data "modmanager/presets${{ matrix.sep }}modmanager/presets" modmanager/__main__.py
       - name: Smoke test the built app (starts, serves the page, lists the games)
         shell: bash
         run: |
@@ -91,6 +95,16 @@ jobs:
         env:
           MODMANAGER_CONFIG_DIR: ${{ runner.temp }}/cfg
           MODMANAGER_LOG_DIR: ${{ runner.temp }}/log
+      - name: The native window library made it into the app
+        if: matrix.webview
+        shell: bash
+        run: |
+          rm -f probe.json
+          ./dist/${{ matrix.name }} --probe-window probe.json &
+          for i in $(seq 1 40); do [ -s probe.json ] && break; sleep 1; done
+          cat probe.json; echo
+          grep -q '"pywebview": true' probe.json
+          grep -q '"native": true' probe.json
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.name }}
