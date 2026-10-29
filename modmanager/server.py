@@ -11,7 +11,7 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import __version__, compare, detect, games as gamesmod, install, launch, order, presets, saves, scan, update
+from . import __version__, collections, compare, detect, games as gamesmod, install, launch, order, presets, saves, scan, update
 from . import workshop
 from .library import Library
 from .paths import LOGO_TYPES, config_dir, find_first, find_logo, game_version, user_dirs, workshop_dirs
@@ -204,6 +204,10 @@ class GameApp:
         doc = presets.from_playset(self.game, self.store.get(pid), self.mods, preset_id, name)
         return presets.save_user_preset(self.game, doc)
 
+    def import_collection(self, text, post=None):
+        doc = collections.import_collection(self.game, text, post or collections.default_post)
+        return presets.save_user_preset(self.game, doc)
+
     def download(self, ids, method):
         ids = workshop.clean_ids(ids)
         if method == "steam":
@@ -358,7 +362,7 @@ def make_handler(hub):
 
         def do_POST(self):
             parts = self.path.strip("/").split("/")
-            if parts[-1] in ("install", "update-check", "downloads"):
+            if parts[-1] in ("install", "update-check", "downloads", "import-collection"):
                 return self._post()  # slow network/disk work must not hold the lock
             with hub.lock:
                 self._post()
@@ -436,6 +440,8 @@ def make_handler(hub):
                     return self._send(200, app.import_playset(b))
                 if parts[:2] == ["api", "presets"] and len(parts) == 4 and parts[3] == "apply":
                     return self._send(200, app.apply_preset(parts[2]))
+                if parts == ["api", "presets", "import-collection"]:
+                    return self._send(200, app.import_collection(str(b.get("url", "")), getattr(self.server, "collection_post", None)))
                 if parts == ["api", "downloads"]:
                     return self._send(200, app.download(b.get("ids"), str(b.get("method", "steam"))))
                 if len(parts) == 4 and parts[:2] == ["api", "mods"] and parts[3] == "uninstall":

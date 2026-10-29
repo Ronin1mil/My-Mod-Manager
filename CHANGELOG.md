@@ -10,6 +10,7 @@ One app for Crusader Kings III, Europa Universalis V and Victoria 3, replacing `
 - Metadata from `.metadata/`, `metadata/` or root `metadata.json`; `rel_type` or `type` relationships; dependencies by metadata id
 - Cycles reported in manual mode too; damaged metadata reported per mod
 - Presets (JSON) with a draft, **unverified** RICE stack for CK3; Workshop download via Steam page or optional steamcmd
+- Presets: import a public Steam Workshop collection by link (one keyless request to api.steampowered.com, only when you press Import; nothing is downloaded); draft CK3 presets for Cultures Expanded and Princes of Darkness
 - Playsets imported (copied) from the standalone managers on first start; their share files still import; share files carry the game
 - Enable all / disable all / prune; rolling `.bak` of the playset file; damaged playset file never overwritten
 - App-wide settings split from per-game settings; `MODMANAGER_CONFIG_DIR`; `MODMANAGER_GITHUB_TOKEN`

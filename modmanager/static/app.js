@@ -275,7 +275,9 @@ function viewPresets() {
     <p>${lastMissing.map(m => `${esc(m.name)} <span class="mut">#${esc(m.workshop_id)}</span>`).join('<br>')}</p>
     <div class="acts"><button data-dl="steam">Open in Steam…</button>${S.steamcmd && S.steam_user ? '<button data-dl="steamcmd" class="pri">Download with steamcmd</button>' : '<span class="mut">Set steamcmd in Settings to download from here.</span>'}
     <button data-dl="rescan">Rescan</button></div><div id="dlstat" class="mut"></div></div>` : '';
-  $('view').innerHTML = miss + (P.map(x => `<div class="pre"><h3>${esc(x.name)} ${x.status === 'verified' ? '<span class="b ok">verified</span>' : '<span class="b warn">unverified</span>'} <span class="b">${x.installed}/${x.total} installed</span></h3>
+  const imp = `<div class="pre"><h3>Import a Workshop collection</h3><p class="mut">Paste a Steam Workshop collection link. Only the list of mods is fetched from Steam (nothing is downloaded) and saved as a preset.</p>
+    <div class="acts"><input id="col-url" placeholder="https://steamcommunity.com/sharedfiles/filedetails/?id=…" style="flex:1;min-width:0"><button id="col-go" class="pri">Import</button></div></div>`;
+  $('view').innerHTML = imp + miss + (P.map(x => `<div class="pre"><h3>${esc(x.name)} ${x.status === 'verified' ? '<span class="b ok">verified</span>' : '<span class="b warn">unverified</span>'} <span class="b">${x.installed}/${x.total} installed</span></h3>
     <p>${esc(x.description)}</p><p>${x.mods.map(m => esc(m.name)).join(' · ')}</p>
     <div class="acts"><button class="pri" data-preset="${esc(x.id)}">Create playset</button></div></div>`).join('')
     || `<div class="empty">No presets for ${esc(GNAME())}.<br>Save one from a playset's settings, or drop a JSON file in the presets folder.</div>`);
@@ -318,6 +320,11 @@ document.addEventListener('click', guard(async e => {
     if (j >= 0 && j < p.mods.length) { const m = [...p.mods]; [m[i], m[j]] = [m[j], m[i]]; await patch({mods: m}); }
   }
   if (ds.bulk) { Object.assign(p, await api(`playsets/${p.id}/${ds.bulk}`, {})); render(); analyse(); }
+  if (e.target.id === 'col-go') {
+    const url = $('col-url').value.trim(); if (!url) return;
+    try { const r = await api('presets/import-collection', {url}); P = null; toast(`Imported "${r.name}" (${r.mods.length} mods). Create a playset from it below.`); loadPresets(); }
+    catch (err) { toast(err.message || String(err)); }
+  }
   if (ds.preset) {
     const r = await api(`presets/${ds.preset}/apply`, {});
     lastMissing = r.missing; await api(`playsets/${r.id}/activate`, {}); await load();
