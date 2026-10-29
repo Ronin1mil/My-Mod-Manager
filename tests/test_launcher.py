@@ -1,5 +1,6 @@
 """Importing the playsets that already exist in the game's own launcher (launcher-v2.sqlite)."""
 import hashlib
+import json
 import os
 import sqlite3
 import tempfile
@@ -304,3 +305,35 @@ class NoEmptyDefaults(unittest.TestCase):
         self.assertEqual(self.store.prune_empty_defaults(), 1)
         self.assertEqual(self.store.data["playsets"], {})
         self.assertIsNone(self.store.data["active"])
+
+
+class BuiltInNoMods(GameCase):
+    """The always-present 'No mods' playset: starts the game without mods, is never stored, cannot be changed."""
+    GAME = games.VIC3
+
+    def test_state_offers_it_without_storing_a_playset(self):
+        st = self.req("GET", "/api/state")[1]
+        self.assertEqual(st["playsets"], [])
+        self.assertEqual((st["no_mods"]["id"], st["no_mods"]["name"], st["no_mods"]["mods"]), ("nomods", "No mods", []))
+
+    def test_it_can_be_activated_and_launched_with_an_empty_load_file(self):
+        mkmod(self.user(), "A", "A")
+        first = self.new_playset(["local:A"])
+        self.post(f"/api/playsets/{first}/launch", {"ack_version": True})
+        self.assertIn("mod/A.mod", (self.user() / "content_load.json").read_text(encoding="utf-8"))
+        self.assertEqual(self.post("/api/playsets/nomods/activate")[0], 200)
+        self.assertEqual(self.req("GET", "/api/state")[1]["active"], "nomods")
+        st, r, _ = self.post("/api/playsets/nomods/launch", {"ack_version": True})
+        self.assertEqual(st, 200, r)
+        self.assertEqual(json.loads((self.user() / "content_load.json").read_text(encoding="utf-8"))["enabled_mods"], [])
+
+    def test_it_cannot_be_changed_or_deleted(self):
+        for act, body in (("update", {"name": "x"}), ("update", {"mods": ["local:A"]}), ("delete", {})):
+            self.assertEqual(self.post(f"/api/playsets/nomods/{act}", body)[0], 400, act)
+        self.assertEqual(self.req("GET", "/api/state")[1]["no_mods"]["name"], "No mods")
+
+    def test_copying_it_makes_a_normal_empty_playset(self):
+        st, r, _ = self.post("/api/playsets/nomods/duplicate", {"name": "Mine"})
+        self.assertEqual(st, 200)
+        names = [p["name"] for p in self.req("GET", "/api/state")[1]["playsets"]]
+        self.assertEqual(names, ["Mine"])

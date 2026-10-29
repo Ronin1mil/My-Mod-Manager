@@ -45,9 +45,10 @@ try {
 
   answer = 'ERASE';
   await page.click('#s-erase');
-  await page.waitForSelector('#np-new', { timeout: 10000 });
+  await page.waitForSelector('#psfixed .ps.on', { timeout: 10000 });
+  assert.equal(await page.textContent('#title'), 'No mods');
   assert.equal(await page.locator('#pslist .ps').count(), 0);
-  assert.ok(!fs.existsSync(file), 'the playset file is gone');
+  assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(file, 'utf8')).playsets), [], 'no playset is left (the file is rewritten empty when the page picks "No mods")');
   assert.deepEqual(errors, []);
   console.log('erase e2e ok');
 } finally {

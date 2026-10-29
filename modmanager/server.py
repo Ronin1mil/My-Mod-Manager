@@ -46,6 +46,7 @@ class GameApp:
         self.cfg = config_dir(game)
         self.store = store or Store(game=game)
         self.store.prune_empty_defaults()
+        self.store.no_mods_provider = lambda: self.starting_mods([])
         self.library = library or Library(game=game)
         self.cli = {"user_dir": user_dir, "workshop_dir": workshop_dir, "game_dir": game_dir,
                     "game_version": game_version_}
@@ -224,7 +225,7 @@ class GameApp:
         s = self.store.settings()
         mods = [{**m, "change": self.library.change(m["id"])} for m in self.mods.values()]
         return {"game": self.game.public(), "mods": mods, "removed": self.library.removed(), "diff": self.diff,
-                "playsets": list(d["playsets"].values()), "active": d["active"],
+                "playsets": list(d["playsets"].values()), "no_mods": self.store.no_mods(), "active": d["active"],
                 "user_dir": str(self.user_dir or ""), "workshop_dir": str(self.workshop_dir or ""),
                 "game_root": str(self.game_root or ""), "game_version": self.game_version,
                 "has_logo": bool(self.logo), "logo_pending": self.logo_pending, "include_vanilla": s["include_vanilla"],

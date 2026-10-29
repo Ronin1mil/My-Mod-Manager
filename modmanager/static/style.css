@@ -116,4 +116,5 @@ dialog.menu .card{margin-bottom:18px}dialog.menu .card h3{margin:0 0 6px}
 dialog.mid{width:min(680px,94vw);max-height:90vh;overflow:auto;font-size:16px;line-height:1.5}dialog.mid h2{font-size:22px}dialog.mid button{font-size:15px;padding:8px 15px}
 button[hidden]{display:none}
 
-body.noplayset #auto,body.noplayset .chk,body.noplayset #sortnow,body.noplayset #installbtn,body.noplayset #cfg,body.noplayset #tabs,body.noplayset #launch,body.noplayset #launchpart{display:none}
+body.nomods .chk,body.nomods #sortnow,body.nomods #cfg,body.nomods #launchpart{display:none}
+#psfixed{margin-top:6px;border-top:1px solid var(--line);padding-top:6px}.ps.fixed span:first-child{font-style:italic}

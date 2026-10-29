@@ -8,6 +8,7 @@ from pathlib import Path
 from .launch import validate_launch_args
 from .paths import config_dir
 
+NO_MODS_ID = "nomods"  # the built-in playset that starts the game with no mods (never stored)
 SHARE_FORMAT = "modmanager-playset"
 LEGACY_SHARE = {"vic3mm-playset": "vic3", "eu5mm-playset/1": "eu5"}  # files from the standalone managers
 
@@ -45,7 +46,13 @@ def _atomic_write(path, text):
     tmp.replace(path)
 
 
+NO_MODS_NOTE = ("Starts the game with no mods, so you can tell whether a problem comes from a mod or from the game or its "
+                "launcher. It is always here and cannot be changed; press + New to make a playset of your own.")
+
+
 class Store:
+    no_mods_provider = None  # () -> mod ids the built-in playset still needs (Bannerlord's official modules)
+
     def __init__(self, path=None, game=None):
         self.path = Path(path) if path else config_dir(game) / "playsets.json"
         self.data = {"active": None, "playsets": {}, "settings": {}}
@@ -108,13 +115,22 @@ class Store:
     def launcher_seen(self):
         return set(self.data.get("launcher_seen", []))
 
+    def no_mods(self):
+        mods = list(self.no_mods_provider()) if self.no_mods_provider else []
+        return {"id": NO_MODS_ID, "name": "No mods", "mods": mods, "disabled": [], "created": 0, "virtual": True,
+                **{**_defaults(), "notes": NO_MODS_NOTE, "auto_sort": False}}
+
     def get(self, pid):
+        if pid == NO_MODS_ID:
+            return self.no_mods()
         ps = self.data["playsets"][pid]
         for k, v in _defaults().items():
             ps.setdefault(k, v)
         return ps
 
     def update(self, pid, **fields):
+        if pid == NO_MODS_ID:
+            raise ValueError("The built-in 'No mods' playset cannot be changed. Press + New to make a playset of your own.")
         ps = self.get(pid)
         clean = {}
         if "name" in fields:
@@ -143,6 +159,8 @@ class Store:
                            launch_args=src["launch_args"], auto_sort=src["auto_sort"])
 
     def delete(self, pid):
+        if pid == NO_MODS_ID:
+            raise ValueError("The built-in 'No mods' playset cannot be deleted.")
         self.data["playsets"].pop(pid, None)
         if self.data["active"] == pid:
             self.data["active"] = next(iter(self.data["playsets"]), None)

@@ -23,11 +23,15 @@ const call = async (url, b) => {
   if (!r.ok) { const e = new Error(j.error || 'Request failed'); e.body = j; e.status = r.status; if (j.log_file) logFile = j.log_file; throw e; }
   return j;
 };
-const api = async (p, b) => { const g = gen, r = await call(`/api/${G}/${p}`, b); if (g !== gen) throw new Stale(); return r; };   // current game
+const api = async (p, b) => {
+  if (S && S.no_mods && /^playsets\/nomods\/(update|autosort|enable|enable_all|disable_all|prune|delete|save-preset)$/.test(p)) {   // the built-in playset is read-only
+    toast('The "No mods" playset cannot be changed. Press + New to make a playset of your own.', true); throw new Stale();
+  }
+  const g = gen, r = await call(`/api/${G}/${p}`, b); if (g !== gen) throw new Stale(); return r; };   // current game
 const app = (p, b) => call('/api/' + p, b);        // app-wide
 const GNAME = () => (S && S.game ? S.game.name : G);
 const M = id => S.mods.find(m => m.id === id);
-const cur = () => (S && S.playsets ? S.playsets.find(p => p.id === S.active) : null);
+const cur = () => (S && S.playsets ? S.playsets.find(p => p.id === S.active) || (S.no_mods && S.no_mods.id === S.active ? S.no_mods : null) : null);
 const nameOf = id => { const m = M(id); return id === '__vanilla__' ? 'Base game' : m ? m.name : id; };
 const KINDS = {file: 'File', definition: 'Definition', patch: 'Patch', replace: 'Replace path', localization: 'Localization', vanilla: 'Base game'};
 let toastT, U = null, T = null, tq = '';
@@ -84,9 +88,7 @@ window.addEventListener('unhandledrejection', ev => { const e = ev.reason; if (e
 async function load(rescanMsg) {
   T = null; P = null;
   S = await api('state');
-  if (!S.playsets.length) { return showNoPlayset(rescanMsg); }   // nothing is created behind the user's back
-  document.body.classList.remove('noplayset');
-  if (!cur()) { S.active = S.playsets[0].id; await api(`playsets/${S.active}/activate`, {}); }
+  if (!cur()) { S.active = S.playsets.length ? S.playsets[0].id : S.no_mods.id; await api(`playsets/${S.active}/activate`, {}); }
   if (rescanMsg) {
     const d = S.diff, bits = [d.added && `${d.added} new`, d.updated && `${d.updated} updated`, d.removed && `${d.removed} removed`].filter(Boolean);
     toast(bits.length ? `Scan: ${bits.join(', ')} (${d.total} mods)` : `Scan: no changes (${d.total} mods)`);
@@ -94,23 +96,6 @@ async function load(rescanMsg) {
   setLogo(G); showImportButton();
   document.title = GNAME() + ' · Ronin Mod Manager';
   render(); analyse(); banner(); pollUpdate();
-  if (S.setup_needed && !setupShown) { setupShown = true; openPaths(true); }
-}
-// No playsets at all (a new game, or the last one was deleted): say so and offer the two ways to get one.
-function showNoPlayset(rescanMsg) {
-  document.body.classList.add('noplayset');
-  A = null; sel = null; drawer();
-  if (rescanMsg) toast(`Scan: ${S.diff.total} mods`);
-  setLogo(G); showImportButton();
-  document.title = GNAME() + ' · Ronin Mod Manager';
-  $('pslist').innerHTML = '<div class="empty mut">No playsets yet</div>';
-  $('title').textContent = 'No playset';
-  $('tabs').innerHTML = ''; $('status').textContent = `${GNAME()}${S.game_version ? ` ${S.game_version}` : ''} · ${S.mods.length} mod${S.mods.length === 1 ? '' : 's'} found`;
-  $('view').innerHTML = `<div class="empty">You have no playset for ${esc(GNAME())} yet.<br><span class="mut">Create one, or import the playsets the game's own launcher already has.</span>
-    <div class="acts"><button class="pri" id="np-new">+ New playset</button><button id="np-imp">Import…</button></div></div>`;
-  $('np-new').onclick = () => $('new').click();
-  $('np-imp').onclick = () => $('imp').click();
-  banner(); pollUpdate();
   if (S.setup_needed && !setupShown) { setupShown = true; openPaths(true); }
 }
 let polls = 0, setupShown = false;
@@ -174,6 +159,8 @@ function render() {
   if (!S || !cur()) return;
   const p = cur(), errs = visIssues().filter(i => i.severity === 'error').length; if (!p) return;
   $('pslist').innerHTML = S.playsets.map(x => `<div class="ps ${x.id === S.active ? 'on' : ''}" data-ps="${esc(x.id)}"><span>${esc(x.name)}</span><span class="mut">${x.mods.length - x.disabled.length}</span></div>`).join('');
+  $('psfixed').innerHTML = `<div class="ps fixed ${S.no_mods.id === S.active ? 'on' : ''}" data-ps="${esc(S.no_mods.id)}" title="Starts the game with no mods: use it to check whether a problem comes from a mod or from the game"><span>No mods</span><span class="mut">${S.no_mods.mods.length || ''}</span></div>`;
+  document.body.classList.toggle('nomods', !!p.virtual);
   $('title').textContent = p.name;
   $('auto').checked = p.auto_sort;
   $('sortnow').style.display = p.auto_sort ? 'none' : '';
@@ -188,6 +175,10 @@ function render() {
 }
 
 function viewOrder(p) {
+  if (p.virtual) {
+    $('view').innerHTML = `<div class="empty">${esc(p.notes)}<br><span class="mut">Press ▶ Play to start ${esc(GNAME())} without mods.${p.mods.length ? ' (The game\'s own required modules are still loaded.)' : ''}</span></div>`;
+    return;
+  }
   const bar = `<div class="bar"><span class="mut">Top loads first, bottom wins.</span><span class="grow"></span>
     <button class="sm" data-bulk="enable_all">Enable all</button><button class="sm" data-bulk="disable_all">Disable all</button>
     <button class="sm" data-bulk="prune" title="Remove mods that are no longer installed">Prune</button></div>`;
