@@ -227,15 +227,12 @@ jobs:
       - name: Checksums (the in-app updater refuses a download that does not match these)
         working-directory: dist
         run: sha256sum Mod-Manager-* > SHA256SUMS.txt && cat SHA256SUMS.txt
-      - name: Remove the old test branch name (one-off, delete this step afterwards)
-        run: git push origin --delete claude/practical-babbage-xl2gwk || echo "already gone"
       - name: Replace the one rolling "test-build" prerelease (a release needs a tag to hold the files; this single tag is reused, never one per build)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           SHORT="${GITHUB_SHA::7}"
           printf 'Test build of the branch being worked on. It may contain bugs; install it from Settings -> App & updates -> Test builds.\n\nbuild: %s\n\nLatest change: %s\n' "$SHORT" "$(git log -1 --format=%s)" > notes.md
-          gh release delete nightly --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || true   # the old name, removed once
           gh release delete test-build --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || true
           gh release create test-build dist/* --repo "$GITHUB_REPOSITORY" --prerelease --target "$GITHUB_SHA" --title "Test build $SHORT" --notes-file notes.md
 
