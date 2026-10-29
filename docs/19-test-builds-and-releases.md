@@ -4,9 +4,9 @@ Two channels, so that **a release only contains what was tried first**:
 
 | | Test build ("nightly") | Release |
 |---|---|---|
-| Built from | the branch being worked on (`claude/practical-babbage-xl2gwk`) | `main` |
+| Built from | the branch being worked on (`nightly`) | `main` |
 | When | automatically on every push to that branch, after all checks pass | only when someone publishes (Actions -> CI -> Run workflow -> `publish`) |
-| Where | one rolling prerelease with the fixed tag `nightly` (replaced on each build) | `vX.Y.Z` releases |
+| Where | one rolling prerelease with the fixed tag `test-build` (replaced on each build; a release needs a tag to hold the files, so there is exactly one, never one per build) | `vX.Y.Z` releases |
 | Installed by | Settings -> App & updates -> **Test builds (nightly)** (experimental) | the update banner, or the Releases page |
 
 ## Flow

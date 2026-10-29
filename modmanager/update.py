@@ -69,14 +69,14 @@ def stable_current():
 
 
 def check_nightly(current_build=BUILD, fetch=None, repo=REPO):
-    """The newest test build: the release tagged 'nightly' (rebuilt by CI from the branch being worked on, marked as a
+    """The newest test build: the release tagged 'test-build' (rebuilt by CI from the branch being worked on, marked as a
     prerelease). Same result shape as check_for_update so the self-updater can install it. Never raises."""
     token = os.environ.get("MODMANAGER_GITHUB_TOKEN") or None
     fetch = fetch or (lambda u: default_fetch(u, token))
     base = {"current": current_build or __version__, "latest": None, "update_available": False, "status": "error",
-            "message": "", "url": f"{LINK_PREFIX}releases/tag/nightly", "notes": "", "published": "", "assets": []}
+            "message": "", "url": f"{LINK_PREFIX}releases/tag/test-build", "notes": "", "published": "", "assets": []}
     try:
-        status, rel = fetch(f"{API}/repos/{repo}/releases/tags/nightly")
+        status, rel = fetch(f"{API}/repos/{repo}/releases/tags/test-build")
         if status == 404:
             return {**base, "status": "no_releases", "message": "No test build has been published yet."}
         if status != 200 or not isinstance(rel, dict):

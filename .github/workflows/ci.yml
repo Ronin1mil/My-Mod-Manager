@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, claude/practical-babbage-xl2gwk]  # the second one is the test-build ("nightly") branch
+    branches: [main, nightly]  # `nightly` is the branch the test builds are made from
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
@@ -20,7 +20,7 @@ permissions:
   contents: read
 
 env:
-  NIGHTLY_BRANCH: claude/practical-babbage-xl2gwk  # every push here publishes the rolling prerelease "nightly" (see docs/19)
+  NIGHTLY_BRANCH: nightly  # every push here replaces the one rolling prerelease "test-build" (see docs/19)
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -191,7 +191,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          built=$(gh release view nightly --repo "$GITHUB_REPOSITORY" --json body --jq .body 2>/dev/null | sed -n 's/^build: *//p' | head -1 || true)
+          built=$(gh release view test-build --repo "$GITHUB_REPOSITORY" --json body --jq .body 2>/dev/null | sed -n 's/^build: *//p' | head -1 || true)
           if [ "$built" = "${GITHUB_SHA::7}" ]; then echo "The nightly test build was made from this same commit ($built)."
           else echo "::warning::This release is commit ${GITHUB_SHA::7}, but the last test build was ${built:-missing}. Releases should contain what was tested."; fi
       - name: Release notes come from CHANGELOG.md (the job fails if this version has none)
@@ -213,7 +213,7 @@ jobs:
 
   nightly:
     name: Publish the test build (nightly prerelease)
-    if: github.event_name == 'push' && github.ref == 'refs/heads/claude/practical-babbage-xl2gwk'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/nightly'
     needs: [unit, e2e, build, installer]
     runs-on: ubuntu-24.04
     permissions:
@@ -227,14 +227,15 @@ jobs:
       - name: Checksums (the in-app updater refuses a download that does not match these)
         working-directory: dist
         run: sha256sum Mod-Manager-* > SHA256SUMS.txt && cat SHA256SUMS.txt
-      - name: Replace the rolling "nightly" prerelease
+      - name: Replace the one rolling "test-build" prerelease (a release needs a tag to hold the files; this single tag is reused, never one per build)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           SHORT="${GITHUB_SHA::7}"
           printf 'Test build of the branch being worked on. It may contain bugs; install it from Settings -> App & updates -> Test builds.\n\nbuild: %s\n\nLatest change: %s\n' "$SHORT" "$(git log -1 --format=%s)" > notes.md
-          gh release delete nightly --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || true
-          gh release create nightly dist/* --repo "$GITHUB_REPOSITORY" --prerelease --target "$GITHUB_SHA" --title "Test build $SHORT" --notes-file notes.md
+          gh release delete nightly --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || true   # the old name, removed once
+          gh release delete test-build --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || true
+          gh release create test-build dist/* --repo "$GITHUB_REPOSITORY" --prerelease --target "$GITHUB_SHA" --title "Test build $SHORT" --notes-file notes.md
 
   refresh_notes:
     name: Refresh release notes (manual run with "refresh_notes")

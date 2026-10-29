@@ -141,7 +141,7 @@ class Flow(unittest.TestCase):
 
 class NightlyCheck(unittest.TestCase):
     def rel(self, body="Test build.\n\nbuild: abc1234\n", assets=True):
-        base = "https://github.com/Ronin1mil/My-Mod-Manager/releases/download/nightly/"
+        base = "https://github.com/Ronin1mil/My-Mod-Manager/releases/download/test-build/"
         a = [{"id": 5, "name": "Mod-Manager-windows.exe", "size": 3, "browser_download_url": base + "Mod-Manager-windows.exe"},
              {"id": 6, "name": "evil.exe", "size": 3, "browser_download_url": "https://evil.example/x.exe"}] if assets else []
         return (200, {"body": body, "published_at": "2026-10-29T10:00:00Z", "prerelease": True, "assets": a})
