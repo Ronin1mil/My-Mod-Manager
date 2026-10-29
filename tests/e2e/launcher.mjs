@@ -44,7 +44,10 @@ try {
   page.on('pageerror', e => errors.push(e.message));
   page.on('dialog', d => d.accept());
   await page.goto(`${srv.base}/#ck3`);
-  await page.waitForSelector('#tabs button');
+  // a game with no playset shows a plain "no playset" screen (nothing is created by itself) with the two ways to get one
+  await page.waitForSelector('#np-imp');
+  assert.equal(await page.textContent('#title'), 'No playset');
+  assert.equal(await page.locator('#pslist .ps').count(), 0);
   await page.waitForSelector('#dlg[open]', { timeout: 3000 }).then(() => page.click('#p-cancel')).catch(() => {});
   await page.waitForFunction(() => !document.getElementById('dlg').open);
 

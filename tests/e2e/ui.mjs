@@ -9,6 +9,7 @@ import os from 'node:os';
 import net from 'node:net';
 import path from 'node:path';
 import assert from 'node:assert/strict';
+import { seed } from './seed.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 
@@ -44,6 +45,7 @@ const server = spawn('python3', ['-m', 'modmanager', '--game', GAME, '--user-dir
 let browser;
 try {
   for (let i = 0; i < 50; i++) { try { await fetch(`http://127.0.0.1:${port}/api/games`); break; } catch { await new Promise(r => setTimeout(r, 100)); } }
+  await seed(`http://127.0.0.1:${port}`, GAME);
   browser = await chromium.launch();
   const page = await browser.newPage();
   const errors = [];

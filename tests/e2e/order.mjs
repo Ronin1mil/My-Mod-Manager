@@ -7,6 +7,7 @@ import os from 'node:os';
 import net from 'node:net';
 import path from 'node:path';
 import assert from 'node:assert/strict';
+import { seed } from './seed.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 const freePort = () => new Promise((res, rej) => { const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => res(p)); }); s.on('error', rej); });
@@ -27,6 +28,7 @@ const base = `http://127.0.0.1:${port}`;
 let browser;
 try {
   for (let i = 0; i < 50; i++) { try { await fetch(`${base}/api/vic3/state`); break; } catch { await new Promise(r => setTimeout(r, 100)); } }
+  await seed(base, 'vic3');
   browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1300, height: 800 } });
   const errors = [];

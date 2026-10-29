@@ -7,6 +7,7 @@ import os from 'node:os';
 import net from 'node:net';
 import path from 'node:path';
 import assert from 'node:assert/strict';
+import { seed } from './seed.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 const freePort = () => new Promise((res, rej) => { const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => res(p)); }); s.on('error', rej); });
@@ -40,6 +41,7 @@ const server = spawn('python3', ['-m', 'modmanager', '--no-browser', '--port', S
 let browser;
 try {
   for (let i = 0; i < 50; i++) { try { await fetch(`${base}/api/games`); break; } catch { await new Promise(r => setTimeout(r, 100)); } }
+  await seed(base, 'ck3', 'eu5', 'vic3', 'bannerlord');
   browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1300, height: 850 } });
   const errors = [];
