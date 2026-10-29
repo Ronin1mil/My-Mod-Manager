@@ -31,7 +31,7 @@ class Registry(unittest.TestCase):
     def test_public_view_has_no_paths_and_nothing_unexpected(self):
         p = games.CK3.public()
         self.assertEqual(set(p), {"id", "name", "app_id", "load_file", "theme", "verified", "install_marker", "kind",
-                                  "has_conflicts", "has_saves"})
+                                  "has_conflicts", "has_saves", "custom"})
         self.assertEqual(p["install_marker"], "game/common")
 
     def test_nothing_is_marked_verified_until_checked_on_a_real_install(self):

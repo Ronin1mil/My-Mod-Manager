@@ -28,9 +28,13 @@ class Game:
     seed_mods: tuple = ()        # module ids a new playset starts with (the official modules of a "modules" game)
     exe_rel: tuple = ()          # game executable relative to the install root ("modules" games start it themselves)
     launch_prefix: tuple = ()    # arguments before the module list
+    content_dir: object = None   # folder under the install root that holds the base content ("" = the root itself); None = the kind's default
+    custom: bool = False         # made by the user in the app (beta), not built in
 
     @property
     def vanilla_dir_name(self):
+        if self.content_dir is not None:
+            return self.content_dir
         return "game" if self.kind == "paradox" else "Modules"
 
     @property
@@ -51,7 +55,7 @@ class Game:
         return {"id": self.id, "name": self.name, "app_id": self.app_id, "load_file": self.load_file,
                 "theme": self.theme, "verified": self.verified, "kind": self.kind,
                 "has_conflicts": self.has_conflicts, "has_saves": self.has_saves,
-                "install_marker": "/".join(self.install_marker)}
+                "install_marker": "/".join(self.install_marker), "custom": self.custom}
 
 
 _COMMON = {"--ink": "#efe6d4", "--mut": "#a1928f"}

@@ -16,7 +16,7 @@ from modmanager.store import GlobalSettings, Store
 
 ALL = [g for g in games.GAMES.values() if g.kind == "paradox"]  # the games that share the playset/load-file behaviour
 EVERY = list(games.GAMES.values())
-APP_WIDE = ("/api/client-error", "/api/settings", "/api/update-check", "/api/games", "/api/erase-all")
+APP_WIDE = ("/api/client-error", "/api/settings", "/api/update-check", "/api/games", "/api/erase-all", "/api/custom-games")
 
 
 def mkmod(user, folder, name=None, deps=(), files=None, incompatible=(), meta_id="", layout=".metadata",
@@ -100,7 +100,7 @@ class GameCase(unittest.TestCase):
     def req(self, method, path, body=None, headers=None, raw=None, game=None):
         g = game or self.GAME
         if path.startswith("/api/") and not path.startswith(APP_WIDE) and not any(
-                path.startswith(f"/api/{x}/") for x in games.GAMES):
+                path.startswith(f"/api/{x}/") for x in (*games.GAMES, *self.hub.custom.defs)):
             path = f"/api/{g.id}/" + path[5:]
         c = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
         h = dict(headers or {})

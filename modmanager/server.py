@@ -14,7 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from . import APP_NAME, BUILD, __version__, collections, compare, detect, games as gamesmod, install, launch, order, presets, saves, scan, update, updates
-from . import errorlog, launcherdb, perflog, selfupdate, workshop
+from . import customgames, errorlog, launcherdb, perflog, selfupdate, workshop
 from .library import Library
 from .paths import LOGO_TYPES, config_dir, fetch_best_logo, find_first, find_logo, game_version, user_dirs, workshop_dirs
 from .store import GlobalSettings, Store, write_load_file
@@ -221,6 +221,56 @@ class GameApp:
         self.files = {}  # file listings are cached per mod root until the next rescan
         with perflog.timed(f"{self.game.id}: update library file", quiet=True):
             self.diff = self.library.merge(self.mods)
+
+    def diagnose(self):
+        """The 'Check this game' report (beta): what the app found, step by step, and what it was looking for, so a game
+        that does not work can be fixed by changing one folder or one field. -> {"checks": [{ok, label, detail}]}"""
+        g, out = self.game, []
+        add = lambda ok, label, detail: out.append({"ok": ok, "label": label, "detail": detail})
+        marker = "/".join(g.install_marker)
+        if self.game_root:
+            add(True, "Game install", f"{self.game_root}  (found by its '{marker}' folder)")
+        else:
+            add(False, "Game install", f"Not found. The app looks for a folder that contains '{marker}' (Settings > Game). "
+                                       f"It also searched the Steam libraries for '{g.install_dir_name}'.")
+        if self.game_root:
+            cd = Path(self.game_dir)
+            add(cd.is_dir(), "Base game content", f"{cd}" + ("" if cd.is_dir() else "  (missing: check 'content folder' in the game definition)"))
+        add(bool(self.game_version), "Game version", self.game_version or "Not read (optional). Only used for warnings.")
+        ud = Path(self.user_dir) if self.user_dir else None
+        add(bool(ud and ud.is_dir()), "User folder", f"{ud}" if ud and ud.is_dir() else
+            f"Not found. Expected Documents/{(g.user_parent + '/') if g.user_parent else ''}{g.user_dir_name}. Set it in Settings > Storage.")
+        if g.kind == "paradox" and ud and ud.is_dir():
+            lf = ud / g.load_file
+            add(True, f"Load file ({g.load_file})", f"{lf}" if lf.is_file() else "Not there yet. That is normal: it is written when you press Play, and the game reads it from here.")
+            md = ud / "mod"
+            add(md.is_dir(), "Local mods folder", f"{md}" if md.is_dir() else "No 'mod' folder in the user folder (no local mods yet).")
+        ws = Path(self.workshop_dir) if self.workshop_dir else None
+        if ws and ws.is_dir():
+            try:
+                n = sum(1 for _ in ws.iterdir())
+            except OSError:
+                n = 0
+            add(True, "Steam Workshop folder", f"{ws}  ({n} item{'' if n == 1 else 's'})")
+        else:
+            add(False, "Steam Workshop folder", f"Not found (optional). Steam keeps Workshop mods in steamapps/workshop/content/{g.app_id}." if g.app_id != "0"
+                else "Not found (optional). This game has no Steam app id.")
+        by = {}
+        for m in self.mods.values():
+            by[m["source"]] = by.get(m["source"], 0) + 1
+        add(bool(self.mods), "Mods found", ", ".join(f"{n} {k}" for k, n in sorted(by.items())) or
+            "None. Mods are read from the local mod folders and the Workshop folder above.")
+        src = None
+        try:
+            src = self._launcher_source()
+        except Exception as e:  # a broken launcher file is a finding, not a crash
+            add(False, "Launcher playsets", f"Could not be read: {type(e).__name__}: {e}")
+        else:
+            add(bool(src), "Launcher playsets", f"{src[0]}  ({len(src[1])} playset{'' if len(src[1]) == 1 else 's'})" if src
+                else "Nothing to import (the game's own launcher file was not found; optional).")
+        launcher = "the game executable you set" if self.game_exe else ("Steam (steam://run/%s)" % g.app_id if g.app_id != "0" else "nothing: set a game executable")
+        add(g.app_id != "0" or bool(self.game_exe), "Play starts the game through", launcher)
+        return {"game": g.name, "checks": out, "beta": g.custom}
 
     # ---- views ----
     def state(self):
@@ -529,8 +579,11 @@ class SaveVersionWarning(Exception):
 class Hub:
     """All games plus app-wide state (settings, update check). Games are created on first use."""
 
-    def __init__(self, overrides=None, settings=None, gamelist=None, factory=None):
+    def __init__(self, overrides=None, settings=None, gamelist=None, factory=None, custom=None):
+        # Games the user added (beta) are only read for a normal start; a Hub built around given games has none unless asked
+        self.custom = custom or (customgames.CustomGames.default() if gamelist is None else customgames.CustomGames())
         self.games = {g.id: g for g in (gamelist or gamesmod.GAMES.values())}
+        self.games.update({g.id: g for g in self.custom.games()})
         self.overrides = overrides or {}  # {game id: GameApp kwargs from the command line}
         self.settings = settings or GlobalSettings()
         self.apps = {}
@@ -564,8 +617,33 @@ class Hub:
     def index(self):
         s = self.settings.get()
         return {"log_file": str(errorlog.log_path()), "can_self_update": selfupdate.can_self_update() or self.updater_forced, "games": [g.public() for g in self.games.values()], "last_game": s["last_game"],
+                "custom_games": self.custom.defs, "game_templates": customgames.TEMPLATES,
                 "version": __version__, "build": BUILD, "settings": s, "update": self._update_cache[1] if self._update_cache else None,
                 "update_pending": self.update_pending}
+
+    def save_custom_game(self, b):
+        """Add a game, or replace the one named by b['id'] (beta). -> the page's game list."""
+        gid = b.get("id") or None
+        if gid is not None and (not isinstance(gid, str) or gid not in self.custom.defs):
+            raise ValueError("That game was not added by you, so it cannot be changed.")
+        with self.lock:
+            gid, game = self.custom.save(b.get("game"), gid, taken=self.games)
+            self.games[gid] = game
+            self.apps.pop(gid, None)   # rebuilt from the new definition on first use
+        return {"id": gid, **self.index()}
+
+    def remove_custom_game(self, gid, erase_data=False):
+        """Forget an added game. Its playsets and settings stay in the app folder (and come back if a game with the same
+        id is added again) unless erase_data is true. The game's own files are never touched."""
+        if not isinstance(gid, str) or gid not in self.custom.defs:
+            raise ValueError("That game was not added by you, so it cannot be removed.")
+        with self.lock:
+            self.custom.remove(gid)
+            self.games.pop(gid, None)
+            self.apps.pop(gid, None)
+            if erase_data:
+                shutil.rmtree(config_dir() / gid, ignore_errors=True)
+        return self.index()
 
     def erase_all(self, confirm):
         """Experimental: delete everything this app saved (playsets, library, settings, backups, logos, presets of every
@@ -579,6 +657,9 @@ class Hub:
         with self.lock:
             self.apps.clear()  # GameApps are rebuilt (and rescan) on first use
             self.settings.data = {}
+            for gid in list(self.custom.defs):
+                self.games.pop(gid, None)
+            self.custom.clear()
             for t in targets:
                 try:
                     if t.is_symlink() or t.is_file():
@@ -777,6 +858,8 @@ def make_handler(hub):
                         return self._send(200, doc)
                     if parts == ["api", "launcher"]:
                         return self._send(200, app.launcher_info())
+                    if parts == ["api", "diagnose"]:
+                        return self._send(200, app.diagnose())
                     if parts == ["api", "presets"]:
                         return self._send(200, app.list_presets())
                     if parts == ["api", "downloads"]:
@@ -825,6 +908,12 @@ def make_handler(hub):
                         return self._send(200, hub.check_update(bool(self._body().get("force"))))
                     if parts == ["api", "settings"]:
                         return self._send(200, hub.settings.update(**self._body()))
+                    if parts == ["api", "custom-games"]:
+                        b = self._body()
+                        return self._send(200, hub.save_custom_game(b))
+                    if parts == ["api", "custom-games", "remove"]:
+                        b = self._body()
+                        return self._send(200, hub.remove_custom_game(b.get("id"), b.get("erase_data") is True))
                     if parts == ["api", "erase-all"]:
                         return self._send(200, hub.erase_all(self._body().get("confirm")))
                     return self._send(404, {"error": "not found"})

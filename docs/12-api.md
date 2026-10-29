@@ -6,6 +6,8 @@ JSON over HTTP on `127.0.0.1` (default port 8765). Everything is same-origin onl
 | Route | |
 |---|---|
 | `GET /api/games` | games (id, name, app id, load file, theme, verified), app version, app settings, last known update result |
+| `POST /api/custom-games` | (beta) `{game: {...}, id?}` adds a game or, with `id`, replaces one you added; the fields are checked (docs/20) -> the games list plus `id` |
+| `POST /api/custom-games/remove` | (beta) `{id, erase_data?}` forgets a game you added; its saved playsets stay unless `erase_data` |
 | `POST /api/settings` | `{auto_update_check?, dismissed_update?, last_game?}` (validated; unknown keys 400) |
 | `POST /api/update-check` | `{force?}` -> release check result (cached 10 min) |
 
@@ -27,3 +29,4 @@ JSON over HTTP on `127.0.0.1` (default port 8765). Everything is same-origin onl
 | `POST import` | a shared playset document (game-checked) -> `{id, missing}` |
 | `POST install` | raw `.zip` body, `X-Filename` header (streamed, 1 GB cap) |
 | `POST mods/<id>/uninstall` | move a local mod to backups |
+| `GET diagnose` | (beta) `{game, beta, checks: [{ok, label, detail}]}`: what was found and what was looked for |

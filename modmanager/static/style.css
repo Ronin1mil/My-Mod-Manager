@@ -129,3 +129,7 @@ body.nomods .chk,body.nomods #sortnow,body.nomods #cfg,body.nomods #launchpart{d
 button.star{background:none;border:0;padding:0 4px;font-size:16px;line-height:1;color:var(--mut)}button.star.on{color:var(--acc)}button.star:hover:not(:disabled){color:var(--acc);border:0}
 .ps{align-items:center}.ps .grow{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #favonly.on{border-color:var(--acc);color:var(--acc)}
+
+.dg{padding:6px 0;border-bottom:1px solid var(--line)}.dg:last-child{border:0}.dg b{font-weight:600}.dg .mut{font-size:13.5px;word-break:break-word}
+.st-form{flex:1;min-height:0;overflow:auto;padding:26px 32px 12px}.st-form select{max-width:100%;font-size:17px;padding:11px 12px}.st-form input[type=color]{width:80px;height:44px;padding:2px;background:var(--bg);border:1px solid var(--line);border-radius:9px}
+.st-foot>span:last-child{white-space:nowrap;flex:none}

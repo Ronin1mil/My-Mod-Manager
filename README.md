@@ -130,6 +130,7 @@ This project was written with the help of an AI coding assistant (see the note a
 | [docs/16-launcher-import.md](docs/16-launcher-import.md) | Importing the launcher's playsets |
 | [docs/17-bannerlord.md](docs/17-bannerlord.md) | Bannerlord: modules, order, launching |
 | [docs/19-test-builds-and-releases.md](docs/19-test-builds-and-releases.md) | Test builds (nightly) and how releases are made |
+| [docs/20-v0.9-plan.md](docs/20-v0.9-plan.md) | Adding your own games (beta) and what was considered and left out |
 
 ## License
 [MIT](LICENSE) © 2026 Ronin1mil

@@ -409,6 +409,17 @@ async function openPaths(first) {
         <div id="p-found" class="mut"></div>
         <label class="fld" for="p-game">Game folder</label><input type="text" id="p-game" value="${esc(S.game_root)}"><div class="st" id="p-gst"></div>
       </div>
+      <div class="card">
+        <h3>Check this game <span class="b warn">beta</span></h3>
+        <p class="desc">Shows step by step what the app found for ${esc(GNAME())} (install, folders, mods, launcher) and what it was looking for where something is missing.</p>
+        <div class="acts"><button id="dg-run">Check now</button><button id="dg-copy" hidden>Copy report</button></div>
+        <div id="dg-out"></div>
+      </div>
+      ${S.game.custom ? `<div class="card">
+        <h3>Added game <span class="b warn">beta</span></h3>
+        <p class="desc">You added this game yourself, so nothing about it is checked against a real install. If something does not work, use "Check this game" above and fix the field it points to.</p>
+        <div class="acts"><button id="cg-edit">Edit this game…</button><button id="cg-remove" class="danger">Remove from the list…</button></div>
+      </div>` : ''}
     </section>
     <section data-pane="ui" hidden>
       <div class="card">
@@ -496,6 +507,23 @@ async function openPaths(first) {
     d.querySelectorAll('[data-st]').forEach(b => b.classList.toggle('on', b.dataset.st === k));
     d.querySelectorAll('[data-pane]').forEach(x => { x.hidden = x.dataset.pane !== k; });
   };
+  $('dg-run').onclick = guard(async () => {
+    $('dg-out').innerHTML = '<p class="mut">Checking…</p>';
+    const r = await api('diagnose');
+    $('dg-out').innerHTML = r.checks.map(c => `<div class="dg ${c.ok ? 'ok' : 'warn'}"><b>${c.ok ? '✓' : '✗'} ${esc(c.label)}</b><div class="mut">${esc(c.detail)}</div></div>`).join('');
+    const text = `${r.game} (Ronin Mod Manager v${GI.version})\n` + r.checks.map(c => `${c.ok ? '[ok]' : '[!!]'} ${c.label}: ${c.detail}`).join('\n');
+    $('dg-copy').hidden = false;
+    $('dg-copy').onclick = () => { try { navigator.clipboard.writeText(text).then(() => toast('Report copied.')); } catch (e) { toast('Could not copy. Select the text instead.', true); } };
+  });
+  if ($('cg-edit')) {
+    $('cg-edit').onclick = () => { d.close(); openGameDialog(G); };
+    $('cg-remove').onclick = guard(async () => {
+      if (!confirm(`Remove ${GNAME()} from the list?\n\nThe game's own files are never touched. Your playsets for it stay saved here unless you choose to erase them next.`)) return;
+      const erase = confirm('Also erase the playsets and settings this app saved for this game?\n\nOK = erase them, Cancel = keep them.');
+      const r = await app('custom-games/remove', {id: G, erase_data: erase});
+      d.close(); await adoptGames(r); await useGame(GI.games[0].id, true);
+    });
+  }
   $('s-imp-auto').onchange = guard(async () => { GI.settings = await app('settings', {auto_import_launcher: $('s-imp-auto').checked}); });
   $('s-imp-show').onchange = guard(async () => { GI.settings = await app('settings', {show_import_button: $('s-imp-show').checked}); showImportButton(); });
   const saveUI = async (b, all) => {
@@ -900,12 +928,80 @@ async function useGame(id, first) {
   document.title = g.name + ' · Ronin Mod Manager';
   await load(first);
 }
-$('game').onchange = guard(() => useGame($('game').value, true));
+// ---- games the user adds (beta) ----
+const ADD_GAME = '__add';
+function fillGames() {
+  $('game').innerHTML = GI.games.map(g => `<option value="${esc(g.id)}">${esc(g.name)}${g.custom ? ' (beta)' : ''}</option>`).join('') +
+    `<option value="${ADD_GAME}">＋ Add a game (beta)…</option>`;
+  if (G) $('game').value = G;
+}
+async function adoptGames(r) {   // the answer carries the whole game list
+  GI.games = r.games; GI.custom_games = r.custom_games; GI.game_templates = r.game_templates;
+  fillGames();
+}
+const GAME_FORM = [   // [key, label, hint, only for kind]
+  ['name', 'Game name', 'Shown in the game list.'],
+  ['app_id', 'Steam app id', 'The number in the game\'s Steam store address (store.steampowered.com/app/<number>). Used to start the game and to find its Workshop folder. Leave empty if it is not on Steam.'],
+  ['user_dir_name', 'Folder in Documents', 'The game\'s own folder, where it keeps saves and mods, for example "Stellaris".'],
+  ['user_parent', 'Inside which folder', 'The folder that holds it. Paradox games use "Paradox Interactive"; leave empty if it is straight in Documents.'],
+  ['install_dir_name', 'Install folder name', 'The folder under steamapps/common, for example "Stellaris".'],
+  ['install_marker', 'Folder that proves it is the game', 'A folder inside the install, for example "common" or "game/common". Used to recognise the install when you point to it.'],
+  ['content_dir', 'Base content folder', 'Where the game\'s own files live inside the install: "game" for most Paradox games, empty if they are straight in the install folder.'],
+  ['load_file', 'Mod list file', 'The file in the Documents folder the game reads its mods from, usually dlc_load.json.', 'paradox'],
+  ['load_style', 'How mods are listed', '"descriptor" = mod/ugc_<id>.mod files; "path" = folder paths in the list.', 'paradox'],
+  ['def_dirs', 'Folders to check for conflicts', 'Script folders inside a mod where two mods can clash, comma separated.', 'paradox'],
+  ['vanilla_only', 'Base game folders to compare', 'Optional. Only these folders of the base game are compared with mods (comma separated). Empty = all.', 'paradox'],
+  ['seed_mods', 'Modules every playset starts with', 'Comma separated module ids.', 'modules'],
+  ['exe_rel', 'Game executable', 'Inside the install folder, for example bin/Win64_Shipping_Client/Game.exe.', 'modules'],
+  ['launch_prefix', 'Arguments before the module list', 'For example /singleplayer.', 'modules'],
+];
+function openGameDialog(editId) {
+  const d = $('dlg'), def = editId ? GI.custom_games[editId] : null, T = GI.game_templates;
+  d.className = 'wide';
+  d.innerHTML = `<div class="st-head"><h2>${def ? 'Edit ' + esc(def.name) : 'Add a game'} <span class="b warn">beta</span></h2>
+      <span class="mut">For games that work like Paradox\'s or like Bannerlord. Nothing here is checked against a real install.</span></div>
+    <div class="st-form">
+      <div class="card">
+        ${def ? '' : `<label class="fld" for="gf-tpl">Start from<span class="hint">Fills in the fields below. Check them against your game.</span></label>
+          <select id="gf-tpl">${T.map((t, i) => `<option value="${i}">${esc(t.label)}</option>`).join('')}</select>`}
+        <label class="fld" for="gf-kind">Type of game<span class="hint">"paradox": mods are listed in a file in the game\'s Documents folder. "modules": Bannerlord style, mods are module folders and the game is started with the list.</span></label>
+        <select id="gf-kind"><option value="paradox">Paradox style (mod list file)</option><option value="modules">Bannerlord style (modules)</option></select>
+        ${GAME_FORM.map(([k, l, h, only]) => `<div data-only="${only || ''}"><label class="fld" for="gf-${k}">${esc(l)}<span class="hint">${esc(h)}</span></label><input type="text" id="gf-${k}"></div>`).join('')}
+        <label class="fld" for="gf-accent">Colour<span class="hint">The accent colour of the app for this game.</span></label>
+        <input type="color" id="gf-accent" value="#8fa8d0">
+        <p class="warn" id="gf-msg"></p>
+      </div></div>
+    <div class="st-foot"><span class="mut">The game\'s folders are chosen afterwards under Settings &gt; Game and Storage. The game\'s own files are never changed by this form.</span><span><button id="gf-cancel">Cancel</button> <button id="gf-save" class="pri">${def ? 'Save' : 'Add game'}</button></span></div>`;
+  const fill = v => {
+    $('gf-kind').value = v.kind || 'paradox';
+    GAME_FORM.forEach(([k]) => { $('gf-' + k).value = v[k] == null ? '' : v[k]; });
+    $('gf-accent').value = v.accent || '#8fa8d0';
+    show();
+  };
+  const show = () => d.querySelectorAll('[data-only]').forEach(x => { x.hidden = !!x.dataset.only && x.dataset.only !== $('gf-kind').value; });
+  $('gf-kind').onchange = show;
+  if (def) fill(def); else { fill(T[0]); $('gf-tpl').onchange = () => fill(T[+$('gf-tpl').value]); }
+  $('gf-cancel').onclick = () => d.close();
+  $('gf-save').onclick = guard(async () => {
+    const game = {kind: $('gf-kind').value, accent: $('gf-accent').value};
+    GAME_FORM.forEach(([k, , , only]) => { if (!only || only === game.kind) game[k] = $('gf-' + k).value; });
+    $('gf-msg').textContent = '';
+    let r;
+    try { r = await app('custom-games', {game, ...(def ? {id: editId} : {})}); } catch (e) { $('gf-msg').textContent = e.message; return; }
+    d.close(); await adoptGames(r);
+    if (def) { await useGame(editId, true); } else { await useGame(r.id, true); toast('Added. Set its folders under Settings, then use "Check this game".'); }
+  });
+  d.showModal();
+}
+$('game').onchange = guard(async () => {
+  if ($('game').value === ADD_GAME) { $('game').value = G; return openGameDialog(); }
+  await useGame($('game').value, true);
+});
 window.addEventListener('hashchange', () => { const w = location.hash.slice(1); if (GI && w !== G && GI.games.some(g => g.id === w)) useGame(w, true).catch(e => fail(e, 'hash')); });
 (async () => {
   GI = await app('games');
   $('ver').textContent = 'v' + GI.version + (GI.build ? ' · test ' + GI.build : '');
-  $('game').innerHTML = GI.games.map(g => `<option value="${esc(g.id)}">${esc(g.name)}</option>`).join('');
+  fillGames();
   let want = location.hash.slice(1);
   try { want = want || localStorage.getItem('mm-game') || ''; } catch (e) { /* ignore */ }
   want = GI.games.some(g => g.id === want) ? want : (GI.games.some(g => g.id === GI.last_game) ? GI.last_game : GI.games[0].id);
