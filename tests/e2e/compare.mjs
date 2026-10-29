@@ -75,6 +75,7 @@ try {
   await post(`/api/vic3/playsets/${second.id}/update`, { disabled: [], mods: ['local:C', 'local:Lib', 'local:A', 'local:B'] });
   await refresh(); await page.click('[data-tab=order]'); await page.click('[data-tab=compare]');
   await page.waitForSelector('text=Loaded in a different order');
+  await page.waitForFunction(() => [...document.querySelectorAll('#view .cmp-h + div .nm')].some(n => n.textContent === 'C'));  // fresh data, not the previous comparison
   const moved = await page.locator('#view .cmp-h', { hasText: 'different order' }).locator('xpath=following-sibling::div[position()<=4]').locator('.nm').allTextContents();
   assert.ok(moved.includes('C') && moved.length <= 2, `only the displaced mod(s) are listed, got ${moved}`);
   await page.click('[data-cmp=order]');

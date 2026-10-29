@@ -407,7 +407,7 @@ document.addEventListener('click', guard(async e => {
   const t = e.target, p = cur(), ds = t.dataset; if (!p) return;
   const psRow = t.closest('[data-ps]');
   if (psRow) { await api(`playsets/${psRow.dataset.ps}/activate`, {}); sel = null; return load(); }
-  if (ds.tab) { tab = ds.tab; render(); if (tab === 'compare') await loadCompare(); if (tab === 'files') await loadFiles(); }
+  if (ds.tab) { tab = ds.tab; render(); if (tab === 'compare') { C = null; render(); await loadCompare(); } if (tab === 'files') await loadFiles(); }
   if (ds.f) { flt = ds.f; render(); }
   if (ds.sel) { sel = sel === ds.sel ? null : ds.sel; render(); }
   if (ds.close) { sel = null; render(); }
