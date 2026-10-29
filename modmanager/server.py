@@ -229,7 +229,7 @@ class GameApp:
                 "user_dir": str(self.user_dir or ""), "workshop_dir": str(self.workshop_dir or ""),
                 "game_root": str(self.game_root or ""), "game_version": self.game_version,
                 "has_logo": bool(self.logo), "logo_pending": self.logo_pending, "include_vanilla": s["include_vanilla"],
-                "setup_done": s["setup_done"], "save_version_check": s["save_version_check"], "steamcmd": s["steamcmd"], "steam_user": s["steam_user"],
+                "ui_scheme": s["ui_scheme"], "ui_text": s["ui_text"], "setup_done": s["setup_done"], "save_version_check": s["save_version_check"], "steamcmd": s["steamcmd"], "steam_user": s["steam_user"],
                 "setup_needed": not s["setup_done"] and not (self.game_root and self.user_dir)}
 
     def analyse(self, pid, conflicts=True):
@@ -785,6 +785,9 @@ def make_handler(hub):
                 b = self._body()
                 if parts == ["api", "paths"]:
                     app.configure(b)
+                    return self._send(200, app.state())
+                if parts == ["api", "ui"]:
+                    app.store.update_settings(**{k: b[k] for k in ("ui_scheme", "ui_text") if k in b})
                     return self._send(200, app.state())
                 if parts == ["api", "skip-setup"]:
                     app.store.update_settings(setup_done=True)

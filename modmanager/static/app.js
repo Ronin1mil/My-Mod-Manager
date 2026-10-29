@@ -93,7 +93,7 @@ async function load(rescanMsg) {
     const d = S.diff, bits = [d.added && `${d.added} new`, d.updated && `${d.updated} updated`, d.removed && `${d.removed} removed`].filter(Boolean);
     toast(bits.length ? `Scan: ${bits.join(', ')} (${d.total} mods)` : `Scan: no changes (${d.total} mods)`);
   }
-  setLogo(G); showImportButton();
+  setLogo(G); showImportButton(); applyUI();
   document.title = GNAME() + ' · Ronin Mod Manager';
   render(); analyse(); banner(); pollUpdate();
   if (S.setup_needed && !setupShown) { setupShown = true; openPaths(true); }
@@ -149,10 +149,10 @@ function worst(id) {
   const is = issuesOf(id);
   return is.some(i => i.severity === 'error') ? 'err' : is.length ? 'warn' : '';
 }
-function badges(m) {
+function badges(m, before = '') {   // `before` (a warning or error) sits just left of the Workshop/Local tag so that tag always ends the row
   return (m.change === 'new' ? '<span class="b new">NEW</span>' : m.change === 'updated' ? '<span class="b new">UPDATED</span>' : '') +
     (m.multiplayer_synchronized === false ? '<span class="b warn" title="Not multiplayer synchronized">MP-unsafe</span>' : '') +
-    (m.exists ? '' : '<span class="b err">missing</span>') + `<span class="b">${esc(m.source)}</span>`;
+    (m.exists ? '' : '<span class="b err">missing</span>') + before + `<span class="b">${esc(m.source)}</span>`;
 }
 
 function render() {
@@ -188,7 +188,7 @@ function viewOrder(p) {
       <span class="h">⠿</span><span class="n">${i + 1}</span>
       <input type="checkbox" data-tog="${esc(id)}" ${off ? '' : 'checked'}>
       <span class="nm" data-sel="${esc(id)}">${esc(m ? m.name : id + ' (not installed)')}</span>
-      ${m ? badges(m) : ''}${w && !off ? `<span class="b ${w}">${w === 'err' ? 'error' : 'warning'}</span>` : ''}
+      ${m ? badges(m, w && !off ? `<span class="b ${w}">${w === 'err' ? 'error' : 'warning'}</span>` : '') : (w && !off ? `<span class="b ${w}">${w === 'err' ? 'error' : 'warning'}</span>` : '')}
       <button class="sm" data-mv="${i},-1">↑</button><button class="sm" data-mv="${i},1">↓</button><button class="sm" data-rm="${esc(id)}">✕</button></div>`;
   }).join('') || '<div class="empty">This playset is empty.<br>Add mods from the Library tab.</div>';
 }
@@ -339,7 +339,7 @@ async function openPaths(first) {
       <span class="mut">Ronin Mod Manager v${esc(GI.version)}${S.game.verified ? '' : ' · launching is <b>not yet verified</b> on a real ' + esc(GNAME()) + ' install'}</span>
     </div>
     <div class="st-body">
-    <nav class="st-tabs" id="st-tabs"><button data-st="game" class="on"><i>🎮</i>Game</button><button data-st="store"><i>📁</i>Storage</button><button data-st="play"><i>▶</i>Playing</button><button data-st="dl"><i>⬇</i>Downloads</button><button data-st="app"><i>⟳</i>App &amp; updates</button></nav>
+    <nav class="st-tabs" id="st-tabs"><button data-st="game" class="on"><i>🎮</i>Game</button><button data-st="store"><i>📁</i>Storage</button><button data-st="play"><i>▶</i>Playing</button><button data-st="ui"><i>🎨</i>UI</button><button data-st="dl"><i>⬇</i>Downloads</button><button data-st="app"><i>⟳</i>App &amp; updates</button></nav>
     <div class="st-panes">
     <section data-pane="game">
       <div class="card">
@@ -348,6 +348,22 @@ async function openPaths(first) {
         <div id="p-found" class="mut"></div>
         <label class="fld" for="p-game">Game folder</label><input type="text" id="p-game" value="${esc(S.game_root)}"><div class="st" id="p-gst"></div>
       </div>
+    </section>
+    <section data-pane="ui" hidden>
+      <div class="card">
+        <h3>Colour scheme</h3>
+        <p class="desc">How ${esc(GNAME())} looks in this app. "Game look" is the game's own colours. Changes apply straight away.</p>
+        <div class="schemes">${[['default', 'Game look', null], ...Object.entries(SCHEMES).map(([k, x]) => [k, x.name, x.v])].map(([k, n, v]) => {
+          const c = v || (G && GI.games.find(g => g.id === G).theme) || {};
+          return `<button class="scheme ${S.ui_scheme === k ? 'on' : ''}" data-scheme="${k}"><b>${esc(n)}</b><span class="chips">${['--bg', '--panel', '--acc', '--p2'].map(x => `<i style="background:${esc(c[x] || '#444')}"></i>`).join('')}</span></button>`;
+        }).join('')}</div>
+      </div>
+      <div class="card">
+        <h3>Text size</h3>
+        <p class="desc">Makes everything in the app bigger or smaller.</p>
+        <select id="ui-text">${Object.entries(TEXT_SIZES).map(([k, [n]]) => `<option value="${k}" ${S.ui_text === k ? 'selected' : ''}>${n}</option>`).join('')}</select>
+      </div>
+      <div class="card"><div class="acts"><button id="ui-all">Use these for all games</button><span class="mut" id="ui-msg"></span></div></div>
     </section>
     <section data-pane="store" hidden>
       <div class="card">
@@ -415,6 +431,16 @@ async function openPaths(first) {
   };
   $('s-imp-auto').onchange = guard(async () => { GI.settings = await app('settings', {auto_import_launcher: $('s-imp-auto').checked}); });
   $('s-imp-show').onchange = guard(async () => { GI.settings = await app('settings', {show_import_button: $('s-imp-show').checked}); showImportButton(); });
+  const saveUI = async (b, all) => {
+    for (const g of all ? GI.games.map(x => x.id) : [G]) { const r = await call(`/api/${g}/ui`, b); if (g === G) S = r; }
+    applyUI(); render();
+  };
+  d.querySelectorAll('[data-scheme]').forEach(b => { b.onclick = guard(async () => {
+    await saveUI({ui_scheme: b.dataset.scheme});
+    d.querySelectorAll('[data-scheme]').forEach(x => x.classList.toggle('on', x === b));
+  }); });
+  $('ui-text').onchange = guard(() => saveUI({ui_text: $('ui-text').value}));
+  $('ui-all').onclick = guard(async () => { await saveUI({ui_scheme: S.ui_scheme, ui_text: S.ui_text}, true); $('ui-msg').textContent = 'Done.'; });
   $('s-erase').onclick = guard(async () => {
     const t = prompt('This deletes ALL playsets and settings saved by this app, for every game. Your games and mods are not touched.\n\nType ERASE to continue.');
     if (t === null) return;
@@ -743,6 +769,23 @@ $('launch').onclick = guard(async () => {
 function applyTheme(g) {
   const root = document.documentElement.style;
   Object.entries(g.theme || {}).forEach(([k, v]) => root.setProperty(k, v));
+  root.colorScheme = 'dark';
+}
+// The player's own colours and text size (Settings -> UI), kept per game. "default" is the game's own look.
+const SCHEMES = {
+  midnight: {name: 'Midnight', dark: true, v: {'--bg': '#0b0f1a', '--side': '#0f1524', '--panel': '#151d30', '--line': '#26324d', '--ink': '#e6ecf8', '--mut': '#93a0bb', '--acc': '#6cb0ff', '--accink': '#06121f', '--p1': '#2b4d86', '--p2': '#3a66ad', '--p3': '#244070'}},
+  parchment: {name: 'Parchment (light)', dark: false, v: {'--bg': '#f3ead6', '--side': '#e9dcc0', '--panel': '#fbf5e6', '--line': '#cdbd98', '--ink': '#2a2116', '--mut': '#6b5c45', '--acc': '#8a5a1c', '--accink': '#fffaf0', '--p1': '#b07a2a', '--p2': '#9a6620', '--p3': '#7a4f14'}},
+  forest: {name: 'Forest', dark: true, v: {'--bg': '#0c130e', '--side': '#101a13', '--panel': '#16231a', '--line': '#2a3d2f', '--ink': '#e3efe0', '--mut': '#8fa591', '--acc': '#8fd08a', '--accink': '#0a1a0c', '--p1': '#2f6b3a', '--p2': '#3f8a4c', '--p3': '#25532e'}},
+  slate: {name: 'Slate', dark: true, v: {'--bg': '#14161a', '--side': '#101215', '--panel': '#1c1f25', '--line': '#2f343d', '--ink': '#e8eaee', '--mut': '#9199a6', '--acc': '#c9ced8', '--accink': '#14161a', '--p1': '#454c5a', '--p2': '#5a6374', '--p3': '#3a404c'}},
+  rose: {name: 'Rose', dark: true, v: {'--bg': '#150d12', '--side': '#1b1018', '--panel': '#241520', '--line': '#43263a', '--ink': '#f6e6ee', '--mut': '#b496a6', '--acc': '#f08cb4', '--accink': '#2a0c1a', '--p1': '#8a2f5c', '--p2': '#ad3f75', '--p3': '#6a2247'}},
+  contrast: {name: 'High contrast', dark: true, v: {'--bg': '#000000', '--side': '#000000', '--panel': '#0d0d0d', '--line': '#8a8a8a', '--ink': '#ffffff', '--mut': '#d0d0d0', '--acc': '#ffd400', '--accink': '#000000', '--p1': '#1f3fd0', '--p2': '#2f55f0', '--p3': '#1a34a8'}},
+};
+const TEXT_SIZES = {small: ['Small', .9], normal: ['Normal', 1], large: ['Large', 1.15], xlarge: ['Extra large', 1.3]};
+function applyUI() {
+  const root = document.documentElement.style, sc = S && SCHEMES[S.ui_scheme];
+  if (sc) { Object.entries(sc.v).forEach(([k, v]) => root.setProperty(k, v)); root.colorScheme = sc.dark ? 'dark' : 'light'; }
+  else if (G && GI) applyTheme(GI.games.find(g => g.id === G) || {});
+  root.setProperty('--zoom', String((TEXT_SIZES[S && S.ui_text] || TEXT_SIZES.normal)[1]));
 }
 // The header always shows the game's logo, never its name as text. While the logo is still being fetched
 // (or if it cannot be had) a neutral crest in the game's colours stands in, so nothing flips or jumps.

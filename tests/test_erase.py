@@ -44,3 +44,17 @@ class EraseAll(GameCase):
         self.post("/api/erase-all", {"confirm": "ERASE"})
         st, r, _ = self.post("/api/erase-all", {"confirm": "ERASE"})
         self.assertEqual((st, r["erased"], r["failed"]), (200, [], []))
+
+
+class UiSettings(GameCase):
+    GAME = games.VIC3
+
+    def test_scheme_and_text_size_are_saved_per_game_and_validated(self):
+        st = self.req("GET", "/api/state")[1]
+        self.assertEqual((st["ui_scheme"], st["ui_text"]), ("default", "normal"))
+        self.assertEqual(self.post("/api/ui", {"ui_scheme": "forest", "ui_text": "xlarge"})[1]["ui_scheme"], "forest")
+        self.assertEqual(self.req("GET", "/api/state")[1]["ui_text"], "xlarge")
+        for bad in ({"ui_scheme": "neon"}, {"ui_text": "huge"}, {"ui_scheme": 3}):
+            self.assertEqual(self.post("/api/ui", bad)[0], 400, bad)
+        self.assertEqual(self.req("GET", "/api/state")[1]["ui_scheme"], "forest")  # a refused change changes nothing
+        self.assertEqual(self.req("GET", "/api/ck3/state")[1]["ui_scheme"], "default")  # another game is untouched

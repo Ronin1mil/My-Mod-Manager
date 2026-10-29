@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+- **Settings -> UI:** pick a colour scheme (Game look, Midnight, Parchment, Forest, Slate, Rose, High contrast) and a text size (Small to Extra large) for each game; "Use these for all games" copies them to the others
+- The built-in "No mods" playset is now at the top of the sidebar
+- In the load order a warning or error tag sits just left of the Workshop/Local tag, so that tag always ends the row
+
 ## 0.8.2 - Ronin Mod Manager, Europa Universalis V import, no empty playsets
 - **New name: Ronin Mod Manager.** The window, installer, shortcuts and page titles use it. The app now keeps its data in `%APPDATA%\Ronin Mod Manager\` and its error log in `Documents\Ronin Mod Manager\RoninModManager-errors.log`. **Nothing is read from the old folders** (`modmanager`, `ck3mm`, `eu5mm`, `vic3mm`) any more, so this is a fresh start. The downloaded file names (`Mod-Manager-windows.exe`, `Mod-Manager-Setup.exe`) are unchanged so older copies can still update to this one
 - **Europa Universalis V can import its launcher playsets.** The game keeps them in `playsets.json` in its folder in Documents (not in a database like the other games). Workshop and local mods are matched by their last folders, so it works on any drive and for any Windows user name
