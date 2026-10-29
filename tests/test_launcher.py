@@ -337,3 +337,33 @@ class BuiltInNoMods(GameCase):
         self.assertEqual(st, 200)
         names = [p["name"] for p in self.req("GET", "/api/state")[1]["playsets"]]
         self.assertEqual(names, ["Mine"])
+
+
+class FavouritesAndMerge(GameCase):
+    GAME = games.VIC3
+
+    def test_favourite_playsets_and_mods_are_kept(self):
+        a = self.new_playset(["local:A"])
+        self.assertEqual(self.post(f"/api/playsets/{a}/update", {"favorite": True})[1]["favorite"], True)
+        self.assertEqual(self.post(f"/api/playsets/{a}/update", {"favorite": "yes"})[0], 400)
+        self.assertEqual(self.post("/api/fav-mod", {"id": "local:A", "on": True})[1]["fav_mods"], ["local:A"])
+        self.post("/api/fav-mod", {"id": "local:A", "on": True})  # twice is still one
+        st = self.req("GET", "/api/state")[1]
+        self.assertEqual(st["fav_mods"], ["local:A"])
+        self.assertTrue(st["playsets"][0]["favorite"])
+        self.assertEqual(self.post("/api/fav-mod", {"id": "local:A", "on": False})[1]["fav_mods"], [])
+        self.assertEqual(self.post("/api/fav-mod", {"id": "x", "on": "no"})[0], 400)
+
+    def test_merge_makes_a_new_playset_and_changes_neither(self):
+        mkmod(self.user(), "A", "A"); mkmod(self.user(), "B", "B"); mkmod(self.user(), "C", "C")
+        a = self.post("/api/playsets", {"name": "One", "mods": ["local:A", "local:B"]})[1]["id"]
+        b = self.post("/api/playsets", {"name": "Two", "mods": ["local:B", "local:C"]})[1]["id"]
+        self.post(f"/api/playsets/{a}/update", {"disabled": ["local:B"]})
+        st, r, _ = self.post(f"/api/playsets/{a}/merge", {"with": b, "name": "Both"})
+        self.assertEqual(st, 200)
+        sets = {p["name"]: p for p in self.req("GET", "/api/state")[1]["playsets"]}
+        self.assertEqual(sets["Both"]["mods"], ["local:A", "local:B", "local:C"])
+        self.assertEqual(sets["Both"]["disabled"], [])  # B is enabled in Two, so it is enabled in the merge
+        self.assertEqual((sets["One"]["mods"], sets["Two"]["mods"]), (["local:A", "local:B"], ["local:B", "local:C"]))
+        self.assertGreaterEqual(self.post(f"/api/playsets/{a}/merge", {"with": "nope"})[0], 400)  # an unknown playset is refused
+        self.assertEqual(len(self.req("GET", "/api/state")[1]["playsets"]), 3)  # and nothing was created

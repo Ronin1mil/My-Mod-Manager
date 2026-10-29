@@ -55,7 +55,33 @@ try {
   assert.deepEqual((await names()).sort(), ['Alpha Local', 'Mid Workshop']);
   await page.selectOption('#lib-tag', '');
 
+  // playsets: count per mod, favourites, merge
+  const post = async (u, b) => (await fetch(`${base}/api/vic3/${u}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) })).json();
+  const one = (await post('playsets', { name: 'One', mods: ['ws:111', 'local:alpha'] })).id;
+  const two = (await post('playsets', { name: 'Two', mods: ['ws:111', 'ws:333'] })).id;
+  await post(`playsets/${one}/activate`, {});
+  await page.reload(); await page.waitForSelector('#tabs button'); await page.click('[data-tab=library]');
+  await page.selectOption('#lib-sort', 'used');
+  assert.deepEqual((await names()).slice(0, 3), ['Mid Workshop', 'Alpha Local', 'Art Workshop']);   // 2 playsets, then 1, then 1 (by name)
+  assert.match(await page.locator('#view .row').first().textContent(), /2 playsets/);
+  await page.click('[data-favmod="ws:333"]');                       // star a mod
+  await page.waitForSelector('[data-favmod="ws:333"].on');
+  await page.selectOption('#lib-sort', 'fav');
+  assert.deepEqual((await names()).slice(0, 1), ['Art Workshop']);
+  await page.click('#favonly');
+  assert.deepEqual(await names(), ['Art Workshop']);
+  await page.click('#favonly');
+  await page.click(`[data-favps="${two}"]`);                         // star a playset: it moves to the top of the list
+  await page.waitForFunction(() => document.querySelector('#pslist .ps .grow').textContent === 'Two');
+  await page.click('[data-tab=compare]');
+  await page.waitForSelector('[data-cmp=merge]');
+  page.once('dialog', d => d.accept('Both'));
+  await page.click('[data-cmp=merge]');
+  await page.waitForFunction(() => document.getElementById('title').textContent === 'Both');
+  assert.deepEqual(await page.locator('#view .nm').allTextContents(), ['Mid Workshop', 'Alpha Local', 'Art Workshop']);
+
   // the choice is remembered after a reload
+  await page.click('[data-tab=library]');
   await page.selectOption('#lib-sort', 'source');
   await page.reload(); await page.waitForSelector('#tabs button'); await page.click('[data-tab=library]');
   assert.equal(await page.inputValue('#lib-sort'), 'source');

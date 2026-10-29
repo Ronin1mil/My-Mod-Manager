@@ -158,7 +158,7 @@ function badges(m, before = '') {   // `before` (a warning or error) sits just l
 function render() {
   if (!S || !cur()) return;
   const p = cur(), errs = visIssues().filter(i => i.severity === 'error').length; if (!p) return;
-  $('pslist').innerHTML = S.playsets.map(x => `<div class="ps ${x.id === S.active ? 'on' : ''}" data-ps="${esc(x.id)}"><span>${esc(x.name)}</span><span class="mut">${x.mods.length - x.disabled.length}</span></div>`).join('');
+  $('pslist').innerHTML = S.playsets.slice().sort((a, b) => !!b.favorite - !!a.favorite).map(x => `<div class="ps ${x.id === S.active ? 'on' : ''}" data-ps="${esc(x.id)}"><button class="star ${x.favorite ? 'on' : ''}" data-favps="${esc(x.id)}" title="${x.favorite ? 'Remove from favourites' : 'Favourite: keep this playset at the top'}" aria-label="Favourite">${x.favorite ? '★' : '☆'}</button><span class="grow">${esc(x.name)}</span><span class="mut">${x.mods.length - x.disabled.length}</span></div>`).join('');
   $('psfixed').innerHTML = `<div class="ps fixed ${S.no_mods.id === S.active ? 'on' : ''}" data-ps="${esc(S.no_mods.id)}" title="Starts the game with no mods: use it to check whether a problem comes from a mod or from the game"><span>No mods</span><span class="mut">${S.no_mods.mods.length || ''}</span></div>`;
   document.body.classList.toggle('nomods', !!p.virtual);
   $('title').textContent = p.name;
@@ -195,7 +195,8 @@ function viewOrder(p) {
 
 // Library sorting: by name, by where the mod comes from (Workshop / Local), by its tags, or source then tag.
 // The tags come from each mod's own descriptor or metadata, read at every scan and kept in the library file.
-const SORTS = {name: 'Name', source: 'Workshop, then Local', 'source-tag': 'Workshop / Local, then tag', tag: 'Tag'};
+const SORTS = {name: 'Name', source: 'Workshop, then Local', 'source-tag': 'Workshop / Local, then tag', tag: 'Tag', used: 'Most playsets first', fav: 'Favourites first'};
+let libUse = {}, favOnly = false;
 let libSort = 'source-tag', libTag = '';
 try { libSort = localStorage.getItem('libSort') || libSort; } catch (e) { /* storage blocked: the default is fine */ }
 if (!SORTS[libSort]) libSort = 'source-tag';
@@ -213,6 +214,8 @@ function libGroups(list) {
     return [...m.entries()].sort(order).map(([k, v]) => ({key: k, h: label(k), mods: v}));
   };
   if (libSort === 'name') return [{h: '', mods: list.slice().sort(byName)}];
+  if (libSort === 'used') return [{h: '', mods: list.slice().sort((a, b) => (libUse[b.id] || 0) - (libUse[a.id] || 0) || byName(a, b))}];
+  if (libSort === 'fav') { const fav = new Set(S.fav_mods || []), f = list.filter(m => fav.has(m.id)).sort(byName), o = list.filter(m => !fav.has(m.id)).sort(byName); return [f.length && {h: '★ Favourites', mods: f}, o.length && {h: f.length ? 'Everything else' : '', mods: o}].filter(Boolean); }
   if (libSort === 'tag') return grp(list.slice().sort(cmpTag), firstTag, k => k || 'No tags', (a, b) => (a[0] === '') - (b[0] === '') || a[0].localeCompare(b[0], undefined, {sensitivity: 'base'}));
   const bySrc = grp(list, srcKey, k => SRC_NAME[k], (a, b) => SRC_ORDER[a[0]] - SRC_ORDER[b[0]]);
   if (libSort === 'source') return bySrc.map(g => ({...g, mods: g.mods.sort(byName)}));
@@ -220,13 +223,16 @@ function libGroups(list) {
 }
 function libRow(m, p) {
   const inn = p.mods.includes(m.id), tags = (m.tags || []).slice(0, 4);
-  return `<div class="row ${m.id === sel ? 'sel' : ''}"><span class="nm" data-sel="${esc(m.id)}" title="${esc(m.root)}">${esc(m.name)}</span>${tags.map(t => `<span class="tg">${esc(t)}</span>`).join('')}${badges(m)}
+  const fav = (S.fav_mods || []).includes(m.id), n = libUse[m.id] || 0;
+  return `<div class="row ${m.id === sel ? 'sel' : ''}"><button class="star ${fav ? 'on' : ''}" data-favmod="${esc(m.id)}" title="${fav ? 'Remove from favourites' : 'Add to favourites'}" aria-label="Favourite">${fav ? '★' : '☆'}</button><span class="nm" data-sel="${esc(m.id)}" title="${esc(m.root)}">${esc(m.name)}</span><span class="mut" title="How many of your playsets contain this mod">${n} playset${n === 1 ? '' : 's'}</span>${tags.map(t => `<span class="tg">${esc(t)}</span>`).join('')}${badges(m)}
         <button class="sm" data-add="${esc(m.id)}" ${inn || !m.exists ? 'disabled' : ''}>${inn ? '✓ Added' : '+ Add'}</button></div>`;
 }
 function viewLibrary(p) {
   if (libTag && !(libTag in (S.tag_counts || {}))) libTag = '';   // a tag of another game
   const f = q.toLowerCase();
-  const list = S.mods.filter(m => (!f || m.name.toLowerCase().includes(f) || (m.tags || []).some(t => t.toLowerCase().includes(f))) && (!libTag || (m.tags || []).includes(libTag)));
+  libUse = {}; S.playsets.forEach(ps => ps.mods.forEach(id => { libUse[id] = (libUse[id] || 0) + 1; }));
+  const fv = new Set(S.fav_mods || []);
+  const list = S.mods.filter(m => (!f || m.name.toLowerCase().includes(f) || (m.tags || []).some(t => t.toLowerCase().includes(f))) && (!libTag || (m.tags || []).includes(libTag)) && (!favOnly || fv.has(m.id)));
   const rem = S.removed.length ? `<div class="row static"><span class="warn">Removed since last scan:</span> ${S.removed.map(r => esc(r.name)).join(', ')}</div>` : '';
   const tagOpts = Object.entries(S.tag_counts || {}).map(([t, n]) => `<option value="${esc(t)}" ${t === libTag ? 'selected' : ''}>${esc(t)} (${n})</option>`).join('');
   const rows = libGroups(list).map(g => (g.h ? `<div class="grp">${esc(g.h)} <span class="mut">${g.sub ? g.sub.reduce((n, s) => n + s.mods.length, 0) : g.mods.length}</span></div>` : '') +
@@ -234,9 +240,10 @@ function viewLibrary(p) {
   $('view').innerHTML = `<div class="bar"><input type="search" id="q" placeholder="Search name or tag…" value="${esc(q)}">
     <select id="lib-sort" title="Sort the library" aria-label="Sort">${Object.entries(SORTS).map(([k, n]) => `<option value="${k}" ${k === libSort ? 'selected' : ''}>Sort: ${n}</option>`).join('')}</select>
     <select id="lib-tag" title="Show only mods with this tag" aria-label="Tag"><option value="">All tags</option>${tagOpts}</select>
-    <button id="addall">Add all shown</button><button id="modupd" title="Ask Steam which Workshop mods have a newer version">Check mod updates</button></div>${updPanel()}${rem}` +
+    <button id="favonly" class="${favOnly ? 'on' : ''}" title="Show only your favourite mods">★ Favourites only</button><button id="addall">Add all shown</button><button id="modupd" title="Ask Steam which Workshop mods have a newer version">Check mod updates</button></div>${updPanel()}${rem}` +
     (rows || `<div class="empty">No mods found.<br>${S.user_dir ? 'Drop a mod archive (.zip, .tar.gz) here to install one, or check the folders in Settings.' : esc(GNAME()) + ' user folder not found. Set it in Settings → Game folders.'}</div>`);
   $('lib-sort').onchange = () => { libSort = $('lib-sort').value; try { localStorage.setItem('libSort', libSort); } catch (e) { /* only a convenience */ } viewLibrary(cur()); };
+  $('favonly').onclick = () => { favOnly = !favOnly; viewLibrary(cur()); };
   $('lib-tag').onchange = () => { libTag = $('lib-tag').value; viewLibrary(cur()); };
   $('modupd').onclick = guard(async () => { $('modupd').disabled = true; try { U = await api('mod-updates', {}); } finally { $('modupd').disabled = false; } viewLibrary(cur()); });
   const qi = $('q');
@@ -288,6 +295,7 @@ function viewCompare(p) {
   const head = (t, n, btn) => n ? `<div class="cmp-h"><span>${t} <span class="mut">(${n})</span></span>${btn || ''}</div>` : '';
   let h = bar;
   if (C.identical) h += '<div class="row static ok">These playsets are identical.</div>';
+  h += `<div class="cmp-bar"><button class="sm" data-cmp="merge" title="Make a new playset with every mod of both (this one's order first); neither playset is changed">Merge both into a new playset</button></div>`;
   h += `<div class="cmp-sum"><span>${here}: ${sm('a')}</span><span>${there}: ${sm('b')}</span></div>`;
   h += head(`Only in ${here}`, C.only_a.length) + C.only_a.map(id => row(id)).join('');
   h += head(`Only in ${there}`, C.only_b.length, '<button class="sm" data-cmp="addall">Add all to ' + here + '</button>') +
@@ -311,6 +319,12 @@ function wireCmp() {
 document.addEventListener('click', guard(async e => {
   const t = e.target, act = t.dataset && t.dataset.cmp, p = cur(); if (!p) return;
   if (!act) return;
+  if (act === 'merge') {
+    const o = S.playsets.find(x => x.id === cmpWith); if (!o) return;
+    const n = prompt('Name for the merged playset', `${p.name} + ${o.name}`); if (!n) return;
+    const r = await api(`playsets/${p.id}/merge`, {with: o.id, name: n});
+    await api(`playsets/${r.id}/activate`, {}); tab = 'order'; return load();
+  }
   if (act === 'add') await patch(q => ({mods: q.mods.includes(t.dataset.id) ? q.mods : [...q.mods, t.dataset.id]}));
   if (act === 'addall') await patch(q => ({mods: [...q.mods, ...C.only_b.filter(id => !q.mods.includes(id))]}));
   if (act === 'state') {
@@ -557,6 +571,9 @@ function drawer() {
 // ---- actions ----
 document.addEventListener('click', guard(async e => {
   const t = e.target, p = cur(), ds = t.dataset; if (!p) return;
+  const starPs = t.closest('[data-favps]'), starMod = t.closest('[data-favmod]');
+  if (starPs) { const id = starPs.dataset.favps, ps = S.playsets.find(x => x.id === id); await api(`playsets/${id}/update`, {favorite: !(ps && ps.favorite)}); return load(); }
+  if (starMod) { const id = starMod.dataset.favmod, on = !(S.fav_mods || []).includes(id); S.fav_mods = (await api('fav-mod', {id, on})).fav_mods; return render(); }
   const psRow = t.closest('[data-ps]');
   if (psRow) { await api(`playsets/${psRow.dataset.ps}/activate`, {}); sel = null; return load(); }
   if (ds.tab) { tab = ds.tab; render(); if (tab === 'compare') { C = null; render(); await loadCompare(); } if (tab === 'files') await loadFiles(); }

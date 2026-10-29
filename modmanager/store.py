@@ -13,7 +13,7 @@ SHARE_FORMAT = "modmanager-playset"
 LEGACY_SHARE = {"vic3mm-playset": "vic3", "eu5mm-playset/1": "eu5"}  # files from the standalone managers
 
 MAX_NAME, MAX_NOTES, MAX_MODS = 60, 2000, 5000
-DEFAULTS = {"notes": "", "launch_args": [], "auto_sort": True, "separate_saves": False}
+DEFAULTS = {"notes": "", "launch_args": [], "auto_sort": True, "separate_saves": False, "favorite": False}
 
 
 # per-game settings (folders + base-game comparison); app-wide ones live in GlobalSettings
@@ -149,7 +149,7 @@ class Store:
             clean["notes"] = fields["notes"]
         if "launch_args" in fields:
             clean["launch_args"] = validate_launch_args(fields["launch_args"])
-        for k in ("auto_sort", "separate_saves"):
+        for k in ("auto_sort", "separate_saves", "favorite"):
             if k in fields:
                 if not isinstance(fields[k], bool):
                     raise ValueError(f"'{k}' must be true or false.")
@@ -170,6 +170,29 @@ class Store:
         if self.data["active"] == pid:
             self.data["active"] = next(iter(self.data["playsets"]), None)
         self.save()
+
+    def merge(self, a, b, name):
+        """A NEW playset with everything of `a` in its order, then what only `b` has (in b's order). A mod is enabled
+        if it is enabled in either. Neither playset is changed."""
+        pa, pb = self.get(a), self.get(b)
+        order = list(pa["mods"]) + [m for m in pb["mods"] if m not in pa["mods"]]
+        on = {m for ps in (pa, pb) for m in ps["mods"] if m not in ps["disabled"]}
+        return self.create(name, order, [m for m in order if m not in on], notes=f"Merged from '{pa['name']}' and '{pb['name']}'.")
+
+    def set_favorite_mod(self, mid, on):
+        """Star or unstar a mod (kept in the playset file, so it survives rescans and uninstalls)."""
+        mid = str(mid)
+        if not mid or len(mid) > 300:
+            raise ValueError("Invalid mod.")
+        fav = self.data.setdefault("fav_mods", [])
+        if on and mid not in fav:
+            if len(fav) >= 5000:
+                raise ValueError("Too many favourites.")
+            fav.append(mid)
+        elif not on and mid in fav:
+            fav.remove(mid)
+        self.save()
+        return list(fav)
 
     def prune_empty_defaults(self):
         """Older versions made an empty playset called 'Default' whenever a game had none. Remove those leftovers (empty,

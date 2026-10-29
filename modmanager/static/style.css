@@ -124,3 +124,6 @@ body.nomods .chk,body.nomods #sortnow,body.nomods #cfg,body.nomods #launchpart{d
 .scheme.on{border-color:var(--acc)}.scheme .chips{display:flex;gap:4px}.scheme .chips i{width:26px;height:26px;border-radius:6px;border:1px solid #0006}
 .grp{margin:14px 4px 4px;font-weight:700;letter-spacing:.04em;color:var(--acc);border-bottom:1px solid var(--line);padding-bottom:3px}.grp.sub{margin:8px 4px 2px 18px;font-size:12px;color:var(--ink);border-bottom:0;text-transform:uppercase;opacity:.85}
 .tg{font-size:11px;padding:0 6px;border-radius:9px;background:var(--panel);border:1px solid var(--line);color:var(--mut);white-space:nowrap}
+button.star{background:none;border:0;padding:0 4px;font-size:16px;line-height:1;color:var(--mut)}button.star.on{color:var(--acc)}button.star:hover:not(:disabled){color:var(--acc);border:0}
+.ps{align-items:center}.ps .grow{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#favonly.on{border-color:var(--acc);color:var(--acc)}

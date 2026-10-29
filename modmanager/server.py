@@ -225,7 +225,7 @@ class GameApp:
         s = self.store.settings()
         mods = [{**m, "change": self.library.change(m["id"])} for m in self.mods.values()]
         return {"game": self.game.public(), "mods": mods, "removed": self.library.removed(), "tag_counts": self.library.tag_counts(), "diff": self.diff,
-                "playsets": list(d["playsets"].values()), "no_mods": self.store.no_mods(), "active": d["active"],
+                "playsets": list(d["playsets"].values()), "no_mods": self.store.no_mods(), "fav_mods": list(self.store.data.get("fav_mods", [])), "active": d["active"],
                 "user_dir": str(self.user_dir or ""), "workshop_dir": str(self.workshop_dir or ""),
                 "game_root": str(self.game_root or ""), "game_version": self.game_version,
                 "has_logo": bool(self.logo), "logo_pending": self.logo_pending, "include_vanilla": s["include_vanilla"],
@@ -786,6 +786,10 @@ def make_handler(hub):
                 if parts == ["api", "paths"]:
                     app.configure(b)
                     return self._send(200, app.state())
+                if parts == ["api", "fav-mod"]:
+                    if not isinstance(b.get("on"), bool):
+                        raise ValueError("'on' must be true or false.")
+                    return self._send(200, {"fav_mods": app.store.set_favorite_mod(b.get("id", ""), b["on"])})
                 if parts == ["api", "ui"]:
                     app.store.update_settings(**{k: b[k] for k in ("ui_scheme", "ui_text") if k in b})
                     return self._send(200, app.state())
@@ -820,6 +824,8 @@ def make_handler(hub):
                     pid, act = parts[2], parts[3]
                     if act == "update":
                         return self._send(200, app.update(pid, b))
+                    if act == "merge":
+                        return self._send(200, {"id": app.store.merge(pid, str(b.get("with", "")), str(b.get("name") or "Merged"))})
                     if act == "duplicate":
                         return self._send(200, {"id": app.store.duplicate(pid, b.get("name") or "Copy")})
                     if act == "delete":
