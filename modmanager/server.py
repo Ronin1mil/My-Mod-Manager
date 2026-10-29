@@ -660,6 +660,16 @@ def make_handler(hub):
                 raise ValueError("Expected a JSON object.")
             return b
 
+        def _drain(self):
+            """Read (and drop) a small request body before answering without using it. Closing a connection that still
+            has unread data makes Windows reset it, and the client then sees an abort instead of the answer."""
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+                if 0 < n <= MAX_JSON:
+                    self.rfile.read(n)
+            except (ValueError, OSError):
+                pass
+
         def _host_ok(self):
             # guards against DNS rebinding: only answer for our own loopback host name
             return self.headers.get("Host", "").rsplit(":", 1)[0] in ("127.0.0.1", "localhost")
@@ -767,6 +777,7 @@ def make_handler(hub):
             host = self.headers.get("Host", "")
             origin = self.headers.get("Origin")
             if not self._host_ok() or (origin and origin.split("//", 1)[-1] != host):
+                self._drain()
                 return self._send(403, {"error": "bad origin"})
             try:
                 parts, app = self._route()
