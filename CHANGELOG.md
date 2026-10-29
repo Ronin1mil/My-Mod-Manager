@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0 - downloadable, self-updating app
+- Single-file apps for Windows, macOS and Linux are built by CI and attached to each GitHub release with `SHA256SUMS.txt`
+- **Update now**: the packaged app downloads the newest release, verifies the checksum, replaces itself and restarts (see docs/14)
+- Error log in `Documents/ModManager-errors.log`; fixes for the "reading 'playsets'" error and logo flipping when switching games; conflict scanning moved off the critical path (faster loading)
+- Compare tab no longer shows the previous comparison while loading
+
 ## 0.2.0 - the merge
 One app for Crusader Kings III, Europa Universalis V and Victoria 3, replacing `ck3-mod-manager`, `eu5-mod-manager` and `vic3-mod-manager`.
 
