@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.8.4 - favourites, merge, library sort and tags, test builds
 - **Test builds (nightly), experimental.** Settings -> App & updates -> Test builds installs the newest build of the branch being worked on, so changes can be tried before they become a release. A release is made from the exact commit that was tested (the release job warns if not). See docs/19
 - **Favourites.** Star a mod (Library) or a playset (sidebar). Starred playsets stay at the top of the list; the library has "Favourites first" and a "★ Favourites only" button
 - **Library sort by number of playsets:** "Most playsets first", with a "N playsets" count on every row
