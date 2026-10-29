@@ -1,37 +1,52 @@
-"""Draws installer/icon.ico (a gold-edged shield on burgundy) with the standard library only. Run: python installer/make_icon.py"""
-import math
+"""Draws installer/icon.ico: three glowing layers (a load order) stacked on a deep indigo tile.
+Standard library only. Run: python installer/make_icon.py   (add --preview to also write icon-preview.png)"""
 import struct
+import sys
 import zlib
 from pathlib import Path
 
-BG1, BG2, GOLD, DARK = (140, 58, 88), (80, 28, 52), (212, 184, 131), (30, 21, 25)
+BG_TOP, BG_BOTTOM = (52, 36, 118), (16, 14, 44)
+# (top face, side) from the bottom layer to the top one
+LAYERS = [((30, 140, 150), (16, 86, 104)), ((72, 200, 178), (36, 128, 128)), ((255, 205, 84), (205, 135, 40))]
+A, B, T = 0.64, 0.30, 0.13      # half width, half height and thickness of a layer
+CENTERS = [0.30, 0.04, -0.22]   # vertical centres, bottom layer first
 
 
-def shield(x, y, k):
-    """Inside a shield of relative size k? x, y in -1..1."""
-    x, y = x / k, y / k
-    if y < -0.85 or y > 1.0:
-        return False
-    half = 0.74 if y <= 0.05 else 0.74 * math.sqrt(max(0.0, 1 - ((y - 0.05) / 0.95) ** 2))
-    return abs(x) <= half
+def mix(c1, c2, t):
+    return tuple(c1[i] + (c2[i] - c1[i]) * t for i in range(3))
+
+
+def layer_hit(x, y, cy):
+    """-> 'top', 'side' or None for a slab whose top face is a diamond centred at (0, cy)."""
+    w = 1 - abs(x) / A
+    if w < 0:
+        return None
+    lo, hi = cy - B * w, cy + B * w
+    if lo <= y <= hi:
+        return "top"
+    if hi < y <= hi + T:
+        return "side"
+    return None
 
 
 def pixel(x, y):
-    if not (-1 <= x <= 1 and -1 <= y <= 1):
-        return None
-    r = 0.22  # rounded square
+    r = 0.24  # rounded tile
     cx, cy = max(abs(x) - (1 - r), 0), max(abs(y) - (1 - r), 0)
-    if cx * cx + cy * cy > r * r:
+    if abs(x) > 1 or abs(y) > 1 or cx * cx + cy * cy > r * r:
         return None
-    t = (y + 1) / 2
-    col = tuple(int(BG1[i] * (1 - t) + BG2[i] * t) for i in range(3))
-    if shield(x, y, 0.78):
-        col = GOLD
-        if shield(x, y, 0.66):
-            col = DARK
-            if abs(x) + abs(y + 0.05) < 0.27:
-                col = GOLD
-    return col
+    col = mix(BG_TOP, BG_BOTTOM, (y + 1) / 2)
+    glow = max(0.0, 1 - ((x * x) / 0.9 + ((y + 0.05) ** 2) / 0.9)) ** 2
+    col = mix(col, (96, 78, 190), glow * 0.55)
+    for (top, side), c in zip(LAYERS, CENTERS):
+        hit = layer_hit(x, y, c)
+        if hit == "top":
+            shade = 1 + 0.10 * (1 - (y - c + B) / (2 * B))  # lighter towards the back edge
+            col = tuple(min(255, v * shade) for v in top)
+            if abs(x) + abs(y - c) * (A / B) > A * 0.93:    # thin lighter rim along the diamond edge
+                col = mix(col, (255, 255, 255), 0.28)
+        elif hit == "side":
+            col = side
+    return tuple(int(v) for v in col)
 
 
 def png(size):
@@ -49,6 +64,7 @@ def png(size):
             n = max(a, 1)
             row += bytes([acc[0] // n, acc[1] // n, acc[2] // n, a * 255 // (ss * ss)])
         rows.append(bytes(row))
+
     def chunk(t, d):
         return struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d) & 0xFFFFFFFF)
     return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", size, size, 8, 6, 0, 0, 0))
@@ -67,6 +83,8 @@ def main():
     out = Path(__file__).with_name("icon.ico")
     out.write_bytes(head + entries + b"".join(imgs))
     print("wrote", out, out.stat().st_size, "bytes")
+    if "--preview" in sys.argv:
+        Path(__file__).with_name("icon-preview.png").write_bytes(imgs[0])
 
 
 if __name__ == "__main__":

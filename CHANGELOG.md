@@ -3,6 +3,8 @@
 ## 0.5.1 - one unreadable folder no longer breaks loading
 - Fixed: a mod folder Windows cannot open (for example a link or mount it does not trust, WinError 448) stopped the whole game from loading; such folders are now skipped, and a mod that points at one shows as missing
 - The error log now lives in its own folder, `Documents/Mod Manager/ModManager-errors.log`; an older log in Documents is moved there
+- New app and installer icon (three stacked layers on indigo); `installer/make_icon.py` draws it
+- New regression tests make each mod folder unreadable in turn, in every way a filesystem probe can fail, and check that loading, warnings, conflicts, the file tree and launching still work
 - The same error repeated within 30 seconds is written once, and a window closed mid-answer is no longer reported as an error
 
 ## 0.5.0 - its own window
