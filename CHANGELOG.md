@@ -1,11 +1,13 @@
 # Changelog
 
 ## 0.5.1 - one unreadable folder no longer breaks loading
-Fixes a crash where one mod folder Windows could not open stopped a whole game from loading, moves the error log into its own folder, and brings a new icon.
+Fixes a crash where one mod folder Windows could not open stopped a whole game from loading, moves the error log into its own folder, and brings a new icon. It also adds eight Steam Workshop collections as ready-made presets (four for Victoria 3, three for Crusader Kings III, one for Europa Universalis V).
 
 
 - Fixed: a mod folder Windows cannot open (for example a link or mount it does not trust, WinError 448) stopped the whole game from loading; such folders are now skipped, and a mod that points at one shows as missing
 - The error log now lives in its own folder, `Documents/Mod Manager/ModManager-errors.log`; an older log in Documents is moved there
+- New presets from Steam Workshop collections: Victoria 3 — Ultra Historical Mod Series, zw's Vic3 Mods, zw's Automated Vic3, Community Flavor Playlist; Crusader Kings III — Seastar's AGOT Collection, Small Maps, A Game of Thrones: The Definitive Collection; Europa Universalis V — Roman Empire Collection. `tools/make_preset.py` makes more from collection links
+- Importing a collection now refuses one that belongs to another game and leaves out mods Steam has removed
 - New app and installer icon (three stacked layers on indigo); `installer/make_icon.py` draws it
 - New regression tests make each mod folder unreadable in turn, in every way a filesystem probe can fail, and check that loading, warnings, conflicts, the file tree and launching still work
 - The same error repeated within 30 seconds is written once, and a window closed mid-answer is no longer reported as an error

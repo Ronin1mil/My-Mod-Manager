@@ -1,0 +1,383 @@
+{
+  "format": "modmanager-preset",
+  "id": "ck3-seastar-s-agot-collection-1-19-0-6-updated",
+  "game": "ck3",
+  "name": "Seastar's AGOT Collection 1.19.0.6 Updated",
+  "status": "unverified",
+  "description": "From the Steam Workshop collection 3608639287. Just my (not) little mod collection. Hello, the new version of the collection is here! Once again, this will probably be the last major update for the current version, as I've finally managed to include every mod I wanted in the collection. If you want to play with Legacy of Valyria and even Essos Expanded, check out my other collection → Seastar's AGOT Collection | LoV🐉 This a… Ids come from the collection (public, Crusader Kings III); not tested in a game.",
+  "source": "https://steamcommunity.com/sharedfiles/filedetails/?id=3608639287",
+  "mods": [
+    {
+      "workshop_id": "2962333032",
+      "name": "A Game of Thrones"
+    },
+    {
+      "workshop_id": "3034473189",
+      "name": "AGOT Submod Core"
+    },
+    {
+      "workshop_id": "3101422928",
+      "name": "Legacy Of The Dragon"
+    },
+    {
+      "workshop_id": "2962713441",
+      "name": "Valyrian Steel"
+    },
+    {
+      "workshop_id": "3412222811",
+      "name": "The Golden Company"
+    },
+    {
+      "workshop_id": "3462342647",
+      "name": "Mari's AGOT Makeovers"
+    },
+    {
+      "workshop_id": "2261468688",
+      "name": "Clear Notifications"
+    },
+    {
+      "workshop_id": "3035543804",
+      "name": "Custom Nickname"
+    },
+    {
+      "workshop_id": "3324579171",
+      "name": "AGOT - Suggest Dragon Bonding"
+    },
+    {
+      "workshop_id": "2971198450",
+      "name": "COW-AGOT: 3D Models & Bigger Castles"
+    },
+    {
+      "workshop_id": "3319354609",
+      "name": "AGOT Additional Models and Special Buildings"
+    },
+    {
+      "workshop_id": "3388366564",
+      "name": "AGOT More Dragon Eggs"
+    },
+    {
+      "workshop_id": "2950245430",
+      "name": "AGOT+"
+    },
+    {
+      "workshop_id": "2995674648",
+      "name": "AGOT - Crowns of Westeros"
+    },
+    {
+      "workshop_id": "3573203384",
+      "name": "More Valyrian Steel"
+    },
+    {
+      "workshop_id": "3319167091",
+      "name": "AGOT - Council Experience"
+    },
+    {
+      "workshop_id": "3586934156",
+      "name": "AGOT - Unbound"
+    },
+    {
+      "workshop_id": "3637024006",
+      "name": "AGOT - House Modifiers"
+    },
+    {
+      "workshop_id": "3445965581",
+      "name": "AGOT expanded - Death and birth"
+    },
+    {
+      "workshop_id": "3466228580",
+      "name": "AGOT expanded - Dragons"
+    },
+    {
+      "workshop_id": "3305687550",
+      "name": "[LOT] Legitimacy Over Time"
+    },
+    {
+      "workshop_id": "3437814875",
+      "name": "Faster Transitions"
+    },
+    {
+      "workshop_id": "2869221069",
+      "name": "Designate Heir - freely"
+    },
+    {
+      "workshop_id": "3522779004",
+      "name": "Bloodlines: Legacies of AGOT"
+    },
+    {
+      "workshop_id": "2677152091",
+      "name": "Invite Debutantes"
+    },
+    {
+      "workshop_id": "2686352443",
+      "name": "Invite Nobles"
+    },
+    {
+      "workshop_id": "2695438942",
+      "name": "Congenital Beauty"
+    },
+    {
+      "workshop_id": "2967263410",
+      "name": "AGOT: House Founders"
+    },
+    {
+      "workshop_id": "3059021049",
+      "name": "AGOT: More Actions"
+    },
+    {
+      "workshop_id": "2756456587",
+      "name": "Multilingual Education"
+    },
+    {
+      "workshop_id": "3713902872",
+      "name": "Succession Crisis"
+    },
+    {
+      "workshop_id": "3587967020",
+      "name": "Additional Models / AGOT+ Compatch"
+    },
+    {
+      "workshop_id": "3377641022",
+      "name": "AGOT : Seasons of Ice and Fire"
+    },
+    {
+      "workshop_id": "2966543745",
+      "name": "AGOT - Armies of Westeros"
+    },
+    {
+      "workshop_id": "3036454680",
+      "name": "Faster Activities"
+    },
+    {
+      "workshop_id": "3276373926",
+      "name": "Battleground Commanders"
+    },
+    {
+      "workshop_id": "3225355262",
+      "name": "Battle Graphics"
+    },
+    {
+      "workshop_id": "3235061780",
+      "name": "Battle Graphics AGOT Compatibility Patch"
+    },
+    {
+      "workshop_id": "3664900993",
+      "name": "AGOT Nobility of Westeros"
+    },
+    {
+      "workshop_id": "3678529052",
+      "name": "Grand Remembrance"
+    },
+    {
+      "workshop_id": "3683507542",
+      "name": "Grand Remembrance - AGOT Compatibility Submod"
+    },
+    {
+      "workshop_id": "3608374693",
+      "name": "[1.20] Dynamic Family Portrait"
+    },
+    {
+      "workshop_id": "3609763696",
+      "name": "Dynamyc Family Portrait (AGOT)"
+    },
+    {
+      "workshop_id": "3340494852",
+      "name": "Grant Cadet Branch"
+    },
+    {
+      "workshop_id": "3425828418",
+      "name": "Better Population Control"
+    },
+    {
+      "workshop_id": "3697008412",
+      "name": "Landmarks of Westeros & COW-AGOT Compatch"
+    },
+    {
+      "workshop_id": "3692879370",
+      "name": "AGOT - Landmarks of Westeros"
+    },
+    {
+      "workshop_id": "3541693392",
+      "name": "AGOT Citadel University"
+    },
+    {
+      "workshop_id": "3621472324",
+      "name": "AGOT Great Councils"
+    },
+    {
+      "workshop_id": "3496313878",
+      "name": "[AGOT] Knights & Banners"
+    },
+    {
+      "workshop_id": "3149692324",
+      "name": "AGOT Bookmarked"
+    },
+    {
+      "workshop_id": "3457401824",
+      "name": "Oathbound"
+    },
+    {
+      "workshop_id": "3329680499",
+      "name": "AGOT - Dragonpit For Dukes"
+    },
+    {
+      "workshop_id": "2712590542",
+      "name": "More Interactive Vassals"
+    },
+    {
+      "workshop_id": "3369079355",
+      "name": "BG Other Graphics: Battleground Commanders"
+    },
+    {
+      "workshop_id": "3371609961",
+      "name": "BG Other Graphics: BC AGOT Compatibility Patch"
+    },
+    {
+      "workshop_id": "3415188429",
+      "name": "Battle Events - AGOT Compatibility Patch"
+    },
+    {
+      "workshop_id": "3287741117",
+      "name": "Battle Events"
+    },
+    {
+      "workshop_id": "2264428428",
+      "name": "Debug Toggle (Less Invasive)"
+    },
+    {
+      "workshop_id": "3254254511",
+      "name": "AGOT Micro"
+    },
+    {
+      "workshop_id": "2227658180",
+      "name": "VIET Events - A Flavor and Immersion Event Mod"
+    },
+    {
+      "workshop_id": "3328141802",
+      "name": "Armies of Westeros REMASTERED (big update soon)"
+    },
+    {
+      "workshop_id": "3571431456",
+      "name": "The Red Keep"
+    },
+    {
+      "workshop_id": "3662281614",
+      "name": "The Red Keep (Hegemony Updates)"
+    },
+    {
+      "workshop_id": "2636170225",
+      "name": "Duel Overlay"
+    },
+    {
+      "workshop_id": "3692949151",
+      "name": "[AGOT] Knights & Banners (AoW)"
+    },
+    {
+      "workshop_id": "3700835663",
+      "name": "AGOT Courts of Westeros"
+    },
+    {
+      "workshop_id": "3439278803",
+      "name": "Gift More GOLD"
+    },
+    {
+      "workshop_id": "3422767115",
+      "name": "AGOT Music++"
+    },
+    {
+      "workshop_id": "3541596590",
+      "name": "AGOT Dragon Wives"
+    },
+    {
+      "workshop_id": "3676293022",
+      "name": "Expanded Court Position - Search and Recruit"
+    },
+    {
+      "workshop_id": "2963453899",
+      "name": "Armor of the Kingsguard"
+    },
+    {
+      "workshop_id": "2220326926",
+      "name": "Better Barbershop"
+    },
+    {
+      "workshop_id": "2220397689",
+      "name": "No Duchy Limit"
+    },
+    {
+      "workshop_id": "3409168338",
+      "name": "AGOT+ - Purple Eyes Restoration"
+    },
+    {
+      "workshop_id": "3459771174",
+      "name": "AGOT Clothes Adjustment"
+    },
+    {
+      "workshop_id": "3673468355",
+      "name": "AGOT: The Knighting Ceremony"
+    },
+    {
+      "workshop_id": "3765282284",
+      "name": "AGOT: Fire and Blood"
+    },
+    {
+      "workshop_id": "3778473717",
+      "name": "AGOT Fire and Blood - NOW Compatch"
+    },
+    {
+      "workshop_id": "3753608966",
+      "name": "AGOT NOW-Season of Ice and Fire Compatch"
+    },
+    {
+      "workshop_id": "3013743552",
+      "name": "AGOT - Holdings Art"
+    },
+    {
+      "workshop_id": "3742055253",
+      "name": "COW-AGOT: Nobility of Westeros Compatch"
+    },
+    {
+      "workshop_id": "3232842149",
+      "name": "BG Other Graphics: Zoom Scale Map"
+    },
+    {
+      "workshop_id": "3371173142",
+      "name": "BG Other Graphics: ZSM AGOT Compatibility Patch"
+    },
+    {
+      "workshop_id": "3712620554",
+      "name": "LoW & Additonal Models and Special Buildings Compatch"
+    },
+    {
+      "workshop_id": "3768208851",
+      "name": "Understated Elegance In Graphics (AGOT Edition)"
+    },
+    {
+      "workshop_id": "3780269495",
+      "name": "AGOT: The Long Night & Azor Ahai"
+    },
+    {
+      "workshop_id": "3800801361",
+      "name": "AGOT - Founder's Seats"
+    },
+    {
+      "workshop_id": "3766971799",
+      "name": "AGOT Seasons + Bookmarked + Fire and Blood Compatch"
+    },
+    {
+      "workshop_id": "3616679470",
+      "name": "AGOT - Dragon Riders Duel"
+    },
+    {
+      "workshop_id": "3810928988",
+      "name": "DICM 1.19.0.6"
+    },
+    {
+      "workshop_id": "2996152542",
+      "name": "Divine Intervention AGOT Cheat Menu"
+    },
+    {
+      "workshop_id": "3793472366",
+      "name": "AGOT - Dynamic Aesthetics by Hades & Fred"
+    }
+  ]
+}

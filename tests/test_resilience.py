@@ -42,9 +42,7 @@ class Unreadable(unittest.TestCase):
         mkworkshop(self.ws, 111, "Workshop One", files={"common/goods/c.txt": "w = {}"})
         mkworkshop(self.ws, 222, "Workshop Two", files={"common/goods/d.txt": "v = {}"})
         self.names = ["plain", "stubbed", "bare", "111", "222"]
-        self.exe = self.r / "game.sh"  # a stand-in for the game so Play has something to start
-        self.exe.write_text("#!/bin/sh\nexit 0\n")
-        self.exe.chmod(0o755)
+        self.exe = self.r / "game.exe"  # only its name is used: starting it is mocked
 
     def app(self):
         return GameApp(games.VIC3, user_dir=self.user, workshop_dir=self.ws, game_exe=str(self.exe),
@@ -88,7 +86,8 @@ class Unreadable(unittest.TestCase):
                 a.analyse(pid)
                 a.conflicts_job(pid)
                 a.tree_job(pid)
-                res = a.launch(pid)  # writes the load file from the mods that can be read
+                with mock.patch("modmanager.launch.start", return_value={"via": "exe"}):  # no real game here
+                    res = a.launch(pid)  # writes the load file from the mods that can be read
                 data = json.loads((self.user / games.VIC3.load_file).read_text())
                 self.assertEqual(res["written"], len(data["enabled_mods"]))
 

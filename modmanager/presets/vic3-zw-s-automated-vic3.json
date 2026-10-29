@@ -1,0 +1,39 @@
+{
+  "format": "modmanager-preset",
+  "id": "vic3-zw-s-automated-vic3",
+  "game": "vic3",
+  "name": "zw's Automated Vic3",
+  "status": "unverified",
+  "description": "From the Steam Workshop collection 3373559506. Save your wrist from hurting. Overview Latest Compatibility Check: Game Version 1.13 Note that most mods of this collection don't require updates for new game versions. Links Support me or request a commission: Ko-fi For general discussion: Join My Discord Server For older versions of mods: GitHub Repositories Ids come from the collection (public, Victoria 3); not tested in a game.",
+  "source": "https://steamcommunity.com/sharedfiles/filedetails/?id=3373559506",
+  "mods": [
+    {
+      "workshop_id": "3432933121",
+      "name": "Auto-Diplomacy And Advanced Subject Management"
+    },
+    {
+      "workshop_id": "3344726320",
+      "name": "Auto-Apply Automation PMs"
+    },
+    {
+      "workshop_id": "3353797125",
+      "name": "Auto-Apply PMs"
+    },
+    {
+      "workshop_id": "3357811223",
+      "name": "Supply Chain Semi-Auto Builder"
+    },
+    {
+      "workshop_id": "3279201462",
+      "name": "Auto-Recruit & One-Click Recruit Commanders"
+    },
+    {
+      "workshop_id": "3278770055",
+      "name": "Controllable Private Construction"
+    },
+    {
+      "workshop_id": "3467896823",
+      "name": "Choose Laws For Released Subjects"
+    }
+  ]
+}

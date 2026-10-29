@@ -69,17 +69,26 @@ def import_collection(game, text, post=default_post):
     if not ids:
         raise ValueError("That collection has no mods in it.")
     ids = ids[:presets.MAX_MODS]
-    names, title, note = {}, None, ""
+    names, title, note, gone, other_game = {}, None, "", set(), False
     fields = {"itemcount": len(ids) + 1, "publishedfileids[0]": cid}
     fields.update({f"publishedfileids[{i + 1}]": w for i, w in enumerate(ids)})
     try:
         for d in post("/ISteamRemoteStorage/GetPublishedFileDetails/v1/", fields)["response"]["publishedfiledetails"]:
-            if str(d.get("publishedfileid")) == cid:
+            wid, app = str(d.get("publishedfileid")), str(d.get("consumer_app_id") or "")
+            if wid == cid:
                 title, note = d.get("title"), d.get("description", "")
+                other_game = bool(app) and app != str(game.app_id)
+            elif d.get("result") not in (None, 1):
+                gone.add(wid)  # deleted or hidden on Steam: it could never be downloaded
             elif d.get("title"):
-                names[str(d["publishedfileid"])] = str(d["title"])[:120]
+                names[wid] = str(d["title"])[:120]
     except (KeyError, TypeError, ValueError):
         pass  # names are a nicety; ids alone make a working preset
+    if other_game:
+        raise ValueError(f"That collection is for another game, not {game.name}. Open that game and import it there.")
+    ids = [w for w in ids if w not in gone]
+    if not ids:
+        raise ValueError("Every mod in that collection has been removed from Steam.")
     title = str(title or f"Collection {cid}")[:60]
     return {"format": presets.FORMAT, "id": _slug(title, f"collection-{cid}"), "game": game.id, "name": title,
             "status": "unverified",

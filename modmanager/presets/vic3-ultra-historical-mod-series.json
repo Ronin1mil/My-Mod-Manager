@@ -1,0 +1,47 @@
+{
+  "format": "modmanager-preset",
+  "id": "vic3-ultra-historical-mod-series",
+  "game": "vic3",
+  "name": "Ultra Historical Mod Series",
+  "status": "unverified",
+  "description": "From the Steam Workshop collection 2918558673. Ultra Historical Mod Series aims to bring a more realistic simulation and immersion. Join us on Regular games with Ultra Historical on This is a modular list of mods that can be played separately but are compatible with each other. Beware: Using this mod makes the game considerably harder for many countries, especialy those starting with low literacy, backward technologies/laws… Ids come from the collection (public, Victoria 3); not tested in a game.",
+  "source": "https://steamcommunity.com/sharedfiles/filedetails/?id=2918558673",
+  "mods": [
+    {
+      "workshop_id": "2897378189",
+      "name": "[1.13]Ultra Historical Research & Education"
+    },
+    {
+      "workshop_id": "2918521358",
+      "name": "[1.13]Ultra Historical Politics"
+    },
+    {
+      "workshop_id": "3007678964",
+      "name": "[1.13]Ultra Historical Warfare"
+    },
+    {
+      "workshop_id": "3018606449",
+      "name": "[1.13]Ultra Historical Diplomacy"
+    },
+    {
+      "workshop_id": "3041693269",
+      "name": "[1.13]Ultra Historical Demography"
+    },
+    {
+      "workshop_id": "3626012595",
+      "name": "[1.13]Ultra Historical Cultures & Discrimination"
+    },
+    {
+      "workshop_id": "3640730097",
+      "name": "[1.13]Ultra Historical Debts and Taxes"
+    },
+    {
+      "workshop_id": "3647628156",
+      "name": "[1.13]Ultra Historical Workforce"
+    },
+    {
+      "workshop_id": "3656697666",
+      "name": "[1.13]Ultra Historical Companies"
+    }
+  ]
+}

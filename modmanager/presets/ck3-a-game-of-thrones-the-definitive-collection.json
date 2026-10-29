@@ -1,0 +1,123 @@
+{
+  "format": "modmanager-preset",
+  "id": "ck3-a-game-of-thrones-the-definitive-collection",
+  "game": "ck3",
+  "name": "A Game of Thrones The Definitive Collection (AGOT 0.4.40)",
+  "status": "unverified",
+  "description": "From the Steam Workshop collection 3631494889. ANNOUNCEMENTS: 8/1/2026 1. AGOT has just updated to version 0.4.40 . The majority of submods are not updated for compatibility. 2. Please prioritize reading the Compatibility section below. 3. Ensure you read all other information and instructions carefully to ensure the collection functions as intended. COLLECTION INFORMATION: This collection was carefully built to provide a s… Ids come from the collection (public, Crusader Kings III); not tested in a game.",
+  "source": "https://steamcommunity.com/sharedfiles/filedetails/?id=3631494889",
+  "mods": [
+    {
+      "workshop_id": "3071630311",
+      "name": "Encyclopedia Debug Toggle"
+    },
+    {
+      "workshop_id": "2712590542",
+      "name": "More Interactive Vassals"
+    },
+    {
+      "workshop_id": "2962333032",
+      "name": "A Game of Thrones"
+    },
+    {
+      "workshop_id": "3034473189",
+      "name": "AGOT Submod Core"
+    },
+    {
+      "workshop_id": "2995674648",
+      "name": "AGOT - Crowns of Westeros"
+    },
+    {
+      "workshop_id": "2963453899",
+      "name": "Armor of the Kingsguard"
+    },
+    {
+      "workshop_id": "3101422928",
+      "name": "Legacy Of The Dragon"
+    },
+    {
+      "workshop_id": "2962713441",
+      "name": "Valyrian Steel"
+    },
+    {
+      "workshop_id": "3412222811",
+      "name": "The Golden Company"
+    },
+    {
+      "workshop_id": "2950245430",
+      "name": "AGOT+"
+    },
+    {
+      "workshop_id": "3422767115",
+      "name": "AGOT Music++"
+    },
+    {
+      "workshop_id": "3356702932",
+      "name": "AGOT - Melodies of Ruin"
+    },
+    {
+      "workshop_id": "3275318194",
+      "name": "Better Ruler Designer"
+    },
+    {
+      "workshop_id": "3149692324",
+      "name": "AGOT Bookmarked"
+    },
+    {
+      "workshop_id": "3225355262",
+      "name": "Battle Graphics"
+    },
+    {
+      "workshop_id": "3235061780",
+      "name": "Battle Graphics AGOT Compatibility Patch"
+    },
+    {
+      "workshop_id": "2967263410",
+      "name": "AGOT: House Founders"
+    },
+    {
+      "workshop_id": "3059021049",
+      "name": "AGOT: More Actions"
+    },
+    {
+      "workshop_id": "3377641022",
+      "name": "AGOT : Seasons of Ice and Fire"
+    },
+    {
+      "workshop_id": "3673468355",
+      "name": "AGOT: The Knighting Ceremony"
+    },
+    {
+      "workshop_id": "3571431456",
+      "name": "The Red Keep"
+    },
+    {
+      "workshop_id": "3662281614",
+      "name": "The Red Keep (Hegemony Updates)"
+    },
+    {
+      "workshop_id": "2971198450",
+      "name": "COW-AGOT: 3D Models & Bigger Castles"
+    },
+    {
+      "workshop_id": "3459939229",
+      "name": "AGOT: Brightboar - Westerosi House Flavor"
+    },
+    {
+      "workshop_id": "3319354609",
+      "name": "AGOT Additional Models and Special Buildings"
+    },
+    {
+      "workshop_id": "3587967020",
+      "name": "Additional Models / AGOT+ Compatch"
+    },
+    {
+      "workshop_id": "3388366564",
+      "name": "AGOT More Dragon Eggs"
+    },
+    {
+      "workshop_id": "3466228580",
+      "name": "AGOT expanded - Dragons"
+    }
+  ]
+}

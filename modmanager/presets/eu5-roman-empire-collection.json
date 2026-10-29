@@ -1,0 +1,119 @@
+{
+  "format": "modmanager-preset",
+  "id": "eu5-roman-empire-collection",
+  "game": "eu5",
+  "name": "Roman Empire Collection",
+  "status": "unverified",
+  "description": "From the Steam Workshop collection 3608056145. Roman Empire Collection Some of these mods provide overlapping or redundant features. They have not all been tested together, and several are compatches meant to support the mods listed above. *** Please let me know any bugs you come across or suggestions on our Discord Ids come from the collection (public, Europa Universalis V); not tested in a game.",
+  "source": "https://steamcommunity.com/sharedfiles/filedetails/?id=3608056145",
+  "mods": [
+    {
+      "workshop_id": "3599543453",
+      "name": "Community Flavor Pack"
+    },
+    {
+      "workshop_id": "3601047146",
+      "name": "Glorp UI"
+    },
+    {
+      "workshop_id": "3605677866",
+      "name": "Better Road Builder"
+    },
+    {
+      "workshop_id": "3599514412",
+      "name": "Battle Graphics"
+    },
+    {
+      "workshop_id": "3628883955",
+      "name": "Treasures of the Roman World"
+    },
+    {
+      "workshop_id": "3721193233",
+      "name": "Oikoumene: Dynamic Place Names"
+    },
+    {
+      "workshop_id": "3600439136",
+      "name": "Empire of the Romans & Basileía Romaíon - Localization Only"
+    },
+    {
+      "workshop_id": "3612926523",
+      "name": "Anatolian & Balkan Monasteries"
+    },
+    {
+      "workshop_id": "3608722796",
+      "name": "[1.3] Roman Roads"
+    },
+    {
+      "workshop_id": "3792166613",
+      "name": "More Privileges and Reforms"
+    },
+    {
+      "workshop_id": "3799692022",
+      "name": "More Laws"
+    },
+    {
+      "workshop_id": "3604169106",
+      "name": "Legacy of Timur: An Age of Gunpowder (1.4)"
+    },
+    {
+      "workshop_id": "3619130338",
+      "name": "[1.3] Improved Subject Management"
+    },
+    {
+      "workshop_id": "3697317887",
+      "name": "Zorange's Mapmode Collection"
+    },
+    {
+      "workshop_id": "3681510822",
+      "name": "Auto Child Education (1.3)"
+    },
+    {
+      "workshop_id": "3681629733",
+      "name": "Nobles Auto Marry - Continued (1.3)"
+    },
+    {
+      "workshop_id": "3634578322",
+      "name": "BR: Battle Graphics Submod"
+    },
+    {
+      "workshop_id": "3812643460",
+      "name": "Centers of Importance"
+    },
+    {
+      "workshop_id": "3644451658",
+      "name": "Rise of the Norse"
+    },
+    {
+      "workshop_id": "3822410674",
+      "name": "Merchant Naval Levies [1.3]"
+    },
+    {
+      "workshop_id": "3811590946",
+      "name": "Copious Canals"
+    },
+    {
+      "workshop_id": "3607417095",
+      "name": "[1.3] Praecepta Militaria - A Byzantine Army Rework"
+    },
+    {
+      "workshop_id": "3618199037",
+      "name": "[1.4] Basileia Romaion 1337: Update 27.1"
+    },
+    {
+      "workshop_id": "3605061066",
+      "name": "Mods by Fishe (1.3.*)"
+    },
+    {
+      "workshop_id": "3621447669",
+      "name": "BR:1337 Submods & Compatches"
+    },
+    {
+      "workshop_id": "3687461111",
+      "name": "Balance of Power Collection."
+    },
+    {
+      "workshop_id": "3820690759",
+      "name": "Praecepta Militaria"
+    }
+  ]
+}

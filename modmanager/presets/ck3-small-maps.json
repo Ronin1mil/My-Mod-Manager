@@ -1,0 +1,71 @@
+{
+  "format": "modmanager-preset",
+  "id": "ck3-small-maps",
+  "game": "ck3",
+  "name": "Small Maps",
+  "status": "unverified",
+  "description": "From the Steam Workshop collection 3814492113. Let me know about any errors you find. All the important ones are already fixed, and none of them cause crashes. Also, if you have any ideas for a good map, let me know. I'll be reading! Ids come from the collection (public, Crusader Kings III); not tested in a game.",
+  "source": "https://steamcommunity.com/sharedfiles/filedetails/?id=3814492113",
+  "mods": [
+    {
+      "workshop_id": "3806985721",
+      "name": "Small Map: The Heartland"
+    },
+    {
+      "workshop_id": "3814481407",
+      "name": "Small Map: CK3 Old Map"
+    },
+    {
+      "workshop_id": "3812869088",
+      "name": "Small Map: West Side"
+    },
+    {
+      "workshop_id": "3813766989",
+      "name": "Small Map: Europa Focus"
+    },
+    {
+      "workshop_id": "3814280321",
+      "name": "Small Map: Pax Romana"
+    },
+    {
+      "workshop_id": "3815459438",
+      "name": "Ultra Small Map: Northern Lords"
+    },
+    {
+      "workshop_id": "3814822137",
+      "name": "Small Map: Just Asia"
+    },
+    {
+      "workshop_id": "3813832936",
+      "name": "Small Map: East Side"
+    },
+    {
+      "workshop_id": "3815473368",
+      "name": "Small Map: The Far East"
+    },
+    {
+      "workshop_id": "3814273223",
+      "name": "Small Map: East Asia"
+    },
+    {
+      "workshop_id": "3814297059",
+      "name": "Small Map: Southeast Asia"
+    },
+    {
+      "workshop_id": "3815076055",
+      "name": "Small Map: Focused Steppes"
+    },
+    {
+      "workshop_id": "3814784314",
+      "name": "Small Map: Indian Subcontinent"
+    },
+    {
+      "workshop_id": "3814305287",
+      "name": "Ultra Small Map: Japan & Korea"
+    },
+    {
+      "workshop_id": "3811066201",
+      "name": "Small Map: Just Africa"
+    }
+  ]
+}

@@ -1,0 +1,187 @@
+{
+  "format": "modmanager-preset",
+  "id": "vic3-community-flavor-playlist",
+  "game": "vic3",
+  "name": "Community Flavor Playlist",
+  "status": "unverified",
+  "description": "From the Steam Workshop collection 3385177152. This is a list of mods that are participating in the Community Mod Triggers component of CMF. Many of these are compatible with each other, but be sure to check each individual mod page for individual compatibility details. Historical Flavor: - Australia & New Zealand Flavor Pack - Bagel's Dynamic Flags, Names, & Colors - From Sea to Sea (Canda Flavor) - Gates of the Bosphorus … Ids come from the collection (public, Victoria 3); not tested in a game.",
+  "source": "https://steamcommunity.com/sharedfiles/filedetails/?id=3385177152",
+  "mods": [
+    {
+      "workshop_id": "2880120246",
+      "name": "[1.13 & 1.14] Basileia Romaion 1736"
+    },
+    {
+      "workshop_id": "3385002128",
+      "name": "[1.13/1.14] Community Mod Framework"
+    },
+    {
+      "workshop_id": "3147725402",
+      "name": "Community Outfit Mod"
+    },
+    {
+      "workshop_id": "3508296963",
+      "name": "[1.13] Expanded Topbar Framework"
+    },
+    {
+      "workshop_id": "3384997867",
+      "name": "[1.13] Gates of the Bosphorus"
+    },
+    {
+      "workshop_id": "3371719217",
+      "name": "[1.13] Manaflow: Ankaris Arrival [English | 汉化 | 한국어]"
+    },
+    {
+      "workshop_id": "2889925770",
+      "name": "[1.13] Morgenröte - Dawn of Flavor"
+    },
+    {
+      "workshop_id": "3612851168",
+      "name": "[1.12] This Land is Mine"
+    },
+    {
+      "workshop_id": "3123122938",
+      "name": "[1.9] James's Korea Flavor Pack"
+    },
+    {
+      "workshop_id": "3539417209",
+      "name": "Aces High: Model Plane Pack"
+    },
+    {
+      "workshop_id": "2939278238",
+      "name": "Australia & New Zealand Flavor Pack"
+    },
+    {
+      "workshop_id": "2895956555",
+      "name": "Better Decrees 1.13"
+    },
+    {
+      "workshop_id": "2932134122",
+      "name": "Better Politics Mod"
+    },
+    {
+      "workshop_id": "3472557637",
+      "name": "Civilization Industrial Era Music Pack"
+    },
+    {
+      "workshop_id": "3602805894",
+      "name": "Civilization V European Music Pack"
+    },
+    {
+      "workshop_id": "3465560233",
+      "name": "Easter Graphics Pack"
+    },
+    {
+      "workshop_id": "3587232850",
+      "name": "Grey's Anti-Trust Patch"
+    },
+    {
+      "workshop_id": "3108195724",
+      "name": "Grey's Deeper Sinosphere"
+    },
+    {
+      "workshop_id": "3330261506",
+      "name": "Grey's Food Industries Rework"
+    },
+    {
+      "workshop_id": "3324254588",
+      "name": "Grey's Military Industries Rework"
+    },
+    {
+      "workshop_id": "3609384092",
+      "name": "Grey's Populist Legal Innovation"
+    },
+    {
+      "workshop_id": "3351014672",
+      "name": "Grey's Populist Legal Power"
+    },
+    {
+      "workshop_id": "3394847149",
+      "name": "Grey's Ranch Production Rework"
+    },
+    {
+      "workshop_id": "3115017647",
+      "name": "Grey's Smarter Private Construction"
+    },
+    {
+      "workshop_id": "3345217364",
+      "name": "Grey's Soft Econ Adjustments"
+    },
+    {
+      "workshop_id": "3336914177",
+      "name": "Grey's Soft Pop Adjustments"
+    },
+    {
+      "workshop_id": "3276243851",
+      "name": "Grey's Subject Interaction Suite"
+    },
+    {
+      "workshop_id": "3306851845",
+      "name": "Grey's Tweaked Starting Conditions"
+    },
+    {
+      "workshop_id": "3371689443",
+      "name": "Grey's Urban Synergy Unleashed"
+    },
+    {
+      "workshop_id": "3199730217",
+      "name": "Hail, Columbia! - United States Flavor Pack"
+    },
+    {
+      "workshop_id": "3245931441",
+      "name": "James's Korea Uniform Pack"
+    },
+    {
+      "workshop_id": "3338630543",
+      "name": "Mandate of Heaven"
+    },
+    {
+      "workshop_id": "3553000326",
+      "name": "[OUTDATED FOR 1.12] Philippine Flavor Mod"
+    },
+    {
+      "workshop_id": "3386448514",
+      "name": "Tecumseh's Legacy"
+    },
+    {
+      "workshop_id": "3412374417",
+      "name": "The Lepsius Map"
+    },
+    {
+      "workshop_id": "3467732355",
+      "name": "[1.12]The Three Brothers REDUX: A Scandinavian Flavor Pack"
+    },
+    {
+      "workshop_id": "3447120489",
+      "name": "Theme: Aetherglow"
+    },
+    {
+      "workshop_id": "3457767393",
+      "name": "Theme: Australia (Green & Gold)"
+    },
+    {
+      "workshop_id": "3446376131",
+      "name": "Theme: Elven Bloom"
+    },
+    {
+      "workshop_id": "3680189264",
+      "name": "From Sea to Sea"
+    },
+    {
+      "workshop_id": "3654153829",
+      "name": "Community State Framework"
+    },
+    {
+      "workshop_id": "3728125278",
+      "name": "Ships Expanded: Imperial Japan"
+    },
+    {
+      "workshop_id": "3727214915",
+      "name": "Venezuela Flavour Pack"
+    },
+    {
+      "workshop_id": "3713104798",
+      "name": "British Flavour Pack: The Imperial Century"
+    }
+  ]
+}

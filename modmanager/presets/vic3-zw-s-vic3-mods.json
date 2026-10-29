@@ -1,0 +1,99 @@
+{
+  "format": "modmanager-preset",
+  "id": "vic3-zw-s-vic3-mods",
+  "game": "vic3",
+  "name": "zw's Vic3 Mods",
+  "status": "unverified",
+  "description": "From the Steam Workshop collection 3373555715. Overview Latest Compatibility Check: Game Version 1.13 Note that most mods of this collection don't require updates for new game versions. All mods are compatible with each other, with the only exception of \"Controllable Private Construction\" and \"Private Investments Only Expand Existing Buildings\". TBD Update: Naval Battle Size Fixed (1.12) Links Support me or request a commis… Ids come from the collection (public, Victoria 3); not tested in a game.",
+  "source": "https://steamcommunity.com/sharedfiles/filedetails/?id=3373555715",
+  "mods": [
+    {
+      "workshop_id": "3442069606",
+      "name": "Westernized Uniforms"
+    },
+    {
+      "workshop_id": "3478376350",
+      "name": "Customize Uniforms"
+    },
+    {
+      "workshop_id": "3432933121",
+      "name": "Auto-Diplomacy And Advanced Subject Management"
+    },
+    {
+      "workshop_id": "3353797125",
+      "name": "Auto-Apply PMs"
+    },
+    {
+      "workshop_id": "3344726320",
+      "name": "Auto-Apply Automation PMs"
+    },
+    {
+      "workshop_id": "3357811223",
+      "name": "Supply Chain Semi-Auto Builder"
+    },
+    {
+      "workshop_id": "3279201462",
+      "name": "Auto-Recruit & One-Click Recruit Commanders"
+    },
+    {
+      "workshop_id": "3278770055",
+      "name": "Controllable Private Construction"
+    },
+    {
+      "workshop_id": "3736531613",
+      "name": "Sustainable Resource"
+    },
+    {
+      "workshop_id": "3324172660",
+      "name": "Sustainable Resource Buildings Expansion"
+    },
+    {
+      "workshop_id": "3367346631",
+      "name": "Sustainable Resource Buildings Expansion (Small Country Patch)"
+    },
+    {
+      "workshop_id": "3306581818",
+      "name": "More Icons For Different Orders"
+    },
+    {
+      "workshop_id": "3282418847",
+      "name": "Automobiles Won't Destroy Your Railways Anymore"
+    },
+    {
+      "workshop_id": "3426210777",
+      "name": "More Mechanized Mobilization Options"
+    },
+    {
+      "workshop_id": "3537145231",
+      "name": "Land Battle Fixed"
+    },
+    {
+      "workshop_id": "3365573515",
+      "name": "Naval Battle Size Fixed"
+    },
+    {
+      "workshop_id": "3284950938",
+      "name": "Remove Unwanted Buildings"
+    },
+    {
+      "workshop_id": "3467896823",
+      "name": "Choose Laws For Released Subjects"
+    },
+    {
+      "workshop_id": "3526501559",
+      "name": "OCD Friendly BIC Shattering"
+    },
+    {
+      "workshop_id": "3524537017",
+      "name": "Better Suez Canal Border"
+    },
+    {
+      "workshop_id": "3278371002",
+      "name": "Private Investments Only Expand Existing Buildings"
+    },
+    {
+      "workshop_id": "3657937087",
+      "name": "Women in Politics"
+    }
+  ]
+}

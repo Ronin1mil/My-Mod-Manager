@@ -30,6 +30,27 @@ class T(unittest.TestCase):
         self.assertEqual((p["name"], p["id"], p["status"]), ("My Big Stack!", "my-big-stack", "unverified"))
         self.assertEqual(p["mods"][0]["name"], "Core")
 
+    def steam(self, head_app, item_app="1158310", gone=()):
+        def post(path, fields):
+            if "GetCollectionDetails" in path:
+                return fake_post(path, fields)
+            items = [{"publishedfileid": "10", "title": "Core", "consumer_app_id": item_app, "result": 9 if "10" in gone else 1},
+                     {"publishedfileid": "30", "title": "Addon", "consumer_app_id": item_app, "result": 9 if "30" in gone else 1}]
+            return {"response": {"publishedfiledetails": [
+                {"publishedfileid": "99", "title": "Stack", "consumer_app_id": head_app, "result": 1}] + items}}
+        return post
+
+    def test_a_collection_for_another_game_is_refused(self):
+        with self.assertRaisesRegex(ValueError, "another game"):
+            collections.import_collection(games.VIC3, "99", self.steam("1158310"))
+        self.assertEqual(len(collections.import_collection(games.CK3, "99", self.steam("1158310"))["mods"]), 2)
+
+    def test_items_removed_from_steam_are_left_out(self):
+        doc = collections.import_collection(games.CK3, "99", self.steam("1158310", gone=("30",)))
+        self.assertEqual([m["workshop_id"] for m in doc["mods"]], ["10"])
+        with self.assertRaisesRegex(ValueError, "removed"):
+            collections.import_collection(games.CK3, "99", self.steam("1158310", gone=("10", "30")))
+
     def test_errors_are_clear(self):
         with self.assertRaises(ValueError):
             collections.import_collection(games.CK3, "99", lambda *a: {"response": {"collectiondetails": [{"result": 9}]}})
