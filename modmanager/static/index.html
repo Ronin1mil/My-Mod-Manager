@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mod Manager</title>
+<link rel="stylesheet" href="/style.css">
+</head><body>
+<div id="app">
+ <aside id="side">
+  <div class="logo" id="logo"><span class="wm"></span><span class="sub">Mod Manager</span></div>
+  <select id="game" aria-label="Game"></select>
+  <div class="side-h">Playsets</div>
+  <div id="pslist"></div>
+  <div class="side-btns"><button id="new">+ New</button><button id="imp">Import</button><input type="file" id="impf" accept=".json" hidden></div>
+  <div class="side-foot"><button id="appcfg" class="sm">⚙ Settings</button><span id="ver" class="mut"></span></div>
+ </aside>
+ <section id="center">
+  <header id="top">
+   <h1 id="title"></h1>
+   <span class="grow"></span>
+   <label class="chk" title="Keep dependencies loading first automatically"><input type="checkbox" id="auto"> Auto-sort</label>
+   <button id="sortnow" title="Reorder so dependencies load first">Sort now</button>
+   <button id="installbtn">Install mod…</button><input type="file" id="installf" accept=".zip" hidden>
+   <button id="rescan">Refresh</button>
+   <button id="cfg">Playset settings</button>
+  </header>
+  <div id="banner" hidden></div>
+  <nav id="tabs"></nav>
+  <div id="view"></div>
+  <footer id="play">
+   <div id="status" class="mut"></div>
+   <span class="grow"></span>
+   <button id="launch" class="pri big">▶ Play</button>
+  </footer>
+ </section>
+ <aside id="drawer"></aside>
+</div>
+<div id="drop">Drop a .zip mod to install it</div>
+<div id="toast" role="status"></div>
+<dialog id="dlg"></dialog>
+<script src="/app.js"></script>
+</body></html>
