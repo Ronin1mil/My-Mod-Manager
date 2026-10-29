@@ -16,6 +16,9 @@ The first time you open a game, a setup dialog finds the install (every Steam li
 
 > **Status:** everything is tested against fake installs and a stub game (see [docs/08-testing.md](docs/08-testing.md)). **Nothing has been run against a real CK3, EU5 or VIC3 install yet**, so the hand-off to the game (load file name and format, whether the stock launcher overrides it) is unverified. The in-app setup dialog says so, and [docs/13-verification-checklist.md](docs/13-verification-checklist.md) lists the five-minute checks that settle it per game.
 
+## Quick start (no Git)
+On GitHub press **Code → Download ZIP**, unzip it, and double-click `Start Mod Manager.bat` (Windows) or `Start Mod Manager.command` (macOS/Linux). You need Python 3.8+ installed.
+
 ## Features
 - **Three games, one app.** A game switcher with a per-game theme; every game keeps its own playsets, library, backups and settings. Adding a game is a data entry in `modmanager/games.py`.
 - **Playsets**: unlimited, each with its own mods, load order, notes, extra launch arguments and (optionally) its **own save folder**; duplicate, export/import to share (a file for the wrong game is refused with a clear message).
