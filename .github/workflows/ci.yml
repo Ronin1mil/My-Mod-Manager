@@ -26,6 +26,7 @@ concurrency:
 jobs:
   unit:
     name: Unit tests (${{ matrix.os }}, Python ${{ matrix.py }})
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.backfill && !inputs.publish) }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -41,6 +42,7 @@ jobs:
 
   e2e:
     name: Browser end-to-end
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.backfill && !inputs.publish) }}
     runs-on: ubuntu-24.04
     env:
       BROWSER: "true"  # a steam:// URL must never open anything on a CI machine
@@ -64,6 +66,7 @@ jobs:
 
   build:
     name: Build app (${{ matrix.name }})
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.backfill && !inputs.publish) }}
     needs: [unit]
     strategy:
       fail-fast: false
@@ -196,13 +199,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           # tag  commit  title
+          fail=0
           while read -r tag sha title; do
             if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then echo "$tag exists"; continue; fi
             v="${tag#v}"
             awk -v h="## $v " 'index($0,h)==1{p=1;next} /^## /{p=0} p' CHANGELOG.md > notes.md
             printf '\nThis release lists the changes only. It has no app files; download the newest release instead.\n' >> notes.md
-            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$sha" --title "$tag - $title" --notes-file notes.md --latest=false
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$sha" --title "$tag - $title" --notes-file notes.md --latest=false || { echo "::error::could not create $tag"; fail=1; }
           done <<'LIST'
-          v0.2.0 37fbecf09e49cc8a82d86f386213497c5adff421 the merge
+          v0.2.0 87d916598e12f73364db2dbbb20f86a2aa1860be the merge
           v0.3.0 51edfa5cac5d8614f06d23789e30bf07dd944fbd downloadable, self-updating app
           LIST
+          exit $fail
