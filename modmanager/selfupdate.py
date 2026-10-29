@@ -21,7 +21,7 @@ import urllib.request
 from pathlib import Path
 
 from . import errorlog
-from .update import ALLOWED_HOST, LINK_PREFIX, REPO, check_for_update
+from .update import ALLOWED_HOST, LINK_PREFIX, REPO, check_for_update, check_nightly, stable_current
 
 MAX_EXE = 300 * 1024 * 1024
 SUMS_NAME = "SHA256SUMS.txt"
@@ -164,8 +164,11 @@ def restart(exe, argv):
 class Updater:
     """One update at a time, run in a worker thread; the page polls `status`."""
 
-    def __init__(self, check=check_for_update, dl=download, exe=None, argv=None, restarter=restart, exiter=None):
-        self.check, self.dl, self.restarter = check, dl, restarter
+    def __init__(self, check=None, dl=download, exe=None, argv=None, restarter=restart, exiter=None, check_nightly_=None):
+        self.check = check or (lambda: check_for_update(stable_current()))
+        self.check_nightly = check_nightly_ or check_nightly
+        self.channel = "stable"
+        self.dl, self.restarter = dl, restarter
         self.exe = exe or sys.executable
         self.argv = list(argv if argv is not None else sys.argv[1:])
         self.exiter = exiter or (lambda: os._exit(0))
@@ -178,13 +181,14 @@ class Updater:
     def _set(self, status, message=""):
         self.state = {"status": status, "message": message}
 
-    def start(self, run_async=True):
+    def start(self, run_async=True, channel="stable"):
         if not can_self_update() and self.exe == sys.executable:
             raise ValueError("This copy runs from source, so it cannot replace itself. Update with Git "
                              "(git pull) or download the ZIP again. The downloadable app updates itself.")
         if not self.lock.acquire(blocking=False):
             return self.status()
-        self._set("working", "Checking for the newest version…")
+        self.channel = "nightly" if channel == "nightly" else "stable"
+        self._set("working", "Checking for the newest test build…" if self.channel == "nightly" else "Checking for the newest version…")
         if run_async:
             threading.Thread(target=self._run, daemon=True, name="self-update").start()
         else:
@@ -196,7 +200,7 @@ class Updater:
         exe = Path(self.exe)
         new = exe.with_name(exe.name + ".new")
         try:
-            info = self.check()
+            info = (self.check_nightly if self.channel == "nightly" else self.check)()
             if not info.get("update_available"):
                 return self._set("current", info.get("message") or "You are up to date.")
             by = {a["name"]: a for a in info.get("assets", []) if SAFE_NAME.match(a.get("name", ""))}

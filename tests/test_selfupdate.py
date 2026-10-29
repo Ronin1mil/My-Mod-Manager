@@ -97,6 +97,19 @@ class Flow(unittest.TestCase):
         self.assertEqual((self.d / "app.old").read_text(), "old-version")
         self.assertEqual(self.restarted, [(str(self.exe), ["--port", "9"])])
 
+    def test_the_test_build_channel_uses_its_own_check(self):
+        calls = []
+        nightly = self.info(latest="test build abc1234")
+        u = su.Updater(check=lambda: calls.append("stable") or self.info(), check_nightly_=lambda: calls.append("nightly") or nightly,
+                       dl=self.dl_factory(), exe=str(self.exe), argv=[],
+                       restarter=lambda e, a: self.restarted.append(1), exiter=lambda: self.exited.append(1))
+        st = u.start(run_async=False, channel="nightly")
+        self.assertEqual((calls, st["status"]), (["nightly"], "restarting"))
+        self.assertIn("test build abc1234", st["message"])
+        self.exe.write_text("old-version")  # the next run is a normal one again
+        u.start(run_async=False)
+        self.assertEqual(calls, ["nightly", "stable"])
+
     def test_checksum_mismatch_changes_nothing(self):
         u = self.updater(dl=self.dl_factory(payload=b"TAMPERED"))
         st = u.start(run_async=False)
@@ -124,3 +137,32 @@ class Flow(unittest.TestCase):
         st = self.updater(dl=boom).start(run_async=False)
         self.assertEqual((st["status"], self.exe.read_text()), ("error", "old-version"))
         self.assertIn("offline", st["message"])
+
+
+class NightlyCheck(unittest.TestCase):
+    def rel(self, body="Test build.\n\nbuild: abc1234\n", assets=True):
+        base = "https://github.com/Ronin1mil/My-Mod-Manager/releases/download/nightly/"
+        a = [{"id": 5, "name": "Mod-Manager-windows.exe", "size": 3, "browser_download_url": base + "Mod-Manager-windows.exe"},
+             {"id": 6, "name": "evil.exe", "size": 3, "browser_download_url": "https://evil.example/x.exe"}] if assets else []
+        return (200, {"body": body, "published_at": "2026-10-29T10:00:00Z", "prerelease": True, "assets": a})
+
+    def test_a_newer_build_is_offered_and_foreign_links_are_dropped(self):
+        from modmanager import update
+        r = update.check_nightly("0000000", fetch=lambda u: self.rel())
+        self.assertEqual((r["update_available"], r["build"], r["status"]), (True, "abc1234", "update"))
+        self.assertEqual([a["name"] for a in r["assets"]], ["Mod-Manager-windows.exe"])
+        self.assertFalse(update.check_nightly("abc1234", fetch=lambda u: self.rel())["update_available"])  # already on it
+
+    def test_missing_release_unreadable_body_and_network_trouble_are_reported(self):
+        from modmanager import update
+        self.assertEqual(update.check_nightly("", fetch=lambda u: (404, None))["status"], "no_releases")
+        self.assertEqual(update.check_nightly("", fetch=lambda u: self.rel(body="no id here"))["update_available"], False)
+        def down(u):
+            raise OSError("offline")
+        self.assertEqual(update.check_nightly("", fetch=down)["status"], "unreachable")
+
+    def test_a_test_build_still_sees_the_release_of_its_own_version(self):
+        from unittest import mock
+        from modmanager import update
+        with mock.patch.object(update, "BUILD", "abc1234"):
+            self.assertTrue(update.is_newer(update.__version__, update.stable_current()))

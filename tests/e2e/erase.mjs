@@ -38,6 +38,10 @@ try {
 
   const openErase = async () => { await page.click('#appcfg'); await page.click('[data-st=app]'); };
   await openErase();
+  // the experimental test-build button is there; with no network (or no release yet) it just says so
+  await page.click('#nt-check');
+  await page.waitForFunction(() => document.getElementById('nt-status').textContent.length > 0 && document.getElementById('nt-status').textContent !== 'Checking…', null, { timeout: 20000 });
+  assert.equal(await page.isDisabled('#nt-go'), true);
   await page.click('#s-erase');
   await page.waitForTimeout(600);
   assert.ok(fs.existsSync(file), 'a wrong answer deletes nothing');

@@ -341,10 +341,10 @@ document.addEventListener('click', guard(async e => {
 }));
 
 // Replace this app with the newest release (downloaded app only), then reload once the new copy answers.
-async function selfUpdate(say, ask = true) {
+async function selfUpdate(say, ask = true, channel = 'stable') {
   say = say || toast;
-  if (ask && !confirm('Download the newest version and restart Ronin Mod Manager? Your playsets and settings are kept.')) return;
-  let st = await app('self-update', {});
+  if (ask && !confirm(channel === 'nightly' ? 'Install the newest TEST build and restart Ronin Mod Manager? It may contain bugs. Your playsets and settings are kept.' : 'Download the newest version and restart Ronin Mod Manager? Your playsets and settings are kept.')) return;
+  let st = await app('self-update', {channel});
   for (let i = 0; i < 600 && ['working', 'restarting'].includes(st.status); i++) {
     say(st.message || 'Updating…');
     await new Promise(r => setTimeout(r, 1000));
@@ -461,6 +461,12 @@ async function openPaths(first) {
         <label class="srow"><span class="rt"><b>Download missing logos</b><span class="hint">Fetches a missing game logo once from Steam's public art server, only when none is found on this PC</span></span><input type="checkbox" class="sw" id="s-logos" ${st.fetch_logos ? 'checked' : ''}></label>
       </div>
       <div class="card">
+        <h3>Test builds (nightly) <span class="b warn">experimental</span></h3>
+        <p class="desc">Builds made automatically from the version being worked on, before it becomes a release. They may contain bugs; your playsets and settings are kept. A release only contains what was tried here first. You have: <b>v${esc(GI.version)}${GI.build ? ' · test build ' + esc(GI.build) : ' (a normal release)'}</b>. To go back to the newest release, press "Check for updates now" above.</p>
+        <p class="mut" id="nt-status"></p>
+        <div class="acts"><button id="nt-check">Check for a test build</button><button id="nt-go" class="danger" disabled>Install the test build</button></div>
+      </div>
+      <div class="card">
         <h3>Erase all data <span class="b warn">experimental</span></h3>
         <p class="desc">Deletes everything this app saved: every playset, the library, backups, logos, your own presets and the settings, for all games. Use it for a completely fresh start. The games' own files, your mods, saves and the error log are not touched.</p>
         <div class="acts"><button id="s-erase">Erase all data…</button></div>
@@ -490,6 +496,16 @@ async function openPaths(first) {
   }); });
   $('ui-text').onchange = guard(() => saveUI({ui_text: $('ui-text').value}));
   $('ui-all').onclick = guard(async () => { await saveUI({ui_scheme: S.ui_scheme, ui_text: S.ui_text}, true); $('ui-msg').textContent = 'Done.'; });
+  $('nt-check').onclick = guard(async () => {
+    $('nt-status').textContent = 'Checking…'; $('nt-go').disabled = true;
+    const r = await app('nightly');
+    $('nt-status').textContent = r.message + (r.published ? ` (built ${r.published})` : '') + (r.update_available && !GI.can_self_update ? ' This copy runs from source files, so it cannot replace itself.' : '');
+    $('nt-go').disabled = !(r.update_available && GI.can_self_update);
+  });
+  $('nt-go').onclick = guard(async () => {
+    $('nt-go').disabled = true;
+    try { await selfUpdate(m => { $('nt-status').textContent = m; }, true, 'nightly'); } finally { $('nt-go').disabled = false; }
+  });
   $('s-erase').onclick = guard(async () => {
     const t = prompt('This deletes ALL playsets and settings saved by this app, for every game. Your games and mods are not touched.\n\nType ERASE to continue.');
     if (t === null) return;
@@ -876,7 +892,7 @@ $('game').onchange = guard(() => useGame($('game').value, true));
 window.addEventListener('hashchange', () => { const w = location.hash.slice(1); if (GI && w !== G && GI.games.some(g => g.id === w)) useGame(w, true).catch(e => fail(e, 'hash')); });
 (async () => {
   GI = await app('games');
-  $('ver').textContent = 'v' + GI.version;
+  $('ver').textContent = 'v' + GI.version + (GI.build ? ' · test ' + GI.build : '');
   $('game').innerHTML = GI.games.map(g => `<option value="${esc(g.id)}">${esc(g.name)}</option>`).join('');
   let want = location.hash.slice(1);
   try { want = want || localStorage.getItem('mm-game') || ''; } catch (e) { /* ignore */ }

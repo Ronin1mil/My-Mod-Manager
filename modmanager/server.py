@@ -13,7 +13,7 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import APP_NAME, __version__, collections, compare, detect, games as gamesmod, install, launch, order, presets, saves, scan, update, updates
+from . import APP_NAME, BUILD, __version__, collections, compare, detect, games as gamesmod, install, launch, order, presets, saves, scan, update, updates
 from . import errorlog, launcherdb, selfupdate, workshop
 from .library import Library
 from .paths import LOGO_TYPES, config_dir, fetch_best_logo, find_first, find_logo, game_version, user_dirs, workshop_dirs
@@ -554,7 +554,7 @@ class Hub:
     def index(self):
         s = self.settings.get()
         return {"log_file": str(errorlog.log_path()), "can_self_update": selfupdate.can_self_update() or self.updater_forced, "games": [g.public() for g in self.games.values()], "last_game": s["last_game"],
-                "version": __version__, "settings": s, "update": self._update_cache[1] if self._update_cache else None,
+                "version": __version__, "build": BUILD, "settings": s, "update": self._update_cache[1] if self._update_cache else None,
                 "update_pending": self.update_pending}
 
     def erase_all(self, confirm):
@@ -588,7 +588,7 @@ class Hub:
         with self._cache_lock:
             if not force and self._update_cache and time.time() - self._update_cache[0] < 600:
                 return self._update_cache[1]
-        res = update.check_for_update(__version__, self.update_fetch)
+        res = update.check_for_update(update.stable_current(), self.update_fetch)
         if res["status"] in ("update", "current", "no_releases"):
             with self._cache_lock:
                 self._update_cache = (time.time(), res)
@@ -716,6 +716,8 @@ def make_handler(hub):
                     return self._send(200, hub.index())
                 if parts == ["api", "self-update"]:
                     return self._send(200, hub.updater.status())
+                if parts == ["api", "nightly"]:
+                    return self._send(200, update.check_nightly(BUILD, hub.update_fetch))
                 if app is not None:
                     if parts == ["api", "state"]:
                         return self._send(200, app.state())
@@ -770,7 +772,10 @@ def make_handler(hub):
                 parts, app = self._route()
                 if app is None:  # app-wide routes
                     if parts == ["api", "self-update"]:
-                        return self._send(200, hub.updater.start())
+                        ch = self._body().get("channel", "stable")
+                        if ch not in ("stable", "nightly"):
+                            raise ValueError("Unknown update channel.")
+                        return self._send(200, hub.updater.start(channel=ch))
                     if parts == ["api", "client-error"]:
                         return self._send(200, hub.client_error(self._body()))
                     if parts == ["api", "update-check"]:

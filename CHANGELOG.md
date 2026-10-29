@@ -1,6 +1,10 @@
 # Changelog
 
 ## Unreleased
+- **Test builds (nightly), experimental.** Settings -> App & updates -> Test builds installs the newest build of the branch being worked on, so changes can be tried before they become a release. A release is made from the exact commit that was tested (the release job warns if not). See docs/19
+- **Favourites.** Star a mod (Library) or a playset (sidebar). Starred playsets stay at the top of the list; the library has "Favourites first" and a "★ Favourites only" button
+- **Library sort by number of playsets:** "Most playsets first", with a "N playsets" count on every row
+- **Merge:** in the Compare tab, "Merge both into a new playset" makes a new playset with every mod of both (this one's order first, a mod is enabled if it is enabled in either); neither playset is changed
 - **Library sorting and tags.** Sort by Name, by Workshop then Local, by Tag, or (the new default) Workshop / Local and then tag, with a heading and count for each group (mods without tags last). A tag menu lists every tag with its count and shows only the mods that have it, and each row shows its first tags. The tags are read from each mod's own descriptor or metadata at every scan and also stored in the library file; your sort choice is remembered
 
 ## 0.8.3 - colour schemes and text size, No mods on top

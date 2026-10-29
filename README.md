@@ -129,6 +129,7 @@ This project was written with the help of an AI coding assistant (see the note a
 | [docs/13-verification-checklist.md](docs/13-verification-checklist.md) | Checks to run on a real install |
 | [docs/16-launcher-import.md](docs/16-launcher-import.md) | Importing the launcher's playsets |
 | [docs/17-bannerlord.md](docs/17-bannerlord.md) | Bannerlord: modules, order, launching |
+| [docs/19-test-builds-and-releases.md](docs/19-test-builds-and-releases.md) | Test builds (nightly) and how releases are made |
 
 ## License
 [MIT](LICENSE) © 2026 Ronin1mil
