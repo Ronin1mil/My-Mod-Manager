@@ -84,3 +84,44 @@ class Http(GameCase):
         c = self.req("GET", f"/api/conflicts/{pid}")[1]
         self.assertEqual((c["pending"], c["conflicts"]), (False, []))
         self.assertEqual(self.req("GET", "/api/conflicts/nope")[0], 404)
+
+
+class Logos(unittest.TestCase):
+    def test_missing_logo_is_fetched_in_the_background_and_picked_up(self):
+        import tempfile
+        import time
+        from modmanager import server
+        from modmanager.library import Library
+        from modmanager.store import Store
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            art = d / "logo.png"
+            art.write_bytes(b"\x89PNG\r\n\x1a\n")
+            with mock.patch.object(server, "fetch_best_logo", return_value=art) as f, \
+                    mock.patch.object(server, "find_logo", return_value=None):
+                app = server.GameApp(games.CK3, user_dir=d / "u", workshop_dir=d / "w", store=Store(d / "p.json"),
+                                     library=Library(d / "l.json"), autodetect=False, fetch_logos=True)
+                for _ in range(100):
+                    if app.logo:
+                        break
+                    time.sleep(0.02)
+                self.assertEqual(app.logo, art)
+                f.assert_called_once()
+                off = server.GameApp(games.CK3, user_dir=d / "u", workshop_dir=d / "w", store=Store(d / "p2.json"),
+                                     library=Library(d / "l2.json"), autodetect=False, fetch_logos=False)
+                self.assertIsNone(off.logo)  # nothing is downloaded unless allowed
+
+    def test_best_logo_falls_back_to_library_art_and_validates_images(self):
+        from modmanager import paths
+        calls = []
+
+        def fake(game, url=None):
+            calls.append(url)
+            if url.endswith("logo.png"):
+                raise ValueError("404")
+            return Path("hero.jpg")
+        with mock.patch.object(paths, "fetch_logo", side_effect=fake):
+            self.assertEqual(paths.fetch_best_logo(games.EU5), Path("hero.jpg"))
+        self.assertTrue(calls[0].endswith("/3450310/logo.png") and calls[1].endswith("/3450310/library_hero.jpg"))
+        with self.assertRaises(ValueError):
+            paths.fetch_logo(games.CK3, "https://evil.example/logo.png")

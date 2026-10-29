@@ -36,7 +36,7 @@ for (const [id, g] of Object.entries(GAMES)) {
 const port = await freePort();
 const base = `http://127.0.0.1:${port}`;
 const server = spawn('python3', ['-m', 'modmanager', '--no-browser', '--port', String(port)],
-  { env: { ...process.env, MODMANAGER_CONFIG_DIR: path.join(root, 'cfg'), BROWSER: 'true', HOME: path.join(root, 'home') }, stdio: 'inherit' });
+  { env: { ...process.env, MODMANAGER_FETCH_LOGOS: '0', MODMANAGER_CONFIG_DIR: path.join(root, 'cfg'), BROWSER: 'true', HOME: path.join(root, 'home') }, stdio: 'inherit' });
 let browser;
 try {
   for (let i = 0; i < 50; i++) { try { await fetch(`${base}/api/games`); break; } catch { await new Promise(r => setTimeout(r, 100)); } }

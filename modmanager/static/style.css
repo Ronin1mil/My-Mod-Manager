@@ -8,9 +8,6 @@ input[type=checkbox]{padding:0;accent-color:var(--acc)}
 #app{display:grid;grid-template-columns:220px 1fr auto;height:100vh}
 #side{background:var(--side);border-right:1px solid var(--line);padding:14px 10px;overflow:auto}
 .logo{margin:0 0 16px;padding-bottom:12px;border-bottom:1px solid var(--line);text-align:center}
-.logo img{display:block;width:100%;height:auto;max-height:96px;object-fit:contain;filter:drop-shadow(0 2px 6px rgba(0,0,0,.6))}
-.logo .wm{display:block;font:italic 600 34px/1 var(--serif);color:var(--acc);text-shadow:0 0 1px #000,0 2px 8px rgba(0,0,0,.55)}
-.logo .wm{font-size:26px}
 #game{width:100%;margin:0 0 14px}
 .logo .sub{display:block;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--mut);margin-top:4px}
 .side-h{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:0 6px 6px}
@@ -67,3 +64,29 @@ dialog h3.sec{font:600 13px var(--serif);color:var(--acc);margin:18px 0 0;border
 .tree details{margin-left:14px}.tree summary{cursor:pointer;padding:2px 0}.tree .tf{margin-left:30px;font-size:13px;padding:1px 0}.tree{font-size:13px;margin-top:6px}
 
 #banner.bad{background:#3a1414;border-color:#8c2a2a;color:#ffd9d9}#banner code{word-break:break-all}
+
+.logo-box{position:relative;height:92px;display:flex;align-items:center;justify-content:center}
+.logo-box .crest{width:56px;height:56px;color:var(--acc);opacity:.55}
+.logo-box img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .25s;filter:drop-shadow(0 2px 6px rgba(0,0,0,.6))}
+.logo-box img.ok{opacity:1}
+
+/* Settings: wide, large text, one topic per tab */
+dialog.wide{width:min(940px,94vw);max-height:90vh;overflow:auto;font-size:16px;line-height:1.5;padding:26px 30px}
+dialog.wide h2{font-size:24px;margin:0}
+dialog.wide h3{font-size:18px;margin:6px 0 12px;color:var(--acc);border:0;padding:0}
+dialog.wide label{font-size:15px;margin:16px 0 6px;color:var(--ink)}
+dialog.wide input[type=text]{font-size:16px;padding:11px 13px}
+dialog.wide .mut,dialog.wide .st{font-size:14px}
+dialog.wide code{font-size:14px;word-break:break-all}
+.st-head{display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap;margin-bottom:6px}
+.st-tabs{display:flex;gap:6px;margin:14px 0 18px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.st-tabs button{background:none;border:0;border-bottom:3px solid transparent;border-radius:0;padding:10px 16px;font-size:16px;color:var(--mut);cursor:pointer}
+.st-tabs button.on{color:var(--ink);border-bottom-color:var(--acc)}
+dialog.wide [data-pane]{min-height:280px}
+dialog.wide .chk{display:flex;gap:12px;align-items:flex-start;margin:14px 0}
+dialog.wide .chk input{margin-top:5px;transform:scale(1.25)}
+dialog.wide .hint{display:block;color:var(--mut);font-size:13.5px;font-weight:400;margin-top:2px}
+dialog.wide label .hint{display:inline;margin-left:8px}
+dialog.wide .acts{margin:12px 0}
+dialog.wide button{font-size:15px;padding:9px 16px}
+dialog.mid{width:min(680px,94vw);max-height:90vh;overflow:auto;font-size:16px;line-height:1.5}dialog.mid h2{font-size:22px}dialog.mid button{font-size:15px;padding:8px 15px}

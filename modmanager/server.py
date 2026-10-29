@@ -15,7 +15,7 @@ from pathlib import Path
 from . import __version__, collections, compare, detect, games as gamesmod, install, launch, order, presets, saves, scan, update, updates
 from . import errorlog, selfupdate, workshop
 from .library import Library
-from .paths import LOGO_TYPES, config_dir, find_first, find_logo, game_version, user_dirs, workshop_dirs
+from .paths import LOGO_TYPES, config_dir, fetch_best_logo, find_first, find_logo, game_version, user_dirs, workshop_dirs
 from .store import GlobalSettings, Store, write_load_file
 
 STATIC = Path(__file__).parent / "static"
@@ -38,7 +38,8 @@ class GameApp:
     """Everything for one game. Paths resolve as: command-line flag > saved setting > auto-detection."""
 
     def __init__(self, game, user_dir=None, workshop_dir=None, game_dir=None, game_version_=None, game_exe=None,
-                 store=None, library=None, logo=None, detect_libraries=(), opener=None, autodetect=True):
+                 store=None, library=None, logo=None, detect_libraries=(), opener=None, autodetect=True,
+                 fetch_logos=False):
         self.game = game
         self.cfg = config_dir(game)
         self.store = store or Store(game=game)
@@ -47,6 +48,8 @@ class GameApp:
                     "game_version": game_version_}
         self.game_exe = game_exe
         self.logo_arg = logo
+        self.fetch_logos = fetch_logos
+        self.logo_pending = False
         self.extra_libraries = tuple(detect_libraries)
         self.opener = opener  # tests inject a fake "open this URL" (Steam)
         self.downloads = workshop.Downloads(game)
@@ -73,7 +76,19 @@ class GameApp:
                                  or find_first(workshop_dirs(g, self.extra_libraries)))
         self.game_version = self.cli["game_version"] or game_version(self.game_root)
         self.logo = find_logo(g, self.logo_arg, self.game_root, self.extra_libraries)
+        if not self.logo and not self.logo_arg and self.fetch_logos and not self.logo_pending:
+            self.logo_pending = True
+            threading.Thread(target=self._fetch_logo, daemon=True, name="logo").start()
         self.rescan()
+
+    def _fetch_logo(self):
+        """No logo on this PC yet: get Steam's public art for the game once, in the background."""
+        try:
+            self.logo = fetch_best_logo(self.game)
+        except Exception as e:  # offline or not on the CDN: the page keeps its neutral crest, nothing else breaks
+            self.logo_error = f"{type(e).__name__}: {e}"
+        finally:
+            self.logo_pending = False
 
     def configure(self, b):
         """Save the setup dialog. The game folder may be any path inside the install."""
@@ -126,7 +141,7 @@ class GameApp:
                 "playsets": list(d["playsets"].values()), "active": d["active"],
                 "user_dir": str(self.user_dir or ""), "workshop_dir": str(self.workshop_dir or ""),
                 "game_root": str(self.game_root or ""), "game_version": self.game_version,
-                "has_logo": bool(self.logo), "include_vanilla": s["include_vanilla"],
+                "has_logo": bool(self.logo), "logo_pending": self.logo_pending, "include_vanilla": s["include_vanilla"],
                 "setup_done": s["setup_done"], "save_version_check": s["save_version_check"], "steamcmd": s["steamcmd"], "steam_user": s["steam_user"],
                 "setup_needed": not s["setup_done"] and not (self.game_root and self.user_dir),
                 "imported_from": d.get("imported_from", "")}
@@ -405,7 +420,8 @@ class Hub:
             raise KeyError(game_id)
         with self.lock:
             if game_id not in self.apps:
-                self.apps[game_id] = self.factory(self.games[game_id], **self.overrides.get(game_id, {}))
+                self.apps[game_id] = self.factory(self.games[game_id], fetch_logos=self.settings.get()["fetch_logos"] and os.environ.get("MODMANAGER_FETCH_LOGOS") != "0",
+                                                  **self.overrides.get(game_id, {}))
             return self.apps[game_id]
 
     def index(self):

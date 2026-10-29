@@ -40,7 +40,7 @@ fs.mkdirSync(path.join(cfg, GAME), { recursive: true });
 fs.writeFileSync(path.join(cfg, GAME, 'logo.png'), png);
 const server = spawn('python3', ['-m', 'modmanager', '--game', GAME, '--user-dir', user, '--workshop-dir', path.join(root, 'none'),
   '--game-exe', exe, '--game-version', '1.7.6', '--no-browser', '--port', String(port)],
-  { env: { ...process.env, MODMANAGER_CONFIG_DIR: cfg }, stdio: 'inherit' });
+  { env: { ...process.env, MODMANAGER_FETCH_LOGOS: '0', MODMANAGER_CONFIG_DIR: cfg }, stdio: 'inherit' });
 let browser;
 try {
   for (let i = 0; i < 50; i++) { try { await fetch(`http://127.0.0.1:${port}/api/games`); break; } catch { await new Promise(r => setTimeout(r, 100)); } }

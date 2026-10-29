@@ -167,19 +167,43 @@ def find_logo(game, explicit=None, game_root=None, extra=()):
     return None
 
 
+def _art_url(game, name):
+    return f"https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/{game.app_id}/{name}"
+
+
 def fetch_logo(game, url=None):
-    """Explicit, user-requested download of the game's logo from Steam's CDN into the config folder.
-    HTTPS only, fixed host suffix, size-capped, must be a real PNG. Returns the saved path."""
+    """Download the game's logo from Steam's CDN into the config folder (explicit call, or the background
+    fetch when the user has not turned it off). HTTPS only, fixed host suffix, size-capped, must be a real
+    PNG or JPEG. Returns the saved path."""
     import urllib.request
     from urllib.parse import urlparse
     url = url or logo_url(game)
     u = urlparse(url)
     if u.scheme != "https" or not (u.hostname or "").endswith(".steamstatic.com"):
         raise ValueError("Logo downloads are limited to https://*.steamstatic.com")
-    with urllib.request.urlopen(url, timeout=20) as r:
+    with urllib.request.urlopen(url, timeout=8) as r:
         data = r.read(MAX_LOGO + 1)
-    if len(data) > MAX_LOGO or not data.startswith(b"\x89PNG\r\n\x1a\n"):
-        raise ValueError("Downloaded file is not a valid PNG logo.")
-    dest = config_dir(game) / "logo.png"
+    if len(data) > MAX_LOGO:
+        raise ValueError("Downloaded logo is too large.")
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        ext = ".png"
+    elif data.startswith(b"\xff\xd8\xff") and url.lower().endswith(".jpg"):
+        ext = ".jpg"
+    else:
+        raise ValueError("Downloaded file is not a valid logo image.")
+    dest = config_dir(game) / f"logo{ext}"
+    dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_bytes(data)
     return dest
+
+
+def fetch_best_logo(game):
+    """Steam's logo if the store has one, otherwise the game's wide library artwork (newer games such as
+    EU5 have no logo.png on the CDN). Raises the last error if neither can be had."""
+    last = None
+    for name in ("logo.png", "library_hero.jpg"):
+        try:
+            return fetch_logo(game, _art_url(game, name))
+        except Exception as e:  # 404, offline, bad image: try the next one
+            last = e
+    raise last

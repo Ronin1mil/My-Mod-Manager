@@ -22,7 +22,7 @@ for (const [f, name, deps] of [['Lib', 'Lib', []], ['A', 'A', ['Lib']], ['B', 'B
 }
 const server = spawn('python3', ['-m', 'modmanager', '--game', 'vic3', '--user-dir', user, '--workshop-dir', path.join(root, 'none'),
   '--game-version', '1.7.6', '--no-browser', '--port', String(port)],
-  { env: { ...process.env, MODMANAGER_CONFIG_DIR: path.join(root, 'cfg') }, stdio: 'inherit' });
+  { env: { ...process.env, MODMANAGER_FETCH_LOGOS: '0', MODMANAGER_CONFIG_DIR: path.join(root, 'cfg') }, stdio: 'inherit' });
 const base = `http://127.0.0.1:${port}`;
 let browser;
 try {

@@ -20,7 +20,7 @@ for (const [f, deps] of [['Lib', []], ['A', ['Lib']], ['B', []], ['C', []]]) {
   write(path.join(user, 'mod', `${f}.mod`), `name="${f}"\npath="mod/${f}"\n`);
 }
 const server = spawn('python3', ['-m', 'modmanager', '--game', 'vic3', '--user-dir', user, '--workshop-dir', path.join(root, 'none'),
-  '--no-browser', '--port', String(port)], { env: { ...process.env, MODMANAGER_CONFIG_DIR: path.join(root, 'cfg') }, stdio: 'inherit' });
+  '--no-browser', '--port', String(port)], { env: { ...process.env, MODMANAGER_FETCH_LOGOS: '0', MODMANAGER_CONFIG_DIR: path.join(root, 'cfg') }, stdio: 'inherit' });
 const post = async (p, b = {}) => { const r = await fetch(base + p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) }); return r.json(); };
 const get = async p => (await fetch(base + p)).json();
 let browser;
@@ -94,8 +94,9 @@ try {
   // ---- Settings: auto-update check is OFF by default, toggling persists
   assert.equal((await get('/api/games')).settings.auto_update_check, false);
   await page.click('#appcfg');
+  await page.click('[data-st=app]');
   assert.equal(await page.locator('#s-auto').isChecked(), false);
-  assert.match(await page.textContent('#dlg'), /Off by default/);
+  assert.match(await page.textContent('#dlg'), /off by default/);
   await page.check('#s-auto');
   await page.waitForSelector('#toast.on');
   assert.equal((await get('/api/games')).settings.auto_update_check, true);

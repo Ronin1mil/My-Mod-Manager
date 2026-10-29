@@ -23,7 +23,7 @@ for (const [f, deps, files] of [['Lib', [], ['common/goods/lib_goods.txt', 'comm
   write(path.join(user, 'mod', `${id}.mod`), `name="${f}"\npath="mod/${id}"\n`);
 }
 const server = spawn('python3', ['-m', 'modmanager', '--game', 'vic3', '--user-dir', user, '--workshop-dir', path.join(root, 'none'),
-  '--game-version', '1.8.1', '--no-browser', '--port', String(port)], { env: { ...process.env, MODMANAGER_CONFIG_DIR: path.join(root, 'cfg') }, stdio: 'inherit' });
+  '--game-version', '1.8.1', '--no-browser', '--port', String(port)], { env: { ...process.env, MODMANAGER_FETCH_LOGOS: '0', MODMANAGER_CONFIG_DIR: path.join(root, 'cfg') }, stdio: 'inherit' });
 const post = async (p, b = {}) => (await fetch(base + p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) })).json();
 let browser;
 try {
@@ -100,7 +100,8 @@ try {
   assert.equal(bodies.length, 1);
 
   // ---- settings has the save-version switch, on by default, persisted
-  await page.click('#appcfg').catch(async () => { await page.click('#cfg'); });
+  await page.click('#appcfg');
+  await page.click('[data-st=play]');
   assert.equal(await page.locator('#p-svc').isChecked(), true);
   await shot(page, '6-settings');
   await page.click('#p-cancel');

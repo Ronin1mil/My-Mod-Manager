@@ -90,7 +90,7 @@ async function load(rescanMsg) {
     const d = S.diff, bits = [d.added && `${d.added} new`, d.updated && `${d.updated} updated`, d.removed && `${d.removed} removed`].filter(Boolean);
     toast(bits.length ? `Scan: ${bits.join(', ')} (${d.total} mods)` : `Scan: no changes (${d.total} mods)`);
   }
-  logoSeen[G] = !!S.has_logo; setLogo(G, GNAME(), S.has_logo);
+  setLogo(G);
   document.title = GNAME() + ' Mod Manager';
   render(); analyse(); banner(); pollUpdate();
   if (S.setup_needed && !setupShown) { setupShown = true; openPaths(true); }
@@ -304,6 +304,7 @@ function banner() {
   if ($('bn-now')) $('bn-now').onclick = guard(selfUpdate);
   $('bn-dismiss').onclick = guard(async () => { GI.settings = await app('settings', {dismissed_update: u.latest}); banner(); });
 }
+$('dlg').addEventListener('close', () => { $('dlg').className = ''; });
 $('appcfg').onclick = () => openPaths(false);
 let inspectT;
 async function inspect() {
@@ -316,27 +317,49 @@ async function inspect() {
 }
 async function openPaths(first) {
   const d = $('dlg'), st = GI.settings;
-  d.innerHTML = `<h2 style="margin-top:0">${first ? 'Set up ' + esc(GNAME()) : 'Settings'}</h2>
-    <p class="mut">Mod Manager v${esc(GI.version)}${S.game.verified ? '' : ' · launching is <b>not yet verified</b> on a real ' + esc(GNAME()) + ' install'}</p>
+  d.className = 'wide';
+  d.innerHTML = `<div class="st-head"><h2>${first ? 'Set up ' + esc(GNAME()) : 'Settings'}</h2>
+      <span class="mut">Mod Manager v${esc(GI.version)}${S.game.verified ? '' : ' · launching is <b>not yet verified</b> on a real ' + esc(GNAME()) + ' install'}</span></div>
     ${S.imported_from ? `<p class="mut">Playsets were imported from your previous manager (${esc(S.imported_from)}).</p>` : ''}
-    <h3 class="sec" style="margin-top:6px;border:0;padding:0">Game folders — ${esc(GNAME())}</h3>
-    <div id="p-found" class="mut" style="font-size:13px"></div>
-    <div class="paths">
-    <label for="p-game">Game folder (paste any path inside your install)</label><input type="text" id="p-game" value="${esc(S.game_root)}"><div class="st" id="p-gst"></div>
-    <label for="p-user">User folder (mods, ${esc(S.game.load_file)})</label><input type="text" id="p-user" value="${esc(S.user_dir)}">
-    <label for="p-ws">Steam Workshop folder</label><input type="text" id="p-ws" value="${esc(S.workshop_dir)}"></div>
-    <label class="chk" style="color:var(--ink);margin-top:12px"><input type="checkbox" id="p-svc" ${S.save_version_check ? 'checked' : ''}> Warn before starting if the saves were made on a different game release (e.g. 1.14 → 1.15)</label>
-    <label class="chk" style="color:var(--ink);margin-top:12px"><input type="checkbox" id="p-van" ${S.include_vanilla ? 'checked' : ''}> Compare mods with the base game (flags what each mod overrides)</label>
-    <h3 class="sec">Downloading Workshop mods</h3>
-    <div class="mut" style="font-size:12px">Optional. "Open in Steam" needs nothing. To download straight from here, give the path to <code>steamcmd</code> and the Steam account name it is already logged in with (log in once in a terminal; this app never sees or stores a password).</div>
-    <div class="paths"><label for="p-cmd">steamcmd executable</label><input type="text" id="p-cmd" value="${esc(S.steamcmd)}">
-    <label for="p-su">Steam account name</label><input type="text" id="p-su" value="${esc(S.steam_user)}"></div>
-    <h3 class="sec">Updates (all games)</h3>
-    <label class="chk" style="color:var(--ink)"><input type="checkbox" id="s-auto" ${st.auto_update_check ? 'checked' : ''}> Check for updates when the manager starts</label>
-    <div class="mut" style="font-size:12px;margin-top:4px">Off by default. When on, the manager asks api.github.com for the latest release each time it starts. Nothing is downloaded or installed automatically, and nothing else is ever sent.</div>
-    <div style="margin-top:10px"><button id="s-check">Check for updates now</button></div>
-    <div id="s-result" style="margin-top:10px"></div>
+    <nav class="st-tabs" id="st-tabs"><button data-st="game" class="on">Game folders</button><button data-st="play">Playing</button><button data-st="dl">Downloads</button><button data-st="app">App &amp; updates</button></nav>
+    <section data-pane="game">
+      <h3>${esc(GNAME())}</h3>
+      <div id="p-found" class="mut"></div>
+      <div class="paths">
+        <label for="p-game">Game folder <span class="hint">paste any path inside your install</span></label><input type="text" id="p-game" value="${esc(S.game_root)}"><div class="st" id="p-gst"></div>
+        <label for="p-user">User folder <span class="hint">mods and ${esc(S.game.load_file)} live here</span></label><input type="text" id="p-user" value="${esc(S.user_dir)}">
+        <label for="p-ws">Steam Workshop folder</label><input type="text" id="p-ws" value="${esc(S.workshop_dir)}">
+      </div>
+    </section>
+    <section data-pane="play" hidden>
+      <h3>Before you play</h3>
+      <label class="chk"><input type="checkbox" id="p-svc" ${S.save_version_check ? 'checked' : ''}> <span>Warn if the saves were made on a different game release<span class="hint">for example 1.14 saves with 1.15 installed</span></span></label>
+      <label class="chk"><input type="checkbox" id="p-van" ${S.include_vanilla ? 'checked' : ''}> <span>Compare mods with the base game<span class="hint">shows what each mod overrides from the original files</span></span></label>
+    </section>
+    <section data-pane="dl" hidden>
+      <h3>Downloading Workshop mods</h3>
+      <p class="mut">Optional. <b>Open in Steam</b> needs nothing. To download straight from here, give the path to <code>steamcmd</code> and the Steam account name it is already logged in with. No password is ever asked for, stored or sent by this app.</p>
+      <div class="paths"><label for="p-cmd">steamcmd executable</label><input type="text" id="p-cmd" value="${esc(S.steamcmd)}">
+      <label for="p-su">Steam account name</label><input type="text" id="p-su" value="${esc(S.steam_user)}"></div>
+    </section>
+    <section data-pane="app" hidden>
+      <h3>Updates</h3>
+      ${GI.can_self_update ? '<p>This is the downloaded app: when a newer version exists you can update it from the banner. Your playsets and settings are kept.</p>' : '<p class="mut">This copy runs from source files, so it cannot replace itself. Update it with Git or download the ZIP again. The downloadable app from the Releases page updates itself.</p>'}
+      <label class="chk"><input type="checkbox" id="s-auto" ${st.auto_update_check ? 'checked' : ''}> <span>Check for updates when the manager starts<span class="hint">off by default; asks api.github.com for the latest release, nothing is installed without you pressing Update</span></span></label>
+      <div class="acts"><button id="s-check">Check for updates now</button></div>
+      <div id="s-result"></div>
+      <h3>Game logos</h3>
+      <label class="chk"><input type="checkbox" id="s-logos" ${st.fetch_logos ? 'checked' : ''}> <span>Download a missing game logo from Steam's public art server<span class="hint">once per game, only when no logo is found on this PC</span></span></label>
+      <h3>Problems</h3>
+      <p class="mut">Errors are saved to <code>${esc(GI.log_file || 'Documents/ModManager-errors.log')}</code>. Send that file when reporting a bug.</p>
+    </section>
     <div class="dlg-btns"><span></span><span><button id="p-cancel">${first ? 'Skip' : 'Cancel'}</button> <button id="p-save" class="pri">Save</button></span></div>`;
+  $('st-tabs').onclick = e => {
+    const k = e.target.dataset && e.target.dataset.st; if (!k) return;
+    d.querySelectorAll('[data-st]').forEach(b => b.classList.toggle('on', b.dataset.st === k));
+    d.querySelectorAll('[data-pane]').forEach(x => { x.hidden = x.dataset.pane !== k; });
+  };
+  $('s-logos').onchange = guard(async () => { GI.settings = await app('settings', {fetch_logos: $('s-logos').checked}); });
   d.showModal();
   $('p-cancel').onclick = guard(async () => { if (first) { S = await api('skip-setup', {}); } d.close(); });
   $('p-game').oninput = () => { clearTimeout(inspectT); inspectT = setTimeout(guard(inspect), 250); };
@@ -499,6 +522,7 @@ document.addEventListener('keydown', e => {
 
 $('cfg').onclick = () => {
   const p = cur(), d = $('dlg'); if (!p) return;
+  d.className = 'mid';
   d.innerHTML = `<h2 style="margin-top:0">Playset settings</h2>
     <label>Name</label><input type="text" id="c-name" maxlength="60" value="${esc(p.name)}">
     <label>Notes</label><textarea id="c-notes" maxlength="2000">${esc(p.notes)}</textarea>
@@ -537,6 +561,7 @@ $('cfg').onclick = () => {
 document.addEventListener('click', e => { if (e.target.id === 'warn-cfg') openWarnCfg(); });
 function openWarnCfg() {
   const d = $('dlg'), h = hiddenCodes();
+  d.className = 'mid';
   d.innerHTML = `<h2 style="margin-top:0">Warning settings</h2><p class="mut">Untick a kind of warning to hide it for ${esc(GNAME())}. Hidden warnings are still real; they just stop counting and showing. Saved in this browser.</p>
     ${Object.entries(WARN_CODES).map(([c, l]) => `<label style="display:flex;gap:8px;align-items:center;color:var(--ink);font-size:14px"><input type="checkbox" data-wc="${c}" ${h.includes(c) ? '' : 'checked'}> ${esc(l)}</label>`).join('')}
     <div class="dlg-btns"><button id="w-all">Show all</button><span><button id="w-close" class="pri">Done</button></span></div>`;
@@ -555,6 +580,7 @@ $('launchpart').onclick = guard(async () => {
   const ids = p.mods.filter(id => !p.disabled.includes(id) && M(id));
   if (!ids.length) return toast('This playset has no enabled mods.');
   const d = $('dlg');
+  d.className = 'mid';
   d.innerHTML = `<h2 style="margin-top:0">Launch part of this playset</h2><p class="mut">Choose which mods to start ${esc(GNAME())} with. The playset itself is not changed.</p>
     <div class="acts"><button class="sm" id="lp-all">All</button><button class="sm" id="lp-none">None</button>
     <button class="sm" id="lp-deps" title="Also tick everything the ticked mods need">+ Their dependencies</button></div>
@@ -611,11 +637,27 @@ function applyTheme(g) {
   const root = document.documentElement.style;
   Object.entries(g.theme || {}).forEach(([k, v]) => root.setProperty(k, v));
 }
-const logoSeen = {};
-function setLogo(id, name, has) {   // one place decides logo vs. name, so switching games never flips between them
-  const html = has ? `<img src="/api/${id}/logo" alt="${esc(name)}"><span class="sub">Mod Manager</span>`
-    : `<span class="wm">${esc(name)}</span><span class="sub">Mod Manager</span>`;
-  if ($('logo').dataset.k !== id + has) { $('logo').innerHTML = html; $('logo').dataset.k = id + has; }
+// The header always shows the game's logo, never its name as text. While the logo is still being fetched
+// (or if it cannot be had) a neutral crest in the game's colours stands in, so nothing flips or jumps.
+const CREST = '<svg class="crest" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 4 56 12v20c0 14-10 24-24 28C18 56 8 46 8 32V12z" fill="none" stroke="currentColor" stroke-width="3"/><path d="M32 16v32M20 26h24" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>';
+let logoTry = 0;
+function setLogo(id) {
+  const box = $('logo');
+  if (box.dataset.k === id) return;
+  box.dataset.k = id; logoTry = 0;
+  box.innerHTML = `<div class="logo-box">${CREST}<img alt="" src="/api/${id}/logo"></div><span class="sub">Mod Manager</span>`;
+  const img = box.querySelector('img');
+  img.onload = () => {   // a dark logo (e.g. black lettering) would vanish on the dark theme: lighten it
+    try {
+      const c = document.createElement('canvas'); c.width = c.height = 48;
+      const x = c.getContext('2d', {willReadFrequently: true}); x.drawImage(img, 0, 0, 48, 48);
+      const d = x.getImageData(0, 0, 48, 48).data; let sum = 0, n = 0;
+      for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 128) { sum += (d[i] + d[i + 1] + d[i + 2]) / 3; n++; }
+      if (n > 20 && sum / n < 70) img.style.filter = 'invert(1) brightness(.92) drop-shadow(0 2px 6px rgba(0,0,0,.6))';
+    } catch (e) { /* cross-origin or blocked canvas: leave as is */ }
+    img.classList.add('ok');
+  };
+  img.onerror = () => { if (logoTry++ < 8 && box.dataset.k === id) setTimeout(() => { if (box.dataset.k === id) img.src = `/api/${id}/logo?r=${logoTry}`; }, 1500); };
 }
 async function useGame(id, first) {
   gen++; G = id; S = A = C = P = null; sel = null; tab = 'order'; cmpWith = null; lastMissing = []; setupShown = false;
@@ -624,7 +666,7 @@ async function useGame(id, first) {
   const g = GI.games.find(x => x.id === id);
   applyTheme(g);
   $('game').value = id;
-  setLogo(g.id, g.name, logoSeen[g.id]);
+  setLogo(g.id);
   document.title = g.name + ' Mod Manager';
   await load(first);
 }

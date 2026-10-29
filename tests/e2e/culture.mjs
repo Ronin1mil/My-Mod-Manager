@@ -45,7 +45,7 @@ const fakeSteamDownload = () => {
 
 const server = spawn('python3', ['-m', 'modmanager', '--game', 'ck3', '--game-dir', game, '--user-dir', user, '--workshop-dir', ws,
   '--game-exe', exe, '--no-browser', '--port', String(port)],
-  { env: { ...process.env, BROWSER: 'true', STUB_USER: user, MODMANAGER_CONFIG_DIR: path.join(root, 'cfg') }, stdio: 'inherit' });
+  { env: { ...process.env, BROWSER: 'true', STUB_USER: user, MODMANAGER_FETCH_LOGOS: '0', MODMANAGER_CONFIG_DIR: path.join(root, 'cfg') }, stdio: 'inherit' });
 const get = async p => (await fetch(base + p)).json();
 let browser;
 try {
