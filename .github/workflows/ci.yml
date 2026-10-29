@@ -11,8 +11,8 @@ on:
         description: "Publish a release for the version in modmanager/__init__.py (creates its tag)"
         type: boolean
         default: false
-      backfill:
-        description: "Also create releases for older versions that have none (notes only, never marked latest)"
+      refresh_notes:
+        description: "Rewrite the title and notes of the existing releases from CHANGELOG.md"
         type: boolean
         default: false
 
@@ -26,7 +26,7 @@ concurrency:
 jobs:
   unit:
     name: Unit tests (${{ matrix.os }}, Python ${{ matrix.py }})
-    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.backfill && !inputs.publish) }}
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.refresh_notes && !inputs.publish) }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -42,7 +42,7 @@ jobs:
 
   e2e:
     name: Browser end-to-end
-    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.backfill && !inputs.publish) }}
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.refresh_notes && !inputs.publish) }}
     runs-on: ubuntu-24.04
     env:
       BROWSER: "true"  # a steam:// URL must never open anything on a CI machine
@@ -66,7 +66,7 @@ jobs:
 
   build:
     name: Build app (${{ matrix.name }})
-    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.backfill && !inputs.publish) }}
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.refresh_notes && !inputs.publish) }}
     needs: [unit]
     strategy:
       fail-fast: false
@@ -174,6 +174,11 @@ jobs:
           V="v$(python3 -c 'import modmanager; print(modmanager.__version__)')"
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then test "$V" = "$GITHUB_REF_NAME"; fi
           echo "TAG=$V" >> "$GITHUB_ENV"
+      - name: Release notes come from CHANGELOG.md (the job fails if this version has none)
+        run: |
+          .github/scripts/release-notes.sh "${TAG#v}" > notes.md
+          .github/scripts/release-notes.sh "${TAG#v}" title > title.txt
+          cat notes.md
       - uses: actions/download-artifact@v4
         with:
           path: dist
@@ -184,30 +189,26 @@ jobs:
       - name: Create release (the in-app update check reads this)
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TAG" --generate-notes
+        run: gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TAG - $(cat title.txt)" --notes-file notes.md
 
-  backfill:
-    name: Releases for older versions (manual run with "backfill")
-    if: github.event_name == 'workflow_dispatch' && inputs.backfill
+  refresh_notes:
+    name: Refresh release notes (manual run with "refresh_notes")
+    if: github.event_name == 'workflow_dispatch' && inputs.refresh_notes
     runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Create the missing releases from their original commits
+      - name: Rewrite title and notes of every release that has a changelog section
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # tag  commit  title
-          fail=0
-          while read -r tag sha title; do
-            if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then echo "$tag exists"; continue; fi
+          for tag in $(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName --jq '.[].tagName'); do
             v="${tag#v}"
-            awk -v h="## $v " 'index($0,h)==1{p=1;next} /^## /{p=0} p' CHANGELOG.md > notes.md
-            printf '\nThis release lists the changes only. It has no app files; download the newest release instead.\n' >> notes.md
-            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$sha" --title "$tag - $title" --notes-file notes.md --latest=false || { echo "::error::could not create $tag"; fail=1; }
-          done <<'LIST'
-          v0.2.0 87d916598e12f73364db2dbbb20f86a2aa1860be the merge
-          v0.3.0 51edfa5cac5d8614f06d23789e30bf07dd944fbd downloadable, self-updating app
-          LIST
-          exit $fail
+            if .github/scripts/release-notes.sh "$v" > notes.md 2>/dev/null; then
+              gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --title "$tag - $(.github/scripts/release-notes.sh "$v" title)" --notes-file notes.md
+              echo "updated $tag"
+            else
+              echo "$tag has no changelog section, left alone"
+            fi
+          done

@@ -1,6 +1,9 @@
 # Changelog
 
 ## 0.5.1 - one unreadable folder no longer breaks loading
+Fixes a crash where one mod folder Windows could not open stopped a whole game from loading, moves the error log into its own folder, and brings a new icon.
+
+
 - Fixed: a mod folder Windows cannot open (for example a link or mount it does not trust, WinError 448) stopped the whole game from loading; such folders are now skipped, and a mod that points at one shows as missing
 - The error log now lives in its own folder, `Documents/Mod Manager/ModManager-errors.log`; an older log in Documents is moved there
 - New app and installer icon (three stacked layers on indigo); `installer/make_icon.py` draws it
@@ -8,6 +11,9 @@
 - The same error repeated within 30 seconds is written once, and a window closed mid-answer is no longer reported as an error
 
 ## 0.5.0 - its own window
+Mod Manager now opens in its own window instead of a browser tab, and "Check for updates" can download the new version and restart the app in one click.
+
+
 - Opens in its own application window instead of a browser tab; closing the window quits the app. Windows and macOS use the system web view (WebView2 / WebKit) through pywebview; elsewhere an installed Edge, Chrome or Chromium is opened as a chromeless "app" window; the default browser is the last resort (`--browser` forces it)
 - The Windows app has no console window and its own icon; startup failures are shown in a message box and written to the error log
 - After an in-app update the new version opens its own window
@@ -15,10 +21,16 @@
 - Fixed: adding several mods quickly could silently lose one (changes now queue and each builds on the previous result)
 
 ## 0.4.0 - cleaner settings
+The settings window is redesigned with side navigation, one card per topic, larger text and toggle switches, and there is now a Windows installer.
+
+
 - Settings window redesigned: side navigation (Game, Storage, Playing, Downloads, App & updates), a card per topic, larger text, toggle switches and more spacing
 - Windows installer (`Mod-Manager-Setup.exe`), MIT license, game logos always shown (downloaded once from Steam's public art if missing)
 
 ## 0.3.0 - downloadable, self-updating app
+Mod Manager is now a downloadable app for Windows, macOS and Linux that can update itself from GitHub, and it writes problems to an error log you can send in.
+
+
 - Single-file apps for Windows, macOS and Linux are built by CI and attached to each GitHub release with `SHA256SUMS.txt`
 - **Update now**: the packaged app downloads the newest release, verifies the checksum, replaces itself and restarts (see docs/14)
 - Error log in `Documents/ModManager-errors.log`; fixes for the "reading 'playsets'" error and logo flipping when switching games; conflict scanning moved off the critical path (faster loading)
