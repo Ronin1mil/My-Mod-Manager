@@ -37,7 +37,7 @@ On GitHub press **Code → Download ZIP**, unzip it, and double-click `Start Mod
 - **Getting Workshop mods**: *Open in Steam* (you press Subscribe) or, optionally, `steamcmd` with an account you already logged in. No password is ever handled by this app.
 - **Install `.zip` mods** by drag and drop (checked for unsafe contents); **uninstall** and **upgrades** keep the old version in a backup folder.
 - **Compare playsets** side by side, with one-click *Add*, *Match state*, *Match order*.
-- **Update check** against this repository: manual, `--check-update`, or on start (**off by default**). It never downloads or installs anything.
+- **Updates** from this repository's Releases: the downloaded app offers an **Update now** button (checksum-verified); a copy run from source only reports that a newer version exists. Checks are manual, `--check-update`, or on start (**off by default**).
 - **Play** writes the game's load file (previous one saved as `.bak`), creates missing Workshop descriptors where the game needs them, and starts the game through Steam (or `--game-exe`).
 
 ## What differs per game
@@ -53,20 +53,22 @@ On GitHub press **Code → Download ZIP**, unzip it, and double-click `Start Mod
 Details and what is still to verify: [docs/02-game-notes.md](docs/02-game-notes.md).
 
 ## Logo and trademarks
-No game artwork is stored in this repository. The sidebar shows the game's logo only if it can read it from *your* Steam cache, a `logo.*` you put in the game's config folder, a file you pass with `--logo`, or one you download yourself with `--fetch-logo`; otherwise a text wordmark. (The standalone CK3 manager bundled a Paradox logo; that was dropped here.)
+No game artwork is stored in this repository. The header shows each game's logo, read from your own Steam cache, a `logo.*` in the game's config folder, or a file passed with `--logo`. If none is found, the app downloads Steam's public logo once and keeps it on your PC (turn this off under Settings → App & updates, or with `MODMANAGER_FETCH_LOGOS=0`).
+
+This is an unofficial fan tool. It is not affiliated with or endorsed by Paradox Interactive or Valve. Crusader Kings, Europa Universalis, Victoria and Steam, and their names and logos, belong to their owners.
 
 ## Known limits
 - The official launcher keeps its own playsets in `launcher-v2.sqlite`; this tool does not edit it. Start the game through this tool so its load order is used.
-- `.zip` archives only (no `.7z`/`.rar` yet).
+- Mods install from `.zip` and `.tar` archives (`.tar.gz`, `.tar.bz2`, `.tar.xz`); `.7z` and `.rar` are not supported.
 - Definition scanning covers top-level keys in the game's script folders; it does not understand per-database merge rules.
 - Per-playset saves are opt-in until verified on a real install.
 - Presets ship with **unverified** Workshop ids; read [docs/11](docs/11-presets-and-downloads.md) before relying on one.
 
 ## Development
 ```bash
-python -m unittest discover -s tests -t .          # 244 unit/API/fuzz/stub-game tests
+python -m unittest discover -s tests -t .          # unit/API/fuzz/stub-game tests
 npm i --no-save playwright && npx playwright install chromium
-for t in ui order compare games; do node tests/e2e/$t.mjs; done   # browser end-to-end
+for t in ui order compare games features culture switch; do node tests/e2e/$t.mjs; done   # browser end-to-end
 GAME=ck3 node tests/e2e/ui.mjs                      # the same flow on CK3
 ```
 Set `MODMANAGER_CONFIG_DIR` to keep the config somewhere else (tests do).
@@ -88,3 +90,6 @@ Set `MODMANAGER_CONFIG_DIR` to keep the config somewhere else (tests do).
 | [docs/11-presets-and-downloads.md](docs/11-presets-and-downloads.md) | Presets, Workshop downloads |
 | [docs/12-api.md](docs/12-api.md) | HTTP API reference |
 | [docs/13-verification-checklist.md](docs/13-verification-checklist.md) | Checks to run on a real install |
+
+## License
+[MIT](LICENSE) © 2026 Ronin1mil
