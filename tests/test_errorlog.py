@@ -14,7 +14,7 @@ class Log(unittest.TestCase):
             p = errorlog.write("page", "TypeError: boom", "at foo (app.js:1:2)", "ck3 app.js:1")
             self.assertEqual(Path(p), Path(d) / errorlog.LOG_DIR / errorlog.LOG_NAME)
             txt = Path(p).read_text(encoding="utf-8")
-            for want in ("[page] TypeError: boom", "at foo (app.js:1:2)", "where: ck3 app.js:1", "Mod Manager ", "Python "):
+            for want in ("[page] TypeError: boom", "at foo (app.js:1:2)", "where: ck3 app.js:1", "Ronin Mod Manager ", "Python "):
                 self.assertIn(want, txt)
             Path(p).write_text("x" * (errorlog.MAX_BYTES + 1))
             errorlog.write("server", "second")

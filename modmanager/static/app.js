@@ -17,7 +17,7 @@ const call = async (url, b) => {
     r = await fetch(url, b === undefined ? {} : {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(b)});
     j = await r.json();
   } catch (err) {  // server gone, or an answer that is not JSON
-    const e = new Error(`Could not reach Mod Manager (${err.message}). Is its window still open?`);
+    const e = new Error(`Could not reach Ronin Mod Manager (${err.message}). Is its window still open?`);
     e.network = true; throw e;
   }
   if (!r.ok) { const e = new Error(j.error || 'Request failed'); e.body = j; e.status = r.status; if (j.log_file) logFile = j.log_file; throw e; }
@@ -75,7 +75,7 @@ function fail(e, where) {
 function showFatal(e) {
   const b = $('banner'); if (!b) return;
   b.hidden = false; b.className = 'bad';
-  b.innerHTML = `<b>Something went wrong:</b> ${esc(e.message)}<br><span class="mut">Details were saved to <code>${esc(logFile || 'your Documents folder (Mod Manager/ModManager-errors.log)')}</code>.</span> <button class="sm" id="bn-x">Hide</button>`;
+  b.innerHTML = `<b>Something went wrong:</b> ${esc(e.message)}<br><span class="mut">Details were saved to <code>${esc(logFile || 'your Documents folder (Ronin Mod Manager/RoninModManager-errors.log)')}</code>.</span> <button class="sm" id="bn-x">Hide</button>`;
   $('bn-x').onclick = () => { b.hidden = true; };
 }
 window.addEventListener('error', ev => { if (ev.error instanceof Stale) return; report(ev.message, ev.error && ev.error.stack, `${ev.filename}:${ev.lineno}`); showFatal(new Error(ev.message)); });
@@ -84,15 +84,33 @@ window.addEventListener('unhandledrejection', ev => { const e = ev.reason; if (e
 async function load(rescanMsg) {
   T = null; P = null;
   S = await api('state');
-  if (!S.playsets.length) { await api('playsets', {name: 'Default'}); return load(); }
+  if (!S.playsets.length) { return showNoPlayset(rescanMsg); }   // nothing is created behind the user's back
+  document.body.classList.remove('noplayset');
   if (!cur()) { S.active = S.playsets[0].id; await api(`playsets/${S.active}/activate`, {}); }
   if (rescanMsg) {
     const d = S.diff, bits = [d.added && `${d.added} new`, d.updated && `${d.updated} updated`, d.removed && `${d.removed} removed`].filter(Boolean);
     toast(bits.length ? `Scan: ${bits.join(', ')} (${d.total} mods)` : `Scan: no changes (${d.total} mods)`);
   }
   setLogo(G); showImportButton();
-  document.title = GNAME() + ' Mod Manager';
+  document.title = GNAME() + ' · Ronin Mod Manager';
   render(); analyse(); banner(); pollUpdate();
+  if (S.setup_needed && !setupShown) { setupShown = true; openPaths(true); }
+}
+// No playsets at all (a new game, or the last one was deleted): say so and offer the two ways to get one.
+function showNoPlayset(rescanMsg) {
+  document.body.classList.add('noplayset');
+  A = null; sel = null; drawer();
+  if (rescanMsg) toast(`Scan: ${S.diff.total} mods`);
+  setLogo(G); showImportButton();
+  document.title = GNAME() + ' · Ronin Mod Manager';
+  $('pslist').innerHTML = '<div class="empty mut">No playsets yet</div>';
+  $('title').textContent = 'No playset';
+  $('tabs').innerHTML = ''; $('status').textContent = `${GNAME()}${S.game_version ? ` ${S.game_version}` : ''} · ${S.mods.length} mod${S.mods.length === 1 ? '' : 's'} found`;
+  $('view').innerHTML = `<div class="empty">You have no playset for ${esc(GNAME())} yet.<br><span class="mut">Create one, or import the playsets the game's own launcher already has.</span>
+    <div class="acts"><button class="pri" id="np-new">+ New playset</button><button id="np-imp">Import…</button></div></div>`;
+  $('np-new').onclick = () => $('new').click();
+  $('np-imp').onclick = () => $('imp').click();
+  banner(); pollUpdate();
   if (S.setup_needed && !setupShown) { setupShown = true; openPaths(true); }
 }
 let polls = 0, setupShown = false;
@@ -285,7 +303,7 @@ document.addEventListener('click', guard(async e => {
 // Replace this app with the newest release (downloaded app only), then reload once the new copy answers.
 async function selfUpdate(say, ask = true) {
   say = say || toast;
-  if (ask && !confirm('Download the newest version and restart Mod Manager? Your playsets and settings are kept.')) return;
+  if (ask && !confirm('Download the newest version and restart Ronin Mod Manager? Your playsets and settings are kept.')) return;
   let st = await app('self-update', {});
   for (let i = 0; i < 600 && ['working', 'restarting'].includes(st.status); i++) {
     say(st.message || 'Updating…');
@@ -299,7 +317,7 @@ async function selfUpdate(say, ask = true) {
     await new Promise(r => setTimeout(r, 1000));
     try { const r = await fetch('/api/games'); if (r.ok) return location.reload(); } catch (e) { /* not up yet */ }
   }
-  throw new Error('Mod Manager did not come back. Start it again from its icon; the update itself was installed.');
+  throw new Error('Ronin Mod Manager did not come back. Start it again from its icon; the update itself was installed.');
 }
 function banner() {
   const b = $('banner'), u = GI.update; b.className = '';
@@ -327,8 +345,7 @@ async function openPaths(first) {
   const d = $('dlg'), st = GI.settings;
   d.className = 'wide';
   d.innerHTML = `<div class="st-head"><h2>${first ? 'Set up ' + esc(GNAME()) : 'Settings'}</h2>
-      <span class="mut">Mod Manager v${esc(GI.version)}${S.game.verified ? '' : ' · launching is <b>not yet verified</b> on a real ' + esc(GNAME()) + ' install'}</span>
-      ${S.imported_from ? `<div class="mut">Playsets were imported from your previous manager (${esc(S.imported_from)}).</div>` : ''}
+      <span class="mut">Ronin Mod Manager v${esc(GI.version)}${S.game.verified ? '' : ' · launching is <b>not yet verified</b> on a real ' + esc(GNAME()) + ' install'}</span>
     </div>
     <div class="st-body">
     <nav class="st-tabs" id="st-tabs"><button data-st="game" class="on"><i>🎮</i>Game</button><button data-st="store"><i>📁</i>Storage</button><button data-st="play"><i>▶</i>Playing</button><button data-st="dl"><i>⬇</i>Downloads</button><button data-st="app"><i>⟳</i>App &amp; updates</button></nav>
@@ -388,8 +405,13 @@ async function openPaths(first) {
         <label class="srow"><span class="rt"><b>Download missing logos</b><span class="hint">Fetches a missing game logo once from Steam's public art server, only when none is found on this PC</span></span><input type="checkbox" class="sw" id="s-logos" ${st.fetch_logos ? 'checked' : ''}></label>
       </div>
       <div class="card">
+        <h3>Erase all data <span class="b warn">experimental</span></h3>
+        <p class="desc">Deletes everything this app saved: every playset, the library, backups, logos, your own presets and the settings, for all games. Use it for a completely fresh start. The games' own files, your mods, saves and the error log are not touched.</p>
+        <div class="acts"><button id="s-erase">Erase all data…</button></div>
+      </div>
+      <div class="card">
         <h3>Problems</h3>
-        <p class="desc">Errors are saved to <code>${esc(GI.log_file || 'Documents/Mod Manager/ModManager-errors.log')}</code>. Send that file when reporting a bug.</p>
+        <p class="desc">Errors are saved to <code>${esc(GI.log_file || 'Documents/Ronin Mod Manager/RoninModManager-errors.log')}</code>. Send that file when reporting a bug.</p>
       </div>
     </section>
     </div>
@@ -402,6 +424,13 @@ async function openPaths(first) {
   };
   $('s-imp-auto').onchange = guard(async () => { GI.settings = await app('settings', {auto_import_launcher: $('s-imp-auto').checked}); });
   $('s-imp-show').onchange = guard(async () => { GI.settings = await app('settings', {show_import_button: $('s-imp-show').checked}); showImportButton(); });
+  $('s-erase').onclick = guard(async () => {
+    const t = prompt('This deletes ALL playsets and settings saved by this app, for every game. Your games and mods are not touched.\n\nType ERASE to continue.');
+    if (t === null) return;
+    const r = await app('erase-all', {confirm: t.trim()});
+    if (r.failed.length) { alert('Some data could not be deleted:\n' + r.failed.join('\n')); }
+    location.reload();
+  });
   $('s-logos').onchange = guard(async () => { GI.settings = await app('settings', {fetch_logos: $('s-logos').checked}); });
   d.showModal();
   $('p-cancel').onclick = guard(async () => { if (first) { S = await api('skip-setup', {}); } d.close(); });
@@ -732,7 +761,7 @@ function setLogo(id) {
   const box = $('logo');
   if (box.dataset.k === id) return;
   box.dataset.k = id; logoTry = 0;
-  box.innerHTML = `<div class="logo-box">${CREST}<img alt="" src="/api/${id}/logo"></div><span class="sub">Mod Manager</span>`;
+  box.innerHTML = `<div class="logo-box">${CREST}<img alt="" src="/api/${id}/logo"></div><span class="sub">Ronin Mod Manager</span>`;
   const img = box.querySelector('img');
   img.onload = () => {   // a dark logo (e.g. black lettering) would vanish on the dark theme: lighten it
     try {
@@ -754,7 +783,7 @@ async function useGame(id, first) {
   applyTheme(g);
   $('game').value = id;
   setLogo(g.id);
-  document.title = g.name + ' Mod Manager';
+  document.title = g.name + ' · Ronin Mod Manager';
   await load(first);
 }
 $('game').onchange = guard(() => useGame($('game').value, true));

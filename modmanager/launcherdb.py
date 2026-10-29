@@ -10,6 +10,7 @@ column is optional here.)
 The file is only ever READ, and only from a temporary copy: the launcher may have it open, and nothing here can
 damage it or the launcher's playsets. Everything is best effort and never raises to the caller.
 """
+import json
 import os
 import re
 import shutil
@@ -120,6 +121,47 @@ def read_playsets(db_file):
                           "registry_id": str(m.get("gameRegistryId") or ""), "dir_path": str(m.get("dirPath") or ""),
                           "name": str(m.get("displayName") or m.get("name") or ""), "source": str(m.get("source") or "")})
         out.append({"id": str(p.get("id")), "name": str(p.get("name") or "Launcher playset")[:100],
+                    "active": _flag(p.get("isActive")), "mods": items})
+    return out
+
+
+def read_playsets_json(user_dir):
+    """Europa Universalis V's launcher keeps its playsets in <user dir>/playsets.json:
+    {"playsets": [{"name", "isActive", "orderedListMods": [{"path", "isEnabled"}], "DLC": [...]}]}.
+    Returned like read_playsets (one entry per playset, mods in the launcher's order), or [] when the file is missing.
+    A mod's `path` is a folder: .../workshop/content/<app id>/<workshop id>/ or <user dir>/mod/<folder>/. The drive and the
+    user's name in it are never used: only the last folders matter, so a library on any drive still matches."""
+    f = Path(user_dir) / "playsets.json" if user_dir else None
+    if not f or not f.is_file():
+        return []
+    try:
+        data = json.loads(f.read_text(encoding="utf-8-sig", errors="replace"))
+    except (OSError, ValueError) as e:
+        raise ValueError(f"The launcher's playset file could not be read ({e}).")
+    raw = data.get("playsets") if isinstance(data, dict) else None
+    if not isinstance(raw, list):
+        return []
+    out = []
+    for i, p in enumerate(raw[:MAX_PLAYSETS]):
+        if not isinstance(p, dict) or _flag(p.get("isRemoved")):
+            continue
+        items = []
+        for j, m in enumerate((p.get("orderedListMods") or [])[:MAX_MODS]):
+            path = str(m.get("path") or "").replace("\\", "/").rstrip("/") if isinstance(m, dict) else ""
+            if not path:
+                continue
+            parts = path.split("/")
+            sid = parts[-1] if len(parts) > 2 and parts[-2].isdigit() and parts[-1].isdigit() else ""
+            local = parts[-1] if len(parts) > 1 and parts[-2] == "mod" else ""
+            items.append({"enabled": _flag(m.get("isEnabled"), True), "position": j, "steam_id": sid, "pdx_id": "",
+                          "registry_id": f"mod/{local}.mod" if local else "", "dir_path": path, "name": parts[-1],
+                          "source": "workshop" if sid else "local"})
+        name = str(p.get("name") or "Launcher playset")[:100]
+        uid, n = name, 1
+        while any(o["id"] == uid for o in out):  # the name identifies a playset, so it survives re-ordering in the launcher
+            n += 1
+            uid = f"{name} #{n}"
+        out.append({"id": uid, "name": name,
                     "active": _flag(p.get("isActive")), "mods": items})
     return out
 

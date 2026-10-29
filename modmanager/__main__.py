@@ -7,7 +7,7 @@ for _n in ("stdout", "stderr"):
     if getattr(sys, _n) is None:
         setattr(sys, _n, open(os.devnull, "w", encoding="utf-8"))
 
-from modmanager import __version__, games
+from modmanager import APP_NAME, __version__, games
 
 ap = argparse.ArgumentParser(prog="modmanager", description="Mod manager for Paradox grand strategy games")
 ap.add_argument("--game", choices=list(games.GAMES), help="open this game first; per-game flags below apply to it")
@@ -72,8 +72,8 @@ except BaseException as e:  # a failed start (port in use, bad folder, ...) must
     if isinstance(e, SystemExit):
         raise
     errorlog.write_exception("startup", e)
-    text = f"Mod Manager could not start: {type(e).__name__}: {e}\nDetails: {errorlog.log_path()}"
+    text = f"{APP_NAME} could not start: {type(e).__name__}: {e}\nDetails: {errorlog.log_path()}"
     print("\n" + text)
     from modmanager import window
-    window.message("Mod Manager", text)
+    window.message(APP_NAME, text)
     raise SystemExit(1)

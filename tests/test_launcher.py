@@ -210,3 +210,97 @@ class WithoutSqlite(unittest.TestCase):
         tree = ast.parse(Path(launcherdb.__file__).read_text(encoding="utf-8"))
         top = [n for n in tree.body if isinstance(n, (ast.Import, ast.ImportFrom))]
         self.assertFalse([n for n in top if any(a.name.split(".")[0] == "sqlite3" for a in getattr(n, "names", []))])
+
+
+EU5_PLAYSETS = {
+    "file_version": "1.0.0",
+    "playsets": [
+        {"name": "Initial playset", "isAutomaticallySorted": False, "isActive": True,
+         "orderedListMods": [
+             {"path": "D:/SteamLibrary/steamapps/workshop/content/3450310/111/", "isEnabled": True},
+             {"path": "C:/Users/player/Documents/Paradox Interactive/Europa Universalis V/mod/local_one/", "isEnabled": True},
+             {"path": "D:/SteamLibrary/steamapps/workshop/content/3450310/999/", "isEnabled": False}],
+         "DLC": [{"paradoxAppId": "d000_shared", "isEnabled": True}]},
+        {"name": "Local only", "orderedListMods": [
+            {"path": "C:\\Users\\player\\Documents\\Paradox Interactive\\Europa Universalis V\\mod\\local_one\\", "isEnabled": True}]},
+        {"name": "Initial playset", "orderedListMods": []},
+    ],
+}
+
+
+class PlaysetsJson(GameCase):
+    """Europa Universalis V's launcher keeps its playsets in playsets.json instead of launcher-v2.sqlite."""
+    GAME = games.EU5
+
+    def setUp(self):
+        super().setUp()
+        self.kw(self.GAME)  # lay the fake install out now so the reader tests can use it before the app starts
+
+    def kw(self, g):
+        base = super().kw(g)
+        if g is self.GAME:
+            import json
+            mkworkshop(self.ws(g), 111, "Alpha")
+            mkmod(self.user(g), "local_one", "Local One")
+            (self.user(g) / "playsets.json").write_text(json.dumps(EU5_PLAYSETS), encoding="utf-8")
+        return base
+
+    def test_reading_ignores_the_drive_and_user_name_and_keeps_order_and_state(self):
+        sets = launcherdb.read_playsets_json(self.user())
+        self.assertEqual([s["name"] for s in sets], ["Initial playset", "Local only", "Initial playset"])
+        self.assertEqual(len({s["id"] for s in sets}), 3)  # same name twice still gives distinct ids
+        self.assertTrue(sets[0]["active"])
+        self.assertEqual([(m["steam_id"], m["enabled"]) for m in sets[0]["mods"]], [("111", True), ("", True), ("999", False)])
+        self.assertEqual(sets[1]["mods"][0]["registry_id"], "mod/local_one.mod")  # backslash paths work too
+
+    def test_missing_or_odd_files_give_nothing_or_a_readable_error(self):
+        self.assertEqual(launcherdb.read_playsets_json(self.r / "nowhere"), [])
+        (self.user() / "playsets.json").write_text('{"playsets": 5}', encoding="utf-8")
+        self.assertEqual(launcherdb.read_playsets_json(self.user()), [])
+        (self.user() / "playsets.json").write_text("{nope", encoding="utf-8")
+        with self.assertRaises(ValueError):
+            launcherdb.read_playsets_json(self.user())
+
+    def test_import_matches_workshop_and_local_mods_and_keeps_the_uninstalled_one(self):
+        st, info, _ = self.req("GET", "/api/launcher")
+        self.assertTrue(info["found"])
+        self.assertEqual(len(info["playsets"]), 3)
+        st, r, _ = self.post("/api/launcher/import", {})
+        self.assertEqual(st, 200)
+        by = {p["name"]: p for p in self.req("GET", "/api/state")[1]["playsets"]}
+        first = by["Initial playset"]
+        self.assertEqual(first["mods"], ["ws:111", "local:local_one", "ws:999"])
+        self.assertEqual(first["disabled"], ["ws:999"])
+        self.assertEqual(by["Local only"]["mods"], ["local:local_one"])
+        self.assertIn("Initial playset (launcher)", by)  # the second playset with the same name is not lost
+
+
+class NoEmptyDefaults(unittest.TestCase):
+    def setUp(self):
+        t = tempfile.TemporaryDirectory()
+        self.addCleanup(t.cleanup)
+        from modmanager.store import Store
+        self.store = Store(Path(t.name) / "playsets.json")
+
+    def test_empty_default_playsets_left_by_older_versions_are_removed(self):
+        a = self.store.create("Default")
+        b = self.store.create("Default")
+        keep = self.store.create("My list", ["ws:1"])
+        self.assertEqual(self.store.prune_empty_defaults(), 2)
+        self.assertEqual(list(self.store.data["playsets"]), [keep])
+        self.assertEqual(self.store.data["active"], keep)
+        self.assertNotIn(a, self.store.data["playsets"])
+
+    def test_a_default_with_mods_notes_or_an_origin_stays(self):
+        self.store.create("Default", ["ws:1"])
+        self.store.create("Default", [], notes="remember this")
+        o = self.store.create("Default")
+        self.store.set_origin(o, "launcher:x")
+        self.assertEqual(self.store.prune_empty_defaults(), 0)
+        self.assertEqual(len(self.store.data["playsets"]), 3)
+
+    def test_everything_empty_leaves_no_playset_at_all(self):
+        self.store.create("Default")
+        self.assertEqual(self.store.prune_empty_defaults(), 1)
+        self.assertEqual(self.store.data["playsets"], {})
+        self.assertIsNone(self.store.data["active"])

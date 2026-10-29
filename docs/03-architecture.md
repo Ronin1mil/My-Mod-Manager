@@ -12,7 +12,7 @@
 | `scan.py` | discover mods; conflicts: file / definition / patch / replace / localization, base-game comparison |
 | `library.py` | persistent library with new/updated/removed tracking |
 | `order.py` | validate, stable topological sort, explanations, one-click fixes |
-| `store.py` | playsets (validated, atomic JSON, rolling `.bak`), share/import, legacy import, global settings, load-file writer |
+| `store.py` | playsets (validated, atomic JSON, rolling `.bak`), share/import, global settings, load-file writer |
 | `presets.py` | curated playsets: validate, load (built-in + yours), apply, save |
 | `workshop.py` | Steam page opener and optional `steamcmd` download jobs |
 | `install.py` | safe `.zip` install, upgrade backups, uninstall |
@@ -41,7 +41,7 @@ Playset: `{id, name, mods:[ids in load order], disabled:[ids], notes, launch_arg
 `Hub` creates a `GameApp` per game on first use (so a game you never open costs nothing and triggers no detection). Requests are routed by `/api/<game>/...`; app-wide routes (`/api/games`, `/api/settings`, `/api/update-check`) have no game segment. One request at a time touches state (a lock); uploads, update checks and downloads run outside it.
 
 ## Adding a game
-1. Add a `Game(...)` to `games.py` (app id, folder names, `install_marker`, `load_file`, `load_style`, `def_dirs`, `legacy_config`, theme) and put it in `GAMES`.
+1. Add a `Game(...)` to `games.py` (app id, folder names, `install_marker`, `load_file`, `load_style`, `def_dirs`, theme) and put it in `GAMES`.
 2. `tests/test_games.py` pins the registry: update it. Parametrised tests (`tests/test_multigame.py`, `test_detect.py`, `test_store_games.py`) pick the new game up through `ALL`.
 3. Add a section to docs/02 and docs/13; add a built-in preset in `modmanager/presets/<game>-*.json` if wanted.
 4. If its load file needs a new style, extend `store.mod_entry` and `Game.load_style` and add a test next to `LoadFiles`.

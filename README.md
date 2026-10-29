@@ -1,8 +1,8 @@
-# My Mod Manager
+# Ronin Mod Manager
 
 One mod manager for **Crusader Kings III**, **Europa Universalis V**, **Victoria 3** and **Mount & Blade II: Bannerlord**. Pick a playset, see *why* two mods fight, press **Play**, and the game starts with exactly that playset's mods. Python standard library only (3.8+), and its own app window.
 
-This repository replaces the three standalone managers (`ck3-mod-manager`, `eu5-mod-manager`, `vic3-mod-manager`). Their playsets are imported automatically on first start, see [docs/10-migration.md](docs/10-migration.md).
+This repository replaces the three standalone managers (`ck3-mod-manager`, `eu5-mod-manager`, `vic3-mod-manager`). Nothing is read from their folders any more; playsets from the games' own launchers can be imported, see [docs/10-migration.md](docs/10-migration.md).
 
 > **Made with AI.** This project was written with the help of an AI coding assistant (Claude by Anthropic) at the direction of its maintainer. It is tested against fake installs only (see Status below), so use it with that in mind and keep backups of your saves.
 
@@ -24,13 +24,13 @@ The first time you open a game, a setup dialog finds the install (every Steam li
 Open the repository's **Releases** page. On Windows download **`Mod-Manager-Setup.exe`** and run it: it installs for your user (no administrator rights), adds a Start-menu entry (and optionally a desktop shortcut) and an uninstaller. Prefer no installer? `Mod-Manager-windows.exe` runs on its own. macOS and Linux apps are not built yet (saved for later); use the Python route below. No Python needed on Windows. Start it and your browser opens the app. When a newer release is published a banner offers **Update now**: the app downloads the new version, checks it against the release's `SHA256SUMS.txt`, replaces itself and restarts. Your playsets and settings live in your user folder and are kept.
 Unsigned apps trigger a warning the first time: Windows SmartScreen ("More info" → "Run anyway"), macOS ("System Settings → Privacy & Security → Open Anyway"). See `docs/14-updates-and-errors.md`.
 
-If something goes wrong, the details are written to **`Documents/Mod Manager/ModManager-errors.log`** (the red banner in the app shows the exact path). Send that file when reporting a problem.
+If something goes wrong, the details are written to **`Documents/Ronin Mod Manager/RoninModManager-errors.log`** (the red banner in the app shows the exact path). Send that file when reporting a problem.
 
 ## Window
 The app opens in its own window and closing the window quits it. On Windows and macOS that is a native window around the system web view (Windows needs the Edge WebView2 runtime, which Windows 11 and current Windows 10 already have). Without it the app falls back to an Edge/Chrome "app" window, then to your default browser (`--browser` forces the browser). Under the hood it is still a small server on `127.0.0.1` that only this PC can reach. The native window is built and probed in CI but has **not** been opened on a real Windows or macOS desktop yet.
 
 ## Quick start (no Git)
-On GitHub press **Code → Download ZIP**, unzip it, and double-click `Start Mod Manager.bat` (Windows) or `Start Mod Manager.command` (macOS/Linux). You need Python 3.8+ installed.
+On GitHub press **Code → Download ZIP**, unzip it, and double-click `Start Ronin Mod Manager.bat` (Windows) or `Start Ronin Mod Manager.command` (macOS/Linux). You need Python 3.8+ installed.
 
 ## Features
 - **Three games, one app.** A game switcher with a per-game theme; every game keeps its own playsets, library, backups and settings. Adding a game is a data entry in `modmanager/games.py`.

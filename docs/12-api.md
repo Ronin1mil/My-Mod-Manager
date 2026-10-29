@@ -12,7 +12,7 @@ JSON over HTTP on `127.0.0.1` (default port 8765). Everything is same-origin onl
 ## Per game: `/api/<ck3|eu5|vic3>/...`
 | Route | |
 |---|---|
-| `GET state` | mods, playsets, active, folders, game root/version, `has_logo`, `include_vanilla`, `setup_done`, `setup_needed`, `imported_from`, steamcmd settings |
+| `GET state` | mods, playsets, active, folders, game root/version, `has_logo`, `include_vanilla`, `setup_done`, `setup_needed`, steamcmd settings |
 | `GET analyse/<playset>` | `{issues, notes, conflicts, counts, truncated}`; conflicts: `{kind: file\|definition\|patch\|replace\|localization, severity, path, mods, winner, vanilla?}` |
 | `GET compare/<a>/<b>` | playset comparison with summaries |
 | `GET playsets/<id>/share` | portable playset document (`modmanager-playset`, carries the game) |

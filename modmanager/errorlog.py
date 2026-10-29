@@ -1,4 +1,4 @@
-"""One plain-text error log in its own folder inside the user's Documents (Documents/Mod Manager), so a problem can be read (and sent) without a console.
+"""One plain-text error log in its own folder inside the user's Documents (Documents/Ronin Mod Manager), so a problem can be read (and sent) without a console.
 
 Written by the server (unexpected errors, crashes) and by the web page (script errors, failed requests) through
 /api/client-error. Never raises, never grows past ~1 MB (one rotated copy), and records no mod contents or
@@ -12,10 +12,10 @@ import time
 import traceback
 from pathlib import Path
 
-from . import __version__
+from . import APP_NAME, __version__
 
-LOG_NAME = "ModManager-errors.log"
-LOG_DIR = "Mod Manager"
+LOG_NAME = "RoninModManager-errors.log"
+LOG_DIR = APP_NAME
 REPEAT_SECONDS = 30  # the same error again within this time is not written again (a failing page retries a lot)
 MAX_BYTES = 1024 * 1024
 MAX_ENTRY = 20000
@@ -73,7 +73,7 @@ def _move_old_log(p):
 
 
 def _header():
-    return (f"Mod Manager {__version__} | Python {platform.python_version()} | {platform.platform()}"
+    return (f"{APP_NAME} {__version__} | Python {platform.python_version()} | {platform.platform()}"
             f"{' | frozen' if getattr(sys, 'frozen', False) else ''}")
 
 

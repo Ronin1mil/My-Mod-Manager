@@ -14,10 +14,10 @@ import sys
 import time
 from pathlib import Path
 
-from . import errorlog
+from . import APP_NAME, errorlog
 from .paths import config_dir
 
-TITLE = "Mod Manager"
+TITLE = APP_NAME
 SIZE = (1320, 880)
 MIN_SIZE = (940, 620)
 

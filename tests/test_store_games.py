@@ -226,59 +226,5 @@ class Sharing(Base):
         self.assertEqual(self.s.data["playsets"], {})
 
 
-class MovingFromStandaloneManagers(Base):
-    def legacy(self, name, doc):
-        d = self.r / "xdg" / name
-        d.mkdir(parents=True)
-        (d / "playsets.json").write_text(json.dumps(doc))
-
-    def test_first_start_adopts_old_playsets_without_touching_them(self):
-        self.legacy("ck3mm", {"active": "p1", "playsets": {
-            "p1": {"id": "p1", "name": "Old CK3 set", "mods": ["local:A", "ws:5"], "disabled": ["ws:5"], "created": 1}}, "settings": {}})
-        before = (self.r / "xdg/ck3mm/playsets.json").read_text()
-        s = Store(game=games.CK3)
-        ps = s.get("p1")
-        self.assertEqual((ps["name"], ps["mods"], ps["disabled"]), ("Old CK3 set", ["local:A", "ws:5"], ["ws:5"]))
-        self.assertEqual((ps["notes"], ps["auto_sort"], ps["launch_args"]), ("", True, []))  # defaults filled in
-        self.assertEqual(s.data["active"], "p1")
-        self.assertEqual((self.r / "xdg/ck3mm/playsets.json").read_text(), before)
-        self.assertTrue((self.r / "cfg/ck3/playsets.json").is_file())
-
-    def test_each_game_only_adopts_its_own_old_file(self):
-        self.legacy("ck3mm", {"playsets": {"p": {"id": "p", "name": "ck3 one", "mods": []}}})
-        self.assertEqual(Store(game=games.EU5).data["playsets"], {})
-        self.assertEqual(list(Store(game=games.CK3).data["playsets"]), ["p"])
-
-    def test_old_eu5_file_with_settings_keeps_working(self):
-        self.legacy("eu5mm", {"active": "e1", "playsets": {"e1": {"id": "e1", "name": "EU", "mods": ["local:X"], "disabled": [], "notes": "keep"}},
-                              "settings": {"game_dir": "/old/path", "setup_done": True}})
-        s = Store(game=games.EU5)
-        self.assertEqual(s.get("e1")["notes"], "keep")
-
-    def test_only_on_first_start_never_overwrites_current_data(self):
-        self.legacy("vic3mm", {"playsets": {"o": {"id": "o", "name": "old", "mods": []}}})
-        s = Store(game=games.VIC3)
-        s.create("mine")
-        s.delete("o")
-        again = Store(game=games.VIC3)
-        self.assertEqual([p["name"] for p in again.data["playsets"].values()], ["mine"])
-
-    def test_junk_legacy_files_are_ignored(self):
-        for junk in ("{bad", "[]", '{"playsets": []}', '{"playsets": {"x": 5}}'):
-            d = self.r / "xdg/ck3mm"
-            d.mkdir(parents=True, exist_ok=True)
-            (d / "playsets.json").write_text(junk)
-            for f in (self.r / "cfg/ck3/playsets.json",):
-                f.unlink() if f.exists() else None
-            self.assertEqual(Store(game=games.CK3).data["playsets"], {}, junk)
-
-    def test_gameapp_reports_where_playsets_came_from(self):
-        self.legacy("vic3mm", {"playsets": {"o": {"id": "o", "name": "old", "mods": []}}})
-        (self.r / "u/mod").mkdir(parents=True)
-        app = GameApp(games.VIC3, user_dir=self.r / "u", workshop_dir=self.r / "none", autodetect=False)
-        self.assertIn("vic3mm", app.state()["imported_from"])
-        self.assertEqual([p["name"] for p in app.state()["playsets"]], ["old"])
-
-
 if __name__ == "__main__":
     unittest.main()

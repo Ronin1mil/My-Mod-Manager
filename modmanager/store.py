@@ -59,32 +59,6 @@ class Store:
                 raise ValueError(f"The playset file {self.path} does not look like a playset file.")
             self.data.update(d)
             self.data.setdefault("settings", {})
-        elif game is not None:
-            self.import_legacy(game)
-
-    def import_legacy(self, game):
-        """First start of a game: adopt playsets from the standalone manager it replaces (copy, never move)."""
-        from .paths import legacy_config_files
-        for f in legacy_config_files(game):
-            try:
-                d = json.loads(f.read_text(encoding="utf-8-sig"))
-            except (OSError, ValueError):
-                continue
-            if isinstance(d, dict) and isinstance(d.get("playsets"), dict):
-                keep = {k: d["playsets"][k] for k, v in d["playsets"].items() if isinstance(v, dict)
-                        and isinstance(v.get("mods", []), list)}
-                for k, v in keep.items():
-                    v.setdefault("id", k)
-                    v.setdefault("name", "Imported")
-                    v.setdefault("mods", [])
-                    v.setdefault("disabled", [])
-                    v.setdefault("created", int(time.time()))
-                self.data["playsets"] = keep
-                self.data["active"] = d.get("active") if d.get("active") in keep else next(iter(keep), None)
-                self.data["imported_from"] = str(f)
-                self.save()
-                return True
-        return False
 
     def settings(self):
         return {**SETTINGS_DEFAULTS, **{k: v for k, v in self.data.get("settings", {}).items() if k in SETTINGS_DEFAULTS}}
@@ -174,6 +148,19 @@ class Store:
             self.data["active"] = next(iter(self.data["playsets"]), None)
         self.save()
 
+    def prune_empty_defaults(self):
+        """Older versions made an empty playset called 'Default' whenever a game had none. Remove those leftovers (empty,
+        no notes, not imported from anywhere); a playset the user named or filled is never touched. -> how many."""
+        gone = [k for k, ps in self.data["playsets"].items()
+                if ps.get("name") == "Default" and not ps.get("mods") and not ps.get("notes") and not ps.get("origin")]
+        for k in gone:
+            del self.data["playsets"][k]
+        if gone:
+            if self.data["active"] not in self.data["playsets"]:
+                self.data["active"] = next(iter(self.data["playsets"]), None)
+            self.save()
+        return len(gone)
+
     def export(self, pid, mods):
         """Return enabled mod ids in load order for a playset (skipping disabled/unknown)."""
         ps = self.get(pid)
@@ -194,11 +181,11 @@ class Store:
     def import_shared(self, data, mods, game_id=""):
         """Create a playset from share() output (or a standalone-manager file). Returns (id, [names not installed])."""
         if not isinstance(data, dict):
-            raise ValueError("Not a Mod Manager playset file")
+            raise ValueError("Not a playset file")
         fmt = data.get("format")
         legacy_game = LEGACY_SHARE.get(fmt)
         if fmt != SHARE_FORMAT and legacy_game is None:
-            raise ValueError("Not a Mod Manager playset file")
+            raise ValueError("Not a playset file")
         file_game = data.get("game") or legacy_game
         if game_id and file_game and file_game != game_id:
             raise ValueError(f"This playset is for '{file_game}', not '{game_id}'. Open that game first.")

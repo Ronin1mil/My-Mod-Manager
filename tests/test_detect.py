@@ -109,10 +109,10 @@ class UserDirsAndConfig(unittest.TestCase):
                 self.assertEqual(paths.config_dir(games.EU5), Path(r) / "eu5")
                 self.assertTrue((Path(r) / "eu5").is_dir())
 
-    def test_legacy_config_locations(self):
-        with tempfile.TemporaryDirectory() as r, mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": r}):
-            names = {g.id: [p.parent.name for p in paths.legacy_config_files(g)] for g in games.GAMES.values()}
-            self.assertEqual(names, {"ck3": ["ck3mm"], "eu5": ["eu5mm"], "vic3": ["vic3mm"], "bannerlord": []})
+    def test_config_folder_is_named_after_the_app(self):
+        with tempfile.TemporaryDirectory() as r, mock.patch.dict(os.environ, {"APPDATA": r, "XDG_CONFIG_HOME": r}):
+            os.environ.pop("MODMANAGER_CONFIG_DIR", None)
+            self.assertEqual(paths.config_dir(games.CK3), Path(r) / "Ronin Mod Manager" / "ck3")
 
 
 class Logos(unittest.TestCase):

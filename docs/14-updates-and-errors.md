@@ -14,7 +14,7 @@
 - Status: the update logic is unit-tested (checksum mismatch, missing hash, redirects, swap/rollback, restart call) and the Linux build was started and served the page in testing. A full download-and-replace against a real published release has to be done once a second release exists.
 
 ## Error log
-- File: `ModManager-errors.log` in the folder `Mod Manager` inside the real Documents folder (older versions wrote it straight into Documents; the file is moved into the folder on first write; the same error repeated within 30 s is written once) (Windows: asked from the shell, so OneDrive-redirected Documents works; else `~/Documents`; else home). Override with `MODMANAGER_LOG_DIR`. ~1 MB cap, one rotated copy `.log.1`.
+- File: `RoninModManager-errors.log` in the folder `Ronin Mod Manager` inside the real Documents folder (older versions wrote it straight into Documents; the file is moved into the folder on first write; the same error repeated within 30 s is written once) (Windows: asked from the shell, so OneDrive-redirected Documents works; else `~/Documents`; else home). Override with `MODMANAGER_LOG_DIR`. ~1 MB cap, one rotated copy `.log.1`.
 - Written for: unexpected server errors (the page gets JSON `{error, log_file}` instead of a dropped connection), crashes at start-up, uncaught exceptions in worker threads, and script errors / failed requests reported by the page (`/api/client-error`, max 200 per run, fields truncated).
 - Entry = time, source (`server`, `page`, `startup`, `crash`, `thread`, `update`), message, where, traceback/stack, app + Python + OS versions. No mod contents.
 - The page shows a red banner with the path for server errors and script errors; ordinary validation messages stay as toasts.

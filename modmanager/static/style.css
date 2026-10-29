@@ -115,3 +115,5 @@ dialog.menu h2{font-size:24px;margin:0 0 16px}dialog.menu button{font-size:15px;
 dialog.menu .card{margin-bottom:18px}dialog.menu .card h3{margin:0 0 6px}
 dialog.mid{width:min(680px,94vw);max-height:90vh;overflow:auto;font-size:16px;line-height:1.5}dialog.mid h2{font-size:22px}dialog.mid button{font-size:15px;padding:8px 15px}
 button[hidden]{display:none}
+
+body.noplayset #auto,body.noplayset .chk,body.noplayset #sortnow,body.noplayset #installbtn,body.noplayset #cfg,body.noplayset #tabs,body.noplayset #launch,body.noplayset #launchpart{display:none}

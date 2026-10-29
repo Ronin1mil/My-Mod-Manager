@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.2 - Ronin Mod Manager, Europa Universalis V import, no empty playsets
+- **New name: Ronin Mod Manager.** The window, installer, shortcuts and page titles use it. The app now keeps its data in `%APPDATA%\Ronin Mod Manager\` and its error log in `Documents\Ronin Mod Manager\RoninModManager-errors.log`. **Nothing is read from the old folders** (`modmanager`, `ck3mm`, `eu5mm`, `vic3mm`) any more, so this is a fresh start. The downloaded file names (`Mod-Manager-windows.exe`, `Mod-Manager-Setup.exe`) are unchanged so older copies can still update to this one
+- **Europa Universalis V can import its launcher playsets.** The game keeps them in `playsets.json` in its folder in Documents (not in a database like the other games). Workshop and local mods are matched by their last folders, so it works on any drive and for any Windows user name
+- **No more empty "Default" playsets.** A game with no playset now shows "No playset" with New playset and Import buttons instead of creating one by itself. Empty playsets called "Default" that older versions left behind are removed on start (a playset with mods, notes or an import origin is never touched)
+- **Settings -> Erase all data (experimental)** deletes everything the app saved (playsets, library, backups, logos, presets, settings) after you type ERASE. The games' files, mods, saves and the error log are not touched
+- The one-time copy of playsets from the old standalone managers (`ck3mm`, `eu5mm`, `vic3mm`) is removed
+
 ## 0.8.1 - fix the crash after updating
 Fixes "No module named '_sqlite3'" that appeared when an older copy (0.5.0 and earlier) updated itself to 0.7.0 or 0.8.0. If you hit it, just start the app again; it works from then on.
 - The old copy restarted the new one while still handing it its own unpacked files, which did not contain the database library the new version needs. The updater now starts the new copy with a clean environment so it unpacks its own files

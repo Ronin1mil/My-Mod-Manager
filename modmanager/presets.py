@@ -21,7 +21,7 @@ STATUSES = ("verified", "unverified")
 def validate(doc, game_id=None):
     """Return a cleaned preset or raise ValueError. Everything is checked: presets are untrusted input."""
     if not isinstance(doc, dict) or doc.get("format") != FORMAT:
-        raise ValueError("Not a Mod Manager preset file.")
+        raise ValueError("Not a preset file.")
     pid, game = doc.get("id"), doc.get("game")
     if not isinstance(pid, str) or not SAFE_ID.match(pid):
         raise ValueError("Preset needs an 'id' of lowercase letters, digits, - _ .")

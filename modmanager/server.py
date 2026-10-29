@@ -5,6 +5,7 @@ URLs:  /api/games, /api/settings, /api/update-check          app-wide
 """
 import json
 import os
+import shutil
 import tempfile
 import threading
 import time
@@ -12,7 +13,7 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import __version__, collections, compare, detect, games as gamesmod, install, launch, order, presets, saves, scan, update, updates
+from . import APP_NAME, __version__, collections, compare, detect, games as gamesmod, install, launch, order, presets, saves, scan, update, updates
 from . import errorlog, launcherdb, selfupdate, workshop
 from .library import Library
 from .paths import LOGO_TYPES, config_dir, fetch_best_logo, find_first, find_logo, game_version, user_dirs, workshop_dirs
@@ -44,6 +45,7 @@ class GameApp:
         self.auto_import_launcher = auto_import_launcher
         self.cfg = config_dir(game)
         self.store = store or Store(game=game)
+        self.store.prune_empty_defaults()
         self.library = library or Library(game=game)
         self.cli = {"user_dir": user_dir, "workshop_dir": workshop_dir, "game_dir": game_dir,
                     "game_version": game_version_}
@@ -139,7 +141,7 @@ class GameApp:
     # ---- the game's own launcher ----
     def launcher_info(self):
         """What the game's launcher has, for the Import menu."""
-        what = "LauncherData.xml" if self.game.kind == "modules" else "launcher-v2.sqlite"
+        what = "LauncherData.xml" if self.game.kind == "modules" else "launcher-v2.sqlite or playsets.json"
         try:
             src = self._launcher_source()
         except ValueError as e:
@@ -201,7 +203,10 @@ class GameApp:
             f = Path(self.user_dir) / "Configs" / "LauncherData.xml" if self.user_dir else None
             return (f, launcherdb.read_bannerlord(self.user_dir)) if f and f.is_file() else None
         files = launcherdb.db_files(self.user_dir)
-        return (files[0], launcherdb.read_playsets(files[0])) if files else None
+        if files:
+            return files[0], launcherdb.read_playsets(files[0])
+        sets = launcherdb.read_playsets_json(self.user_dir)  # EU5's launcher keeps its playsets in a plain JSON file
+        return (Path(self.user_dir) / "playsets.json", sets) if sets else None
 
     def rescan(self):
         if self.game.kind == "modules":
@@ -224,8 +229,7 @@ class GameApp:
                 "game_root": str(self.game_root or ""), "game_version": self.game_version,
                 "has_logo": bool(self.logo), "logo_pending": self.logo_pending, "include_vanilla": s["include_vanilla"],
                 "setup_done": s["setup_done"], "save_version_check": s["save_version_check"], "steamcmd": s["steamcmd"], "steam_user": s["steam_user"],
-                "setup_needed": not s["setup_done"] and not (self.game_root and self.user_dir),
-                "imported_from": d.get("imported_from", "")}
+                "setup_needed": not s["setup_done"] and not (self.game_root and self.user_dir)}
 
     def analyse(self, pid, conflicts=True):
         """Problems with the load order (fast) and, unless conflicts=False, the file/definition conflicts (slow:
@@ -552,6 +556,31 @@ class Hub:
                 "version": __version__, "settings": s, "update": self._update_cache[1] if self._update_cache else None,
                 "update_pending": self.update_pending}
 
+    def erase_all(self, confirm):
+        """Experimental: delete everything this app saved (playsets, library, settings, backups, logos, presets of every
+        game) so the next start is a fresh one. Only the app's own folders are removed; the games' folders, mods, saves
+        and load files are never touched, and neither is the error log. -> {"erased": [names], "failed": [names]}"""
+        if confirm != "ERASE":
+            raise ValueError("Type ERASE to confirm.")
+        base = config_dir()
+        targets = [base / g for g in self.games] + [self.settings.path]
+        erased, failed = [], []
+        with self.lock:
+            self.apps.clear()  # GameApps are rebuilt (and rescan) on first use
+            self.settings.data = {}
+            for t in targets:
+                try:
+                    if t.is_symlink() or t.is_file():
+                        t.unlink()
+                    elif t.is_dir():
+                        shutil.rmtree(t)
+                    else:
+                        continue
+                    erased.append(t.name)
+                except OSError as e:
+                    failed.append(f"{t.name} ({e.strerror or e})")
+        return {"erased": erased, "failed": failed}
+
     def check_update(self, force=False):
         """One GitHub request per 10 minutes at most. Network I/O happens outside the request lock."""
         import time
@@ -747,6 +776,8 @@ def make_handler(hub):
                         return self._send(200, hub.check_update(bool(self._body().get("force"))))
                     if parts == ["api", "settings"]:
                         return self._send(200, hub.settings.update(**self._body()))
+                    if parts == ["api", "erase-all"]:
+                        return self._send(200, hub.erase_all(self._body().get("confirm")))
                     return self._send(404, {"error": "not found"})
                 if parts == ["api", "install"]:
                     return self._send(200, self._install(app))
@@ -865,7 +896,7 @@ def serve(port=8765, open_browser=True, overrides=None, initial_game=None, windo
     url = f"http://127.0.0.1:{port}/" + (f"#{initial_game}" if initial_game else "")
     mode = "window" if open_browser and window else "browser" if open_browser else "none"
     os.environ["MODMANAGER_MODE"] = mode  # an updated copy restarts the same way
-    print(f"Mod Manager {__version__} running at {url}  (Ctrl+C to quit)")
+    print(f"{APP_NAME} {__version__} running at {url}  (Ctrl+C to quit)")
     print("  games: " + ", ".join(f"{g.id} ({g.name})" for g in hub.games.values()))
     if mode == "window":
         threading.Thread(target=srv.serve_forever, daemon=True, name="server").start()

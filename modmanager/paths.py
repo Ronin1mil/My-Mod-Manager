@@ -5,6 +5,8 @@ import re
 import sys
 from pathlib import Path
 
+from . import APP_NAME
+
 _VDF_PATH = re.compile(r'"path"\s+"([^"]+)"')
 _VERSION = re.compile(r"\d+(?:\.\d+)+")
 
@@ -16,17 +18,10 @@ def config_dir(game=None):
     if not base:
         base = os.environ.get("XDG_CONFIG_HOME") or (
             os.environ.get("APPDATA") if sys.platform == "win32" else str(Path.home() / ".config"))
-        base = str(Path(base) / "modmanager")
+        base = str(Path(base) / APP_NAME)
     d = Path(base) / game.id if game else Path(base)
     d.mkdir(parents=True, exist_ok=True)
     return d
-
-
-def legacy_config_files(game):
-    """Playset files written by the standalone managers this app replaces (migrated on first start)."""
-    base = os.environ.get("XDG_CONFIG_HOME") or (
-        os.environ.get("APPDATA") if sys.platform == "win32" else str(Path.home() / ".config"))
-    return [Path(base) / n / "playsets.json" for n in game.legacy_config]
 
 
 def user_dirs(game):

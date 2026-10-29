@@ -16,7 +16,7 @@ from modmanager.store import GlobalSettings, Store
 
 ALL = [g for g in games.GAMES.values() if g.kind == "paradox"]  # the games that share the playset/load-file behaviour
 EVERY = list(games.GAMES.values())
-APP_WIDE = ("/api/client-error", "/api/settings", "/api/update-check", "/api/games")
+APP_WIDE = ("/api/client-error", "/api/settings", "/api/update-check", "/api/games", "/api/erase-all")
 
 
 def mkmod(user, folder, name=None, deps=(), files=None, incompatible=(), meta_id="", layout=".metadata",

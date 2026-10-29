@@ -21,7 +21,6 @@ class Game:
     load_style: str              # "descriptor": mod/ugc_<id>.mod entries; "path": mod folder / workshop path
     def_dirs: tuple              # script folders whose top-level keys are definitions
     vanilla_only: tuple = ()     # only these folders under <install>/game hold base content (empty = all)
-    legacy_config: tuple = ()    # config folder names of the standalone managers this replaces
     theme: dict = field(default_factory=dict)
     verified: bool = False       # True once a real install confirmed the load file + layout
     kind: str = "paradox"        # "paradox": playsets write a load file; "modules": Bannerlord-style modules (SubModule.xml)
@@ -61,7 +60,6 @@ CK3 = Game(
     id="ck3", name="Crusader Kings III", app_id="1158310", user_dir_name="Crusader Kings III",
     install_dir_name="Crusader Kings III", install_marker=("game", "common"),
     load_file="dlc_load.json", load_style="descriptor", def_dirs=("common", "events"),
-    legacy_config=("ck3mm",),
     theme={**_COMMON, "--bg": "#120b0b", "--side": "#170e0e", "--panel": "#1d1313", "--line": "#3b2423",
            "--acc": "#e0766a", "--accink": "#fff4ee", "--p1": "#8f2a24", "--p2": "#b53a32", "--p3": "#6b1e1a",
            "--mut": "#a08c85"})
@@ -70,7 +68,7 @@ EU5 = Game(
     id="eu5", name="Europa Universalis V", app_id="3450310", user_dir_name="Europa Universalis V",
     install_dir_name="Europa Universalis V", install_marker=("game", "in_game"),
     load_file="dlc_load.json", load_style="path", def_dirs=("common",),
-    vanilla_only=("in_game", "main_menu", "loading_screen"), legacy_config=("eu5mm",),
+    vanilla_only=("in_game", "main_menu", "loading_screen"),
     theme={**_COMMON, "--bg": "#0e1621", "--side": "#0b121b", "--panel": "#15202d", "--line": "#2a3a4d",
            "--acc": "#d4a73a", "--accink": "#1a1407", "--p1": "#2b4a6e", "--p2": "#3a6291", "--p3": "#223a56",
            "--mut": "#8f9bab"})
@@ -79,7 +77,6 @@ VIC3 = Game(
     id="vic3", name="Victoria 3", app_id="529340", user_dir_name="Victoria 3",
     install_dir_name="Victoria 3", install_marker=("game", "common"),
     load_file="content_load.json", load_style="descriptor", def_dirs=("common", "events"),
-    legacy_config=("vic3mm",),
     theme={**_COMMON, "--bg": "#0f0b0d", "--side": "#150e12", "--panel": "#1e1519", "--line": "#3a2a31",
            "--acc": "#d4b883", "--accink": "#fbf3e2", "--p1": "#8c3a58", "--p2": "#a34868", "--p3": "#6a2640"})
 

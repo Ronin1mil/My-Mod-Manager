@@ -45,7 +45,7 @@ try {
   await page.waitForTimeout(3500);                        // let the abandoned CK3 answers arrive
   assert.doesNotMatch(await page.textContent('#logo'), /Victoria|Crusader|Europa/, 'the header never shows a game name as text');
   assert.match(await page.getAttribute('#logo img', 'src'), /\/api\/vic3\/logo/, 'VIC3 header uses VIC3 art, not CK3');
-  assert.equal(await page.evaluate(() => document.title), 'Victoria 3 Mod Manager');
+  assert.equal(await page.evaluate(() => document.title), 'Victoria 3 · Ronin Mod Manager');
   assert.equal(await page.inputValue('#game'), 'vic3');
   assert.deepEqual(errors, [], `no page errors, got ${errors}`);
 
@@ -62,13 +62,13 @@ try {
 
   // a script error is written to the log file with its stack
   await page.evaluate(() => setTimeout(() => { throw new Error('test-boom'); }, 0));
-  const logfile = path.join(logs, 'Mod Manager', 'ModManager-errors.log');
+  const logfile = path.join(logs, 'Ronin Mod Manager', 'RoninModManager-errors.log');
   for (let i = 0; i < 40 && !(fs.existsSync(logfile) && /test-boom/.test(fs.readFileSync(logfile, 'utf8'))); i++) await new Promise(r => setTimeout(r, 100));
   const txt = fs.readFileSync(logfile, 'utf8');
   assert.match(txt, /\[page\] .*test-boom/);
   assert.match(txt, /ck3/);
   await page.waitForSelector('#banner.bad');
-  assert.match(await page.textContent('#banner'), /ModManager-errors\.log/);
+  assert.match(await page.textContent('#banner'), /RoninModManager-errors\.log/);
   console.log('switch e2e ok');
 } finally {
   await browser?.close();
