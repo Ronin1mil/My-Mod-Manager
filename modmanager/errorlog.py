@@ -33,7 +33,6 @@ def documents_dir():
     if sys.platform == "win32":
         try:
             import ctypes
-            from ctypes import wintypes
             buf = ctypes.c_wchar_p()
             guid = ctypes.create_string_buffer(16)
             # FOLDERID_Documents {FDD39AD0-238F-46AF-ADB4-6C85480369C7}

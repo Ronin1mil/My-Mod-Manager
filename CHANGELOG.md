@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+- **Faster conflict scan** (about 3x on a large mod list, same results): the file parser now tokenizes in C, per-file cache lookups use plain `os.stat`, and shared keys are grouped only when there is something to compare
+- **Activity log** (test builds, or `MODMANAGER_ACTIVITY_LOG=1`): `RoninModManager-activity.log` records every request, scan, conflict check and update step with millisecond timestamps and durations, to find what is slow or stuck. See docs/19
+- Removed unused imports and a leftover loop variable
+
 ## 0.8.4 - favourites, merge, library sort and tags, test builds
 - **Test builds (nightly), experimental.** Settings -> App & updates -> Test builds installs the newest build of the branch being worked on, so changes can be tried before they become a release. A release is made from the exact commit that was tested (the release job warns if not). See docs/19
 - **Favourites.** Star a mod (Library) or a playset (sidebar). Starred playsets stay at the top of the list; the library has "Favourites first" and a "★ Favourites only" button

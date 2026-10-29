@@ -142,7 +142,7 @@ def read_playsets_json(user_dir):
     if not isinstance(raw, list):
         return []
     out = []
-    for i, p in enumerate(raw[:MAX_PLAYSETS]):
+    for p in raw[:MAX_PLAYSETS]:
         if not isinstance(p, dict) or _flag(p.get("isRemoved")):
             continue
         items = []

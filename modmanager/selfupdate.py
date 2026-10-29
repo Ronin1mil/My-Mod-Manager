@@ -21,7 +21,7 @@ import urllib.request
 from pathlib import Path
 
 from . import errorlog, perflog
-from .update import ALLOWED_HOST, LINK_PREFIX, REPO, check_for_update, check_nightly, stable_current
+from .update import ALLOWED_HOST, check_for_update, check_nightly, stable_current
 
 MAX_EXE = 300 * 1024 * 1024
 SUMS_NAME = "SHA256SUMS.txt"

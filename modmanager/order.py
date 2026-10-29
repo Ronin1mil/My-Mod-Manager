@@ -154,7 +154,7 @@ def compute_order(mods, selection, auto=True, game_version=""):
     for a, b in edges:
         incoming.setdefault(b, []).append(a)
 
-    indeg = {n: 0 for n in nodes}
+    indeg = dict.fromkeys(nodes, 0)
     out_edges = {}
     for a, b in edges:
         indeg[b] += 1
