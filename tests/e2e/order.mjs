@@ -55,6 +55,7 @@ try {
   for (const id of ['B', 'D', 'A', 'C', 'Lib']) await page.click(`[data-add="local:${id}"]`);
   await page.click('[data-tab=order]');
   await page.waitForFunction(() => document.querySelectorAll('#view .row').length === 5);
+  await waitOrder((await apiOrder()).map(id => id));   // the list shows what the server holds (a redraw may still be waiting for the click to finish)
   let n = await names();
   assert.ok(n.indexOf('Lib') < n.indexOf('A') && n.indexOf('A') < n.indexOf('B'), `valid order, got ${n}`);
   assert.deepEqual([...n].sort(), ['A', 'B', 'C', 'D', 'Lib']);
@@ -63,7 +64,7 @@ try {
 
   // --- auto-sort ON: dragging a mod ABOVE its dependency is undone (the list stays valid)
   const before = await names();
-  await row('B').dragTo(page.locator('#view .row').first());
+  await row('B').locator('.h').dragTo(page.locator('#view .row').first());
   await page.waitForTimeout(500);
   n = await names();
   assert.ok(n.indexOf('Lib') < n.indexOf('A') && n.indexOf('A') < n.indexOf('B'), `auto-sort keeps it valid, got ${n}`);
@@ -71,7 +72,7 @@ try {
   // --- auto-sort OFF: the manual order is kept and violations are flagged
   await page.uncheck('#auto');
   await page.waitForSelector('#sortnow', { state: 'visible' });
-  await row('B').dragTo(page.locator('#view .row').first());
+  await row('B').locator('.h').dragTo(page.locator('#view .row').first());
   await page.waitForTimeout(500);
   n = await names();
   assert.equal(n[0], 'B', `manual drag is honoured, got ${n}`);
@@ -118,6 +119,20 @@ try {
   await page.click('[data-tab=order]');
   assert.equal(await page.locator('#view .row.off').count(), 0);
   assert.match(await page.textContent('#status'), /5 mods active/);
+
+  // --- a redraw while the button is held down (late analysis result, window focus) must not eat the click
+  {
+    const box = row('D').locator('[data-tog]');
+    const b = await box.boundingBox();
+    // click at the edge of the square label, outside the 18px box itself: the whole square counts
+    await page.mouse.move(b.x + b.width / 2 + 10, b.y + b.height / 2 + 8);
+    await page.mouse.down();
+    await page.evaluate(() => render());   // what analyse() / the focus rescan do
+    await page.mouse.up();
+    await page.waitForFunction(() => document.querySelectorAll('#view .row.off').length === 1);
+    await row('D').locator('[data-tog]').check();
+    await page.waitForFunction(() => document.querySelectorAll('#view .row.off').length === 0);
+  }
 
   // --- removing a mod (✕) and re-adding it from the library
   await row('D').locator('[data-rm]').click();

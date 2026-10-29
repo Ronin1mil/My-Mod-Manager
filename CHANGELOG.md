@@ -1,6 +1,7 @@
 # Changelog
 
-## Unreleased
+## 0.8.5 - checkboxes that always click, faster scan, activity log
+- **Fix: the enable/disable checkbox sometimes ignored a click** (seen on 1440p screens). The box was tiny and sat inside a draggable row, so a slightly moving mouse started a drag instead of a click, and a list redraw (a late warning check, or the window regaining focus) between mouse-down and mouse-up removed the box under the pointer. Now the whole 30 px square around the box is clickable, a row is dragged only by its ⠿ handle, and a redraw waits until the mouse button is released
 - **Faster conflict scan** (about 3x on a large mod list, same results): the file parser now tokenizes in C, per-file cache lookups use plain `os.stat`, and shared keys are grouped only when there is something to compare
 - **Activity log** (test builds, or `MODMANAGER_ACTIVITY_LOG=1`): `RoninModManager-activity.log` records every request, scan, conflict check and update step with millisecond timestamps and durations, to find what is slow or stuck. See docs/19
 - Removed unused imports and a leftover loop variable

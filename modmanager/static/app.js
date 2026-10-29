@@ -155,7 +155,19 @@ function badges(m, before = '') {   // `before` (a warning or error) sits just l
     (m.exists ? '' : '<span class="b err">missing</span>') + before + `<span class="b">${esc(m.source)}</span>`;
 }
 
+// A redraw between mouse-down and mouse-up replaces the element under the pointer and the click is lost (the late
+// analysis result and the window-focus rescan both redraw). So a redraw asked for while a button is held waits for the
+// release; the click that follows the release draws by itself, and a redraw still waiting runs just after it.
+let pressed = false, redrawLater = false;
+const release = () => {
+  pressed = false;
+  if (redrawLater) setTimeout(() => { if (redrawLater && !pressed) render(); }, 30);
+};
+document.addEventListener('pointerdown', () => { pressed = true; setTimeout(release, 4000); }, true);   // the timer: never wait forever
+['pointerup', 'pointercancel', 'dragend'].forEach(t => document.addEventListener(t, release, true));
 function render() {
+  if (pressed) { redrawLater = true; return; }
+  redrawLater = false;
   if (!S || !cur()) return;
   const p = cur(), errs = visIssues().filter(i => i.severity === 'error').length; if (!p) return;
   $('pslist').innerHTML = S.playsets.slice().sort((a, b) => !!b.favorite - !!a.favorite).map(x => `<div class="ps ${x.id === S.active ? 'on' : ''}" data-ps="${esc(x.id)}"><button class="star ${x.favorite ? 'on' : ''}" data-favps="${esc(x.id)}" title="${x.favorite ? 'Remove from favourites' : 'Favourite: keep this playset at the top'}" aria-label="Favourite">${x.favorite ? '★' : '☆'}</button><span class="grow">${esc(x.name)}</span><span class="mut">${x.mods.length - x.disabled.length}</span></div>`).join('');
@@ -184,9 +196,9 @@ function viewOrder(p) {
     <button class="sm" data-bulk="prune" title="Remove mods that are no longer installed">Prune</button></div>`;
   $('view').innerHTML = bar + p.mods.map((id, i) => {
     const m = M(id), off = p.disabled.includes(id), w = worst(id);
-    return `<div class="row ${off ? 'off' : ''} ${id === sel ? 'sel' : ''}" draggable="true" data-i="${i}">
-      <span class="h">⠿</span><span class="n">${i + 1}</span>
-      <input type="checkbox" data-tog="${esc(id)}" ${off ? '' : 'checked'}>
+    return `<div class="row ${off ? 'off' : ''} ${id === sel ? 'sel' : ''}" data-i="${i}">
+      <span class="h" draggable="true">⠿</span><span class="n">${i + 1}</span>
+      <label class="tick"><input type="checkbox" data-tog="${esc(id)}" ${off ? '' : 'checked'}></label>
       <span class="nm" data-sel="${esc(id)}">${esc(m ? m.name : id + ' (not installed)')}</span>
       ${m ? badges(m, w && !off ? `<span class="b ${w}">${w === 'err' ? 'error' : 'warning'}</span>` : '') : (w && !off ? `<span class="b ${w}">${w === 'err' ? 'error' : 'warning'}</span>` : '')}
       <button class="sm" data-mv="${i},-1">↑</button><button class="sm" data-mv="${i},1">↓</button><button class="sm" data-rm="${esc(id)}">✕</button></div>`;
@@ -638,7 +650,7 @@ document.addEventListener('change', guard(async e => {
   if (t.dataset.tog) { const id = t.dataset.tog; await patch(q => ({disabled: t.checked ? q.disabled.filter(x => x !== id) : [...q.disabled, id]})); }
 }));
 const view = $('view');
-view.addEventListener('dragstart', e => { const r = e.target.closest('[data-i]'); if (r) { drag = +r.dataset.i; r.classList.add('drag'); } });
+view.addEventListener('dragstart', e => { const r = e.target.closest('[data-i]'); if (r) { drag = +r.dataset.i; r.classList.add('drag'); if (e.dataTransfer) e.dataTransfer.setDragImage(r, 10, 10); } });
 view.addEventListener('dragover', e => { if (drag !== null) e.preventDefault(); });
 view.addEventListener('drop', guard(async e => {
   const r = e.target.closest('[data-i]'), p = cur(); if (!p) return;

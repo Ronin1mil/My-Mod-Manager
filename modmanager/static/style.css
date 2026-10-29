@@ -25,7 +25,9 @@ h1{font:600 20px var(--serif);margin:0;letter-spacing:.04em}.grow{flex:1}.chk{di
 .row{display:flex;gap:8px;align-items:center;padding:7px 10px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);margin-bottom:5px}
 .row.sel{border-color:var(--acc)}.row.drag{opacity:.4}.row.off .nm{text-decoration:line-through;color:var(--mut)}
 .row.static{cursor:default}.nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
-.n{color:var(--mut);width:28px;text-align:right}.h{cursor:grab;color:var(--mut)}
+.n{color:var(--mut);width:28px;text-align:right}.h{cursor:grab;color:var(--mut);padding:4px 6px;margin:-4px -2px}
+/* the box itself is small (and smaller still on 1440p/4K); the label around it makes the whole 30px square clickable */
+.tick{display:flex;align-items:center;justify-content:center;width:30px;height:30px;margin:-6px -4px;cursor:pointer}.tick input{width:18px;height:18px;margin:0;cursor:pointer}
 .b{font-size:11px;padding:1px 7px;border-radius:9px;border:1px solid var(--line);color:var(--mut);white-space:nowrap}
 .b.err{color:var(--err);border-color:var(--err)}.b.warn{color:var(--warn);border-color:var(--warn)}.b.ok{color:var(--ok);border-color:var(--ok)}.b.new{color:var(--acc);border-color:var(--acc)}
 .err{color:var(--err)}.warn{color:var(--warn)}.ok{color:var(--ok)}.info,.mut{color:var(--mut)}code{word-break:break-all}
