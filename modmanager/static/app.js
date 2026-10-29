@@ -283,18 +283,19 @@ document.addEventListener('click', guard(async e => {
 }));
 
 // Replace this app with the newest release (downloaded app only), then reload once the new copy answers.
-async function selfUpdate() {
-  if (!confirm('Download the newest version and restart Mod Manager? Your playsets and settings are kept.')) return;
+async function selfUpdate(say, ask = true) {
+  say = say || toast;
+  if (ask && !confirm('Download the newest version and restart Mod Manager? Your playsets and settings are kept.')) return;
   let st = await app('self-update', {});
   for (let i = 0; i < 600 && ['working', 'restarting'].includes(st.status); i++) {
-    toast(st.message || 'Updating…');
+    say(st.message || 'Updating…');
     await new Promise(r => setTimeout(r, 1000));
     try { st = await app('self-update'); } catch (e) { if (st.status === 'restarting') break; throw e; }  // old copy exited
   }
   if (st.status === 'error') throw new Error(st.message);
-  if (st.status === 'current') return toast(st.message);
-  toast('Restarting…');
-  for (let i = 0; i < 60; i++) {   // wait for the new copy, then load it
+  if (st.status === 'current') return say(st.message);
+  say('Restarting…');
+  for (let i = 0; i < 60; i++) {   // wait for the new copy, then load it (an app window is replaced by the new copy's own)
     await new Promise(r => setTimeout(r, 1000));
     try { const r = await fetch('/api/games'); if (r.ok) return location.reload(); } catch (e) { /* not up yet */ }
   }
@@ -308,7 +309,7 @@ function banner() {
   b.innerHTML = `<span class="grow"><b>Version ${esc(u.latest)} is available</b> <span class="mut">(you have ${esc(GI.version)})</span></span>
     ${GI.can_self_update ? '<button class="sm pri" id="bn-now">Update now</button>' : ''}
     <a href="${esc(link)}" target="_blank" rel="noopener noreferrer">View release</a><button class="sm" id="bn-dismiss">Dismiss</button>`;
-  if ($('bn-now')) $('bn-now').onclick = guard(selfUpdate);
+  if ($('bn-now')) $('bn-now').onclick = guard(() => selfUpdate());
   $('bn-dismiss').onclick = guard(async () => { GI.settings = await app('settings', {dismissed_update: u.latest}); banner(); });
 }
 $('dlg').addEventListener('close', () => { $('dlg').className = ''; });
@@ -411,7 +412,12 @@ async function openPaths(first) {
     $('s-result').innerHTML = `<div class="${u.status === 'update' ? 'ok' : u.status === 'current' ? 'ok' : 'warn'}"><b>${esc(u.message)}</b></div>` +
       (u.latest ? `<div class="mut">Running ${esc(u.current)} · latest ${esc(u.latest)}${u.published ? ' · ' + esc(u.published) : ''}</div>` : '') +
       (u.notes ? `<div class="notes">${esc(u.notes)}</div>` : '') +
-      (u.status === 'update' ? `<a href="${esc(link)}" target="_blank" rel="noopener noreferrer">Open the release page</a>` : '');
+      (u.status === 'update' ? `<div class="acts">${GI.can_self_update ? '<button class="pri" id="s-now">Download and restart</button> ' : ''}<a href="${esc(link)}" target="_blank" rel="noopener noreferrer">Release page</a></div><div id="s-prog" class="mut"></div>` : '');
+    if ($('s-now')) $('s-now').onclick = guard(async () => {
+      $('s-now').disabled = true; $('s-check').disabled = true;
+      try { await selfUpdate(m => { $('s-prog').textContent = m; }, false); }
+      catch (e) { $('s-now').disabled = false; $('s-check').disabled = false; throw e; }
+    });
   });
   inspect();
   const {installs} = await api('detect');

@@ -65,6 +65,7 @@ try {
   await page.waitForSelector('text=Alpha needs Core Library');
   await page.click('[data-fix=enable]');
   await page.click('[data-tab=order]');
+  await page.waitForFunction(() => document.querySelectorAll('#view .nm').length === 2);  // the fix is answered asynchronously
   const names = await page.locator('#view .nm').allTextContents();
   assert.deepEqual(names, ['Core Library', 'Alpha'], 'dependency loads first after the fix');
 

@@ -37,10 +37,11 @@ try {
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   page.on('dialog', d => d.accept());
-  let injected = null;
+  let injected = null, canSelf = false;
   await page.route('**/api/games', async route => {
     const r = await route.fetch(); const j = await r.json();
     if (injected) j.update = injected;
+    if (canSelf) j.can_self_update = true;
     await route.fulfill({ json: j });
   });
   await page.goto(`${base}/#vic3`);
@@ -114,6 +115,25 @@ try {
   const href = await page.locator('#s-result a').getAttribute('href');
   assert.ok(href.startsWith('https://github.com/Ronin1mil/My-Mod-Manager/'), `off-repo link replaced, got ${href}`);
   assert.equal(await page.locator('#s-result a').getAttribute('rel'), 'noopener noreferrer');
+  assert.equal(await page.locator('#s-now').count(), 0, 'a copy run from source cannot replace itself, so no download button');
+  await page.click('#p-cancel');
+
+  // ---- the packaged app: "Check now" offers Download and restart, shows progress, and recovers from an error
+  canSelf = true; await page.reload(); await page.waitForSelector('#tabs button');
+  await page.click('#appcfg'); await page.click('[data-st=app]'); await page.click('#s-check');
+  await page.waitForSelector('#s-now');
+  let posts = 0;
+  await page.route('**/api/self-update', route => {
+    if (route.request().method() === 'POST') { posts++; return route.fulfill({ json: { status: 'working', message: 'Downloading version 9.9.9…' } }); }
+    return route.fulfill({ json: { status: 'error', message: 'The download failed (test).' } });
+  });
+  await page.click('#s-now');
+  await page.waitForSelector('#s-prog:has-text("Downloading version 9.9.9")');
+  await page.waitForFunction(() => !document.getElementById('s-now').disabled, null, { timeout: 8000 });  // error: button is usable again
+  assert.equal(posts, 1);
+  await page.waitForSelector('#toast.on:has-text("download failed")');
+  await page.unroute('**/api/self-update');
+  canSelf = false;
   await page.click('#p-cancel');
 
   // ---- Banner on start-up when an update is known; Dismiss persists per version

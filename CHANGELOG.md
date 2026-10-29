@@ -4,6 +4,7 @@
 - Opens in its own application window instead of a browser tab; closing the window quits the app. Windows and macOS use the system web view (WebView2 / WebKit) through pywebview; elsewhere an installed Edge, Chrome or Chromium is opened as a chromeless "app" window; the default browser is the last resort (`--browser` forces it)
 - The Windows app has no console window and its own icon; startup failures are shown in a message box and written to the error log
 - After an in-app update the new version opens its own window
+- Settings → App & updates → **Check for updates now** now offers **Download and restart** (it no longer only links to the release page), with progress shown in the window
 - Fixed: adding several mods quickly could silently lose one (changes now queue and each builds on the previous result)
 
 ## 0.4.0 - cleaner settings

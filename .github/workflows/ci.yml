@@ -11,6 +11,10 @@ on:
         description: "Publish a release for the version in modmanager/__init__.py (creates its tag)"
         type: boolean
         default: false
+      backfill:
+        description: "Also create releases for older versions that have none (notes only, never marked latest)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -178,3 +182,27 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TAG" --generate-notes
+
+  backfill:
+    name: Releases for older versions (manual run with "backfill")
+    if: github.event_name == 'workflow_dispatch' && inputs.backfill
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create the missing releases from their original commits
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # tag  commit  title
+          while read -r tag sha title; do
+            if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then echo "$tag exists"; continue; fi
+            v="${tag#v}"
+            awk -v h="## $v " 'index($0,h)==1{p=1;next} /^## /{p=0} p' CHANGELOG.md > notes.md
+            printf '\nThis release lists the changes only. It has no app files; download the newest release instead.\n' >> notes.md
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$sha" --title "$tag - $title" --notes-file notes.md --latest=false
+          done <<'LIST'
+          v0.2.0 37fbecf09e49cc8a82d86f386213497c5adff421 the merge
+          v0.3.0 51edfa5cac5d8614f06d23789e30bf07dd944fbd downloadable, self-updating app
+          LIST
