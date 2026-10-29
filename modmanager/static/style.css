@@ -70,23 +70,44 @@ dialog h3.sec{font:600 13px var(--serif);color:var(--acc);margin:18px 0 0;border
 .logo-box img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .25s;filter:drop-shadow(0 2px 6px rgba(0,0,0,.6))}
 .logo-box img.ok{opacity:1}
 
-/* Settings: wide, large text, one topic per tab */
-dialog.wide{width:min(940px,94vw);max-height:90vh;overflow:auto;font-size:16px;line-height:1.5;padding:26px 30px}
-dialog.wide h2{font-size:24px;margin:0}
-dialog.wide h3{font-size:18px;margin:6px 0 12px;color:var(--acc);border:0;padding:0}
-dialog.wide label{font-size:15px;margin:16px 0 6px;color:var(--ink)}
-dialog.wide input[type=text]{font-size:16px;padding:11px 13px}
-dialog.wide .mut,dialog.wide .st{font-size:14px}
-dialog.wide code{font-size:14px;word-break:break-all}
-.st-head{display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap;margin-bottom:6px}
-.st-tabs{display:flex;gap:6px;margin:14px 0 18px;border-bottom:1px solid var(--line);flex-wrap:wrap}
-.st-tabs button{background:none;border:0;border-bottom:3px solid transparent;border-radius:0;padding:10px 16px;font-size:16px;color:var(--mut);cursor:pointer}
-.st-tabs button.on{color:var(--ink);border-bottom-color:var(--acc)}
-dialog.wide [data-pane]{min-height:280px}
-dialog.wide .chk{display:flex;gap:12px;align-items:flex-start;margin:14px 0}
+/* Settings: wide dialog, side navigation, one card per topic */
+dialog.wide{width:min(1020px,95vw);height:min(760px,92vh);max-height:92vh;overflow:hidden;font-size:17px;line-height:1.55;padding:0}
+dialog.wide[open]{display:flex;flex-direction:column}
+.st-head{padding:24px 32px 18px;border-bottom:1px solid var(--line)}
+dialog.wide h2{font-size:26px;margin:0 0 4px}
+.st-body{display:grid;grid-template-columns:230px 1fr;flex:1;min-height:0}
+.st-tabs{display:flex;flex-direction:column;gap:6px;padding:20px 14px;background:var(--side);border-right:1px solid var(--line);overflow:auto}
+.st-tabs button{display:flex;align-items:center;gap:12px;text-align:left;background:none;border:0;border-radius:10px;padding:13px 16px;font-size:17px;color:var(--mut);cursor:pointer}
+.st-tabs button i{font-style:normal;font-size:20px;width:26px;text-align:center}
+.st-tabs button:hover{background:var(--panel);color:var(--ink)}
+.st-tabs button.on{background:var(--panel);color:var(--ink);box-shadow:inset 4px 0 var(--acc)}
+.st-panes{overflow:auto;padding:26px 32px 12px}
+.st-panes [data-pane]{display:block}.st-panes [data-pane][hidden]{display:none}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:24px 26px;margin-bottom:24px}
+.card h3{font:600 20px var(--serif);color:var(--acc);margin:0 0 6px;border:0;padding:0}
+.card .desc{color:var(--mut);font-size:15.5px;margin:0 0 18px}
+.card label.fld{display:block;font-size:16px;font-weight:600;color:var(--ink);margin:18px 0 8px}
+.card label.fld:first-of-type{margin-top:6px}
+.card label.fld .hint{display:block;font-weight:400;color:var(--mut);font-size:14.5px;margin:2px 0 0}
+dialog.wide input[type=text]{width:100%;font-size:17px;padding:13px 15px;background:var(--bg);border-radius:9px}
+dialog.wide input[type=text]:focus{outline:2px solid var(--acc);outline-offset:1px}
+.card .st{font-size:15px;margin-top:8px}
+.srow{display:flex;align-items:center;justify-content:space-between;gap:28px;padding:18px 0;border-top:1px solid var(--line);cursor:pointer;margin:0}
+.srow:first-of-type{border-top:0;padding-top:4px}
+.srow .rt{display:block}.srow .rt b{display:block;font-size:17px;font-weight:600;color:var(--ink)}
+.srow .hint{display:block;color:var(--mut);font-size:14.5px;font-weight:400;margin-top:3px}
+input.sw{appearance:none;-webkit-appearance:none;flex:none;width:52px;height:30px;border-radius:15px;background:var(--bg);border:1px solid var(--line);position:relative;cursor:pointer;transition:background .15s;padding:0;margin:0}
+input.sw::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--mut);transition:left .15s,background .15s}
+input.sw:checked{background:var(--p2);border-color:var(--acc)}input.sw:checked::after{left:25px;background:var(--accink)}
+input.sw:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.card .acts{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:6px 0 0}
+.card #s-result{margin-top:14px}
+dialog.wide .mut,dialog.wide .st{font-size:15px}
+dialog.wide code{font-size:14.5px;word-break:break-all;background:var(--bg);padding:2px 7px;border-radius:5px}
+dialog.wide button{font-size:16px;padding:11px 20px;border-radius:9px}
+dialog.wide .chk{display:flex;gap:12px;align-items:flex-start;margin:12px 0}
 dialog.wide .chk input{margin-top:5px;transform:scale(1.25)}
-dialog.wide .hint{display:block;color:var(--mut);font-size:13.5px;font-weight:400;margin-top:2px}
-dialog.wide label .hint{display:inline;margin-left:8px}
-dialog.wide .acts{margin:12px 0}
-dialog.wide button{font-size:15px;padding:9px 16px}
+dialog.wide #p-found{margin-bottom:6px}
+.st-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 32px;border-top:1px solid var(--line);background:var(--side)}
+@media (max-width:760px){.st-body{grid-template-columns:1fr;grid-template-rows:auto 1fr}.st-tabs{flex-direction:row;overflow:auto;border-right:0;border-bottom:1px solid var(--line);padding:10px}.st-tabs button{padding:10px 14px;white-space:nowrap}}
 dialog.mid{width:min(680px,94vw);max-height:90vh;overflow:auto;font-size:16px;line-height:1.5}dialog.mid h2{font-size:22px}dialog.mid button{font-size:15px;padding:8px 15px}

@@ -319,43 +319,70 @@ async function openPaths(first) {
   const d = $('dlg'), st = GI.settings;
   d.className = 'wide';
   d.innerHTML = `<div class="st-head"><h2>${first ? 'Set up ' + esc(GNAME()) : 'Settings'}</h2>
-      <span class="mut">Mod Manager v${esc(GI.version)}${S.game.verified ? '' : ' · launching is <b>not yet verified</b> on a real ' + esc(GNAME()) + ' install'}</span></div>
-    ${S.imported_from ? `<p class="mut">Playsets were imported from your previous manager (${esc(S.imported_from)}).</p>` : ''}
-    <nav class="st-tabs" id="st-tabs"><button data-st="game" class="on">Game folders</button><button data-st="play">Playing</button><button data-st="dl">Downloads</button><button data-st="app">App &amp; updates</button></nav>
+      <span class="mut">Mod Manager v${esc(GI.version)}${S.game.verified ? '' : ' · launching is <b>not yet verified</b> on a real ' + esc(GNAME()) + ' install'}</span>
+      ${S.imported_from ? `<div class="mut">Playsets were imported from your previous manager (${esc(S.imported_from)}).</div>` : ''}
+    </div>
+    <div class="st-body">
+    <nav class="st-tabs" id="st-tabs"><button data-st="game" class="on"><i>🎮</i>Game</button><button data-st="store"><i>📁</i>Storage</button><button data-st="play"><i>▶</i>Playing</button><button data-st="dl"><i>⬇</i>Downloads</button><button data-st="app"><i>⟳</i>App &amp; updates</button></nav>
+    <div class="st-panes">
     <section data-pane="game">
-      <h3>${esc(GNAME())}</h3>
-      <div id="p-found" class="mut"></div>
-      <div class="paths">
-        <label for="p-game">Game folder <span class="hint">paste any path inside your install</span></label><input type="text" id="p-game" value="${esc(S.game_root)}"><div class="st" id="p-gst"></div>
-        <label for="p-user">User folder <span class="hint">mods and ${esc(S.game.load_file)} live here</span></label><input type="text" id="p-user" value="${esc(S.user_dir)}">
-        <label for="p-ws">Steam Workshop folder</label><input type="text" id="p-ws" value="${esc(S.workshop_dir)}">
+      <div class="card">
+        <h3>${esc(GNAME())} install</h3>
+        <p class="desc">Where the game is installed. Paste any path inside the install folder and the manager finds the right one.</p>
+        <div id="p-found" class="mut"></div>
+        <label class="fld" for="p-game">Game folder</label><input type="text" id="p-game" value="${esc(S.game_root)}"><div class="st" id="p-gst"></div>
+      </div>
+    </section>
+    <section data-pane="store" hidden>
+      <div class="card">
+        <h3>Mods &amp; saves</h3>
+        <p class="desc">The game's own folder in Documents. Your mods, saves and <code>${esc(S.game.load_file)}</code> live here.</p>
+        <label class="fld" for="p-user">User folder</label><input type="text" id="p-user" value="${esc(S.user_dir)}">
+      </div>
+      <div class="card">
+        <h3>Steam Workshop</h3>
+        <p class="desc">Where Steam keeps the Workshop mods you subscribed to.</p>
+        <label class="fld" for="p-ws">Workshop folder</label><input type="text" id="p-ws" value="${esc(S.workshop_dir)}">
       </div>
     </section>
     <section data-pane="play" hidden>
-      <h3>Before you play</h3>
-      <label class="chk"><input type="checkbox" id="p-svc" ${S.save_version_check ? 'checked' : ''}> <span>Warn if the saves were made on a different game release<span class="hint">for example 1.14 saves with 1.15 installed</span></span></label>
-      <label class="chk"><input type="checkbox" id="p-van" ${S.include_vanilla ? 'checked' : ''}> <span>Compare mods with the base game<span class="hint">shows what each mod overrides from the original files</span></span></label>
+      <div class="card">
+        <h3>Before you play</h3>
+        <p class="desc">Checks the manager runs for you.</p>
+        <label class="srow"><span class="rt"><b>Warn about save versions</b><span class="hint">Warn if the saves were made on a different game release, for example 1.14 saves with 1.15 installed</span></span><input type="checkbox" class="sw" id="p-svc" ${S.save_version_check ? 'checked' : ''}></label>
+        <label class="srow"><span class="rt"><b>Compare mods with the base game</b><span class="hint">Shows what each mod overrides from the original game files</span></span><input type="checkbox" class="sw" id="p-van" ${S.include_vanilla ? 'checked' : ''}></label>
+      </div>
     </section>
     <section data-pane="dl" hidden>
-      <h3>Downloading Workshop mods</h3>
-      <p class="mut">Optional. <b>Open in Steam</b> needs nothing. To download straight from here, give the path to <code>steamcmd</code> and the Steam account name it is already logged in with. No password is ever asked for, stored or sent by this app.</p>
-      <div class="paths"><label for="p-cmd">steamcmd executable</label><input type="text" id="p-cmd" value="${esc(S.steamcmd)}">
-      <label for="p-su">Steam account name</label><input type="text" id="p-su" value="${esc(S.steam_user)}"></div>
+      <div class="card">
+        <h3>Downloading Workshop mods</h3>
+        <p class="desc">Optional. <b>Open in Steam</b> needs nothing. To download straight from here, give the path to <code>steamcmd</code> and the Steam account name it is already logged in with. No password is ever asked for, stored or sent by this app.</p>
+        <label class="fld" for="p-cmd">steamcmd executable</label><input type="text" id="p-cmd" value="${esc(S.steamcmd)}">
+        <label class="fld" for="p-su">Steam account name</label><input type="text" id="p-su" value="${esc(S.steam_user)}">
+      </div>
     </section>
     <section data-pane="app" hidden>
-      <h3>Updates</h3>
-      ${GI.can_self_update ? '<p>This is the downloaded app: when a newer version exists you can update it from the banner. Your playsets and settings are kept.</p>' : '<p class="mut">This copy runs from source files, so it cannot replace itself. Update it with Git or download the ZIP again. The downloadable app from the Releases page updates itself.</p>'}
-      <label class="chk"><input type="checkbox" id="s-auto" ${st.auto_update_check ? 'checked' : ''}> <span>Check for updates when the manager starts<span class="hint">off by default; asks api.github.com for the latest release, nothing is installed without you pressing Update</span></span></label>
-      <div class="acts"><button id="s-check">Check for updates now</button></div>
-      <div id="s-result"></div>
-      <h3>Game logos</h3>
-      <label class="chk"><input type="checkbox" id="s-logos" ${st.fetch_logos ? 'checked' : ''}> <span>Download a missing game logo from Steam's public art server<span class="hint">once per game, only when no logo is found on this PC</span></span></label>
-      <h3>Problems</h3>
-      <p class="mut">Errors are saved to <code>${esc(GI.log_file || 'Documents/ModManager-errors.log')}</code>. Send that file when reporting a bug.</p>
+      <div class="card">
+        <h3>Updates</h3>
+        <p class="desc">${GI.can_self_update ? 'This is the downloaded app. When a newer version exists, update from the banner at the top. Your playsets and settings are kept.' : 'This copy runs from source files, so it cannot replace itself. Update it with Git or download the ZIP again. The downloadable app from the Releases page updates itself.'}</p>
+        <label class="srow"><span class="rt"><b>Check for updates on start</b><span class="hint">Off by default. Asks api.github.com for the latest release; nothing is installed until you press Update</span></span><input type="checkbox" class="sw" id="s-auto" ${st.auto_update_check ? 'checked' : ''}></label>
+        <div class="acts"><button id="s-check">Check for updates now</button></div>
+        <div id="s-result"></div>
+      </div>
+      <div class="card">
+        <h3>Game logos</h3>
+        <label class="srow"><span class="rt"><b>Download missing logos</b><span class="hint">Fetches a missing game logo once from Steam's public art server, only when none is found on this PC</span></span><input type="checkbox" class="sw" id="s-logos" ${st.fetch_logos ? 'checked' : ''}></label>
+      </div>
+      <div class="card">
+        <h3>Problems</h3>
+        <p class="desc">Errors are saved to <code>${esc(GI.log_file || 'Documents/ModManager-errors.log')}</code>. Send that file when reporting a bug.</p>
+      </div>
     </section>
-    <div class="dlg-btns"><span></span><span><button id="p-cancel">${first ? 'Skip' : 'Cancel'}</button> <button id="p-save" class="pri">Save</button></span></div>`;
+    </div>
+    </div>
+    <div class="st-foot"><span class="mut">Changes on this window are applied when you press Save.</span><span><button id="p-cancel">${first ? 'Skip' : 'Cancel'}</button> <button id="p-save" class="pri">Save</button></span></div>`;
   $('st-tabs').onclick = e => {
-    const k = e.target.dataset && e.target.dataset.st; if (!k) return;
+    const t = e.target.closest && e.target.closest('[data-st]'), k = t && t.dataset.st; if (!k) return;
     d.querySelectorAll('[data-st]').forEach(b => b.classList.toggle('on', b.dataset.st === k));
     d.querySelectorAll('[data-pane]').forEach(x => { x.hidden = x.dataset.pane !== k; });
   };

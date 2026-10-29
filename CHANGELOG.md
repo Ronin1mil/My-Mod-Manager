@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0 - cleaner settings
+- Settings window redesigned: side navigation (Game, Storage, Playing, Downloads, App & updates), a card per topic, larger text, toggle switches and more spacing
+- Windows installer (`Mod-Manager-Setup.exe`), MIT license, game logos always shown (downloaded once from Steam's public art if missing)
+
 ## 0.3.0 - downloadable, self-updating app
 - Single-file apps for Windows, macOS and Linux are built by CI and attached to each GitHub release with `SHA256SUMS.txt`
 - **Update now**: the packaged app downloads the newest release, verifies the checksum, replaces itself and restarts (see docs/14)

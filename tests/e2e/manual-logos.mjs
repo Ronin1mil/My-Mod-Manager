@@ -29,6 +29,6 @@ try {
   }
   await page.click('#appcfg');
   await shot(page, 'settings-1-game');
-  for (const t of ['play', 'dl', 'app']) { await page.click(`[data-st=${t}]`); await shot(page, `settings-${t}`); }
+  for (const t of ['store', 'play', 'dl', 'app']) { await page.click(`[data-st=${t}]`); await shot(page, `settings-${t}`); }
   console.log('logos ok');
 } finally { await browser?.close(); server.kill(); fs.rmSync(root, { recursive: true, force: true }); }

@@ -96,7 +96,7 @@ try {
   await page.click('#appcfg');
   await page.click('[data-st=app]');
   assert.equal(await page.locator('#s-auto').isChecked(), false);
-  assert.match(await page.textContent('#dlg'), /off by default/);
+  assert.match(await page.textContent('#dlg'), /off by default/i);
   await page.check('#s-auto');
   await page.waitForSelector('#toast.on');
   assert.equal((await get('/api/games')).settings.auto_update_check, true);

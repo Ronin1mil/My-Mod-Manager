@@ -64,6 +64,7 @@ try {
     await page.fill('#p-game', path.join(g.install, g.marker));
     await page.waitForSelector('#p-gst .ok');
     assert.match(await page.textContent('#p-gst'), /version 1\.2\.3/);
+    await page.click('[data-st=store]');
     await page.fill('#p-user', g.user);
     await page.click('#p-save');
     await page.waitForFunction(() => !document.getElementById('dlg').open);
