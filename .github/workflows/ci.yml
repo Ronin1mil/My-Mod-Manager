@@ -227,6 +227,8 @@ jobs:
       - name: Checksums (the in-app updater refuses a download that does not match these)
         working-directory: dist
         run: sha256sum Mod-Manager-* > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - name: Remove the old test branch name (one-off, delete this step afterwards)
+        run: git push origin --delete claude/practical-babbage-xl2gwk || echo "already gone"
       - name: Replace the one rolling "test-build" prerelease (a release needs a tag to hold the files; this single tag is reused, never one per build)
         env:
           GH_TOKEN: ${{ github.token }}
