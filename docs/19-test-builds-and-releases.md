@@ -20,3 +20,8 @@ Two channels, so that **a release only contains what was tried first**:
 - The test build uses the same safety as a release update: the files come only from this repository's GitHub release `nightly`, and the SHA-256 listed in its `SHA256SUMS.txt` must match before the running app is replaced.
 - A test build counts as *older than the release of its own version*, so once that release exists the normal update banner offers it. To leave the test channel earlier, press "Check for updates now".
 - Your playsets and settings are not touched by switching channels.
+
+## Activity log (for finding what is slow)
+Test builds write `RoninModManager-activity.log` next to the error log (`Documents\Ronin Mod Manager\`). One line per event with a millisecond timestamp and the thread. A step that can take a while writes `>` when it starts and `<` with its duration when it ends, so a hang shows as a `>` with no `<`. It records start-up, every API request with its duration and status, reading the mod folders, the load-order check, the conflict scan (with counts), writing the load file, update checks and the update steps. It never records mod contents.
+
+It is on for test builds and off in releases; set the environment variable `MODMANAGER_ACTIVITY_LOG=1` (or `0`) to force it either way. Send the file when something feels slow.

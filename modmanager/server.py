@@ -14,7 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from . import APP_NAME, BUILD, __version__, collections, compare, detect, games as gamesmod, install, launch, order, presets, saves, scan, update, updates
-from . import errorlog, launcherdb, selfupdate, workshop
+from . import errorlog, launcherdb, perflog, selfupdate, workshop
 from .library import Library
 from .paths import LOGO_TYPES, config_dir, fetch_best_logo, find_first, find_logo, game_version, user_dirs, workshop_dirs
 from .store import GlobalSettings, Store, write_load_file
@@ -65,7 +65,8 @@ class GameApp:
             found = detect.detect_all(game, self.extra_libraries)
             if found:  # take the first install; the UI asks the user to confirm it
                 self.store.update_settings(game_dir=found[0]["path"])
-        self.apply_settings()
+        with perflog.timed(f"{game.id}: start-up scan"):
+            self.apply_settings()
         if not self.first_boot:
             self.auto_import()
 
@@ -194,7 +195,8 @@ class GameApp:
         if not self.auto_import_launcher:
             return
         try:
-            self.launcher_import(only_unseen=True)
+            with perflog.timed(f"{self.game.id}: import launcher playsets"):
+                self.launcher_import(only_unseen=True)
         except Exception as e:
             errorlog.write_exception("launcher-import", e, self.game.id)
 
@@ -210,12 +212,15 @@ class GameApp:
         return (Path(self.user_dir) / "playsets.json", sets) if sets else None
 
     def rescan(self):
-        if self.game.kind == "modules":
-            self.mods = scan.scan_modules(self.game_root, self.workshop_dir)
-        else:
-            self.mods = scan.scan_mods(self.user_dir, self.workshop_dir)
+        with perflog.timed(f"{self.game.id}: read mod folders") as t:
+            if self.game.kind == "modules":
+                self.mods = scan.scan_modules(self.game_root, self.workshop_dir)
+            else:
+                self.mods = scan.scan_mods(self.user_dir, self.workshop_dir)
+            t.note(mods=len(self.mods))
         self.files = {}  # file listings are cached per mod root until the next rescan
-        self.diff = self.library.merge(self.mods)
+        with perflog.timed(f"{self.game.id}: update library file", quiet=True):
+            self.diff = self.library.merge(self.mods)
 
     # ---- views ----
     def state(self):
@@ -237,7 +242,9 @@ class GameApp:
         reads every mod's files). The page asks for the fast part first and the conflicts afterwards."""
         ps = self.store.get(pid)
         enabled = [m for m in ps["mods"] if m not in ps["disabled"]]
-        res = order.compute_order(self.mods, enabled, ps["auto_sort"], self.game_version)
+        with perflog.timed(f"{self.game.id}: load-order check", quiet=True) as t:
+            res = order.compute_order(self.mods, enabled, ps["auto_sort"], self.game_version)
+            t.note(mods=len(enabled))
         out = {"issues": res["issues"], "notes": res["notes"], "conflicts": [], "counts": {}, "truncated": False,
                "pending": not conflicts}
         if conflicts:
@@ -259,7 +266,9 @@ class GameApp:
         def run():
             if not self.game.has_conflicts:  # Bannerlord modules do not share script folders: nothing meaningful to compare
                 return {"conflicts": [], "counts": {}, "truncated": False, "pending": False}
-            conflicts = scan.find_conflicts(mods, ordr, files, defs, van)
+            with perflog.timed(f"{self.game.id}: conflict scan", mods=len(ordr), base_game=bool(van)) as t:
+                conflicts = scan.find_conflicts(mods, ordr, files, defs, van)
+                t.note(found=len(conflicts))
             counts = {}
             for c in conflicts:
                 k = "vanilla" if c.get("vanilla") else c["kind"]
@@ -487,7 +496,8 @@ class GameApp:
         if not ack_version:
             self.check_save_version(pid)
         ids, problems = self._chosen(pid, only)
-        f = write_load_file(self.game, self.user_dir, self.mods, ids)
+        with perflog.timed(f"{self.game.id}: write load file", mods=len(ids)):
+            f = write_load_file(self.game, self.user_dir, self.mods, ids)
         saves_note = None
         if ps["separate_saves"]:
             saves_note = saves.activate(self.user_dir / saves.SAVES_DIR_NAME, self.cfg / "saves" / pid)
@@ -588,7 +598,8 @@ class Hub:
         with self._cache_lock:
             if not force and self._update_cache and time.time() - self._update_cache[0] < 600:
                 return self._update_cache[1]
-        res = update.check_for_update(update.stable_current(), self.update_fetch)
+        with perflog.timed("check GitHub for a new version"):
+            res = update.check_for_update(update.stable_current(), self.update_fetch)
         if res["status"] in ("update", "current", "no_releases"):
             with self._cache_lock:
                 self._update_cache = (time.time(), res)
@@ -625,6 +636,7 @@ def make_handler(hub):
             pass
 
         def _send(self, code, body, ctype="application/json", headers=()):
+            self._status = code
             try:
                 self._send_now(code, body, ctype, headers)
             except (ConnectionError, TimeoutError):  # the window or tab went away mid-answer: nothing to report
@@ -681,7 +693,27 @@ def make_handler(hub):
                 return ["api"] + parts[2:], hub.app(parts[1])
             return parts, None
 
+        QUIET = ("/api/self-update", "/api/downloads")  # polled every second: log only when slow
+
+        def _timed(self, method, run):
+            path = self.path.split("?")[0]
+            self._status = 0
+            quiet = path.startswith(self.QUIET) or not path.startswith("/api/")
+            if quiet and not path.startswith("/api/"):
+                return run()  # the page itself and its files: not worth a line
+            with perflog.timed(f"{method} {path}", quiet=quiet) as t:
+                try:
+                    return run()
+                finally:
+                    t.note(status=self._status)
+
         def do_GET(self):
+            self._timed("GET", self._do_get)
+
+        def do_POST(self):
+            self._timed("POST", self._do_post)
+
+        def _do_get(self):
             p = self.path.split("?")[0].strip("/").split("/")
             if len(p) >= 4 and p[0] == "api" and p[2] in ("conflicts", "tree") and p[1] in hub.games:
                 return self._heavy_get(p)
@@ -710,7 +742,7 @@ def make_handler(hub):
                 errorlog.write_exception("server", e, self.path.split("?")[0])
                 return self._send(500, {"error": f"{type(e).__name__}: {e}", "log_file": str(errorlog.log_path())})
 
-        def do_POST(self):
+        def _do_post(self):
             parts = self.path.strip("/").split("/")
             if parts[-1] in ("install", "update-check", "downloads", "import-collection", "mod-updates", "self-update"):
                 return self._post()  # slow network/disk work must not hold the lock
@@ -908,6 +940,8 @@ def serve(port=8765, open_browser=True, overrides=None, initial_game=None, windo
     otherwise it opens in the default browser and runs until Ctrl+C."""
     import webbrowser
     from . import window as windowmod
+    perflog.log(f"=== {APP_NAME} {__version__}{' test build ' + BUILD if BUILD else ''} starting (pid {os.getpid()}, "
+                f"{'packaged' if selfupdate.frozen() else 'from source'}, port {port})")
     hub = Hub(overrides=overrides)
     hub.check_on_launch()  # no-op unless the user enabled "check for updates on launch"
     srv = None
@@ -919,6 +953,7 @@ def serve(port=8765, open_browser=True, overrides=None, initial_game=None, windo
             if not os.environ.get("MODMANAGER_RESTARTED") or attempt == 39:
                 raise
             time.sleep(0.5)
+    perflog.log("server is listening")
     url = f"http://127.0.0.1:{port}/" + (f"#{initial_game}" if initial_game else "")
     mode = "window" if open_browser and window else "browser" if open_browser else "none"
     os.environ["MODMANAGER_MODE"] = mode  # an updated copy restarts the same way
@@ -926,7 +961,8 @@ def serve(port=8765, open_browser=True, overrides=None, initial_game=None, windo
     print("  games: " + ", ".join(f"{g.id} ({g.name})" for g in hub.games.values()))
     if mode == "window":
         threading.Thread(target=srv.serve_forever, daemon=True, name="server").start()
-        result = windowmod.show(url)
+        with perflog.timed("open the app window"):
+            result = windowmod.show(url)
         if result == "closed":
             srv.shutdown()
             srv.server_close()

@@ -20,7 +20,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from . import errorlog
+from . import errorlog, perflog
 from .update import ALLOWED_HOST, LINK_PREFIX, REPO, check_for_update, check_nightly, stable_current
 
 MAX_EXE = 300 * 1024 * 1024
@@ -200,6 +200,7 @@ class Updater:
         exe = Path(self.exe)
         new = exe.with_name(exe.name + ".new")
         try:
+            perflog.log(f"update ({self.channel}): checking")
             info = (self.check_nightly if self.channel == "nightly" else self.check)()
             if not info.get("update_available"):
                 return self._set("current", info.get("message") or "You are up to date.")
@@ -218,14 +219,17 @@ class Updater:
             expected = sums.get(want)
             if not expected:
                 return self._set("error", f"{SUMS_NAME} does not list {want}; the update was not installed.")
-            got = self.dl(_asset_url(by[want], token), new, MAX_EXE, token)
+            with perflog.timed("update: download the app", size=by[want].get("size", 0)):
+                got = self.dl(_asset_url(by[want], token), new, MAX_EXE, token)
             self._set("working", "Verifying the download…")
             if got != expected:
                 new.unlink(missing_ok=True)
                 return self._set("error", "The downloaded file does not match its published checksum, so it was "
                                  "discarded and nothing was changed.")
-            swap(exe, new)
+            with perflog.timed("update: swap in the new file"):
+                swap(exe, new)
             self._set("restarting", f"Updated to {info['latest']}. Restarting…")
+            perflog.log("update: starting the new copy, this one exits in 1.5 s")
             self.restarter(exe, self.argv)
             threading.Timer(1.5, self.exiter).start()
         except Exception as e:
