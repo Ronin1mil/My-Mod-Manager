@@ -18,5 +18,4 @@
 | 14 | Definition scope | Keys clash only inside the same script folder (`common/traits`), not across folders. Finer than the old CK3 rule (whole `common/`) to avoid false positives. |
 | 15 | Presets | Plain JSON, validated; shipped ids are labelled `unverified` until checked. No ids are invented: the draft RICE preset only contains ids read from Workshop page text. |
 | 16 | Downloads | "Open in Steam" needs nothing; `steamcmd` is optional and never receives a password from this app. |
-| 17 | Telemetry | None. |
 | 18 | CK3 Tauri/Rust plan | The earlier CK3 plan (Tauri 2 + Rust + React) was never approved and is superseded by this app; its goals (conflict viewer, profiles, safety rules, security plan) are all covered here. |

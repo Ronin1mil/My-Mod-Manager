@@ -10,7 +10,7 @@ Players who run several mod setups ("Vanilla+", "Realism", "Testing", "RICE") an
 2. **Non-destructive**: never delete or overwrite the user's files. Uninstalls and upgrades go to a backup folder; the previous load file is kept as `.bak`; an existing save folder is moved aside, never removed; a damaged playset file is never overwritten.
 3. **Explain, don't just flag**: every position in the load order has a "why is it here?" answer; every conflict names the winner; every problem says what to do.
 4. **Honest about limits**: anything not verified against a real install is written down (docs/02, docs/13) and shown in the UI.
-5. **Local and private**: no account, no telemetry, binds to 127.0.0.1 only; the network is touched only on an explicit user action.
+5. **Local and private**: binds to 127.0.0.1 only; the network is touched only on an explicit user action.
 6. **One engine, many games**: the engine never names a game; differences live in `games.py`.
 
 ## Non-goals (for now)

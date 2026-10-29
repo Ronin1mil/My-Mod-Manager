@@ -1,8 +1,10 @@
 # My Mod Manager
 
-One mod manager for Paradox grand strategy games: **Crusader Kings III**, **Europa Universalis V** and **Victoria 3**. Pick a playset, see *why* two mods fight, press **Play**, and the game starts with exactly that playset's mods. Python standard library only (3.8+), a local web UI, no account, no telemetry.
+One mod manager for Paradox grand strategy games: **Crusader Kings III**, **Europa Universalis V** and **Victoria 3**. Pick a playset, see *why* two mods fight, press **Play**, and the game starts with exactly that playset's mods. Python standard library only (3.8+), and a local web UI.
 
 This repository replaces the three standalone managers (`ck3-mod-manager`, `eu5-mod-manager`, `vic3-mod-manager`). Their playsets are imported automatically on first start, see [docs/10-migration.md](docs/10-migration.md).
+
+> **Made with AI.** This project was written with the help of an AI coding assistant (Claude by Anthropic) at the direction of its maintainer. It is tested against fake installs only (see Status below), so use it with that in mind and keep backups of your saves.
 
 ```bash
 python -m modmanager                       # opens http://127.0.0.1:8765, pick the game in the sidebar
