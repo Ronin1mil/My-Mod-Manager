@@ -124,6 +124,17 @@ def _edges(mods, nodes):
             if did and did != mid and did in present and (did, mid) not in seen:
                 seen.add((did, mid))
                 edges.append((did, mid))
+        # soft rules (Bannerlord modules): only when the other mod is present, never a warning when it is not
+        for dep in mods[mid].get("load_after", []):
+            did = resolve(idx, mods[mid], dep)
+            if did and did != mid and did in present and (did, mid) not in seen:
+                seen.add((did, mid))
+                edges.append((did, mid))
+        for oth in mods[mid].get("load_before", []):
+            oid = resolve(idx, mods[mid], oth)
+            if oid and oid != mid and oid in present and (mid, oid) not in seen:
+                seen.add((mid, oid))
+                edges.append((mid, oid))
     return edges
 
 
@@ -148,16 +159,17 @@ def compute_order(mods, selection, auto=True, game_version=""):
     for a, b in edges:
         indeg[b] += 1
         out_edges.setdefault(a, []).append(b)
-    heap = [(user_pos[n], n) for n in nodes if indeg[n] == 0]
+    rank = lambda n: mods[n].get("rank", 0)  # official Bannerlord modules sort ahead of the rest when nothing else decides
+    heap = [(rank(n), user_pos[n], n) for n in nodes if indeg[n] == 0]
     heapq.heapify(heap)
     sorted_ids = []
     while heap:
-        _, mid = heapq.heappop(heap)
+        _, _, mid = heapq.heappop(heap)
         sorted_ids.append(mid)
         for t in out_edges.get(mid, []):
             indeg[t] -= 1
             if indeg[t] == 0:
-                heapq.heappush(heap, (user_pos[t], t))
+                heapq.heappush(heap, (rank(t), user_pos[t], t))
     if len(sorted_ids) < len(nodes):  # whatever never reached in-degree 0 sits on or behind a loop
         done = set(sorted_ids)
         stuck = [n for n in nodes if n not in done]
@@ -179,6 +191,7 @@ def compute_order(mods, selection, auto=True, game_version=""):
     for mid in order:
         deps = sorted(_name(mods, a) for a in incoming.get(mid, []))
         reason = (f"Loads after {', '.join(deps)} (dependency)." if deps
+                  else "Official module: loads before the others." if mods.get(mid, {}).get("official")
                   else "Keeps the position you gave it.")
         notes[mid] = {"moved": auto and user_pos.get(mid) != pos[mid], "reason": reason}
     issues.sort(key=lambda i: 0 if i["severity"] == "error" else 1)

@@ -263,6 +263,75 @@ def install_archive(archive, user_dir, archive_name="mod.zip", cfg=None):
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def find_module_roots(base, depth=4):
+    """Folders that hold a SubModule.xml (Bannerlord-style modules). An archive may wrap them in Modules/."""
+    base, roots = Path(base), []
+
+    def walk(d, level):
+        if (d / "SubModule.xml").is_file():
+            roots.append(d)
+            return
+        if level < depth:
+            for c in sorted(d.iterdir()):
+                if c.is_dir() and not c.is_symlink():
+                    walk(c, level + 1)
+
+    walk(base, 0)
+    return roots
+
+
+def install_modules_archive(archive, game_root, archive_name="mod.zip", cfg=None):
+    """Install a Bannerlord-style mod archive into <game_root>/Modules/<ModuleId> (an existing copy is moved to the
+    backup folder first). Returns {installed: [{folder, name, upgraded, id}], warnings: []}."""
+    from .scan import parse_submodule
+    if not str(archive_name).lower().endswith(ARCHIVE_EXT):
+        raise ValueError("Supported archives: .zip, .tar, .tar.gz/.tgz, .tar.bz2, .tar.xz. "
+                         "For .7z or .rar, extract the mod and re-pack it as .zip.")
+    if not game_root or not (Path(game_root) / "Modules").is_dir():
+        raise ValueError("The game's Modules folder was not found. Set the game folder in Settings.")
+    mod_dir = Path(game_root) / "Modules"
+    stage = Path(cfg or config_dir()) / "staging"
+    stage.mkdir(parents=True, exist_ok=True)
+    tmp = Path(tempfile.mkdtemp(dir=stage))
+    try:
+        extract_archive(archive, tmp, archive_name)
+        roots = find_module_roots(tmp)
+        if not roots:
+            raise ValueError("This archive does not contain a module (no SubModule.xml found).")
+        report = {"installed": [], "warnings": []}
+        for root in roots:
+            sub = parse_submodule((root / "SubModule.xml").read_text(encoding="utf-8-sig", errors="replace"))
+            if not sub:
+                report["warnings"].append(f"{root.name}: its SubModule.xml could not be read, skipped.")
+                continue
+            if sub["official"] and sub["id"] in ("Native", "SandBoxCore", "Sandbox", "StoryMode", "CustomBattle"):
+                report["warnings"].append(f"{sub['id']} is an official module and is never replaced from an archive.")
+                continue
+            dest = mod_dir / sub["id"]
+            upgraded = dest.exists()
+            if upgraded:
+                _move_to_backup(dest, sub["id"], cfg)
+            shutil.move(str(root), str(dest))
+            report["installed"].append({"folder": sub["id"], "name": sub["name"], "upgraded": upgraded, "id": f"local:{sub['id']}"})
+        if not report["installed"]:
+            raise ValueError(report["warnings"][0] if report["warnings"] else "Nothing was installed.")
+        return report
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def uninstall_module(game_root, mod, cfg=None):
+    """Move an installed module's folder to the backup folder. Official modules are refused."""
+    if mod["source"] != "local" or not mod["root"] or mod.get("official"):
+        raise ValueError("Only mods in the Modules folder can be uninstalled here (not the official ones). "
+                         "Unsubscribe Workshop mods in Steam.")
+    mod_dir = (Path(game_root) / "Modules").resolve()
+    root = Path(mod["root"]).resolve()
+    if mod_dir not in root.parents:
+        raise ValueError("This mod lives outside the Modules folder; remove it manually.")
+    return str(_move_to_backup(root, root.name, cfg))
+
+
 def uninstall(user_dir, mod, cfg=None):
     """Move a local mod's folder and descriptor into the backup folder (never deletes)."""
     if mod["source"] != "local" or not mod["root"]:

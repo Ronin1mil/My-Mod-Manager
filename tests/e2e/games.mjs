@@ -51,7 +51,7 @@ try {
 
   await page.goto(`${base}/`);
   await page.waitForSelector('#game option:nth-child(3)', { state: 'attached' });
-  assert.deepEqual(await page.locator('#game option').allTextContents(), ['Crusader Kings III', 'Europa Universalis V', 'Victoria 3']);
+  assert.deepEqual(await page.locator('#game option').allTextContents(), ['Crusader Kings III', 'Europa Universalis V', 'Victoria 3', 'Mount & Blade II: Bannerlord']);
 
   const seen = {};
   for (const id of ['ck3', 'eu5', 'vic3']) {

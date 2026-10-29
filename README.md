@@ -1,6 +1,6 @@
 # My Mod Manager
 
-One mod manager for Paradox grand strategy games: **Crusader Kings III**, **Europa Universalis V** and **Victoria 3**. Pick a playset, see *why* two mods fight, press **Play**, and the game starts with exactly that playset's mods. Python standard library only (3.8+), and its own app window.
+One mod manager for **Crusader Kings III**, **Europa Universalis V**, **Victoria 3** and **Mount & Blade II: Bannerlord**. Pick a playset, see *why* two mods fight, press **Play**, and the game starts with exactly that playset's mods. Python standard library only (3.8+), and its own app window.
 
 This repository replaces the three standalone managers (`ck3-mod-manager`, `eu5-mod-manager`, `vic3-mod-manager`). Their playsets are imported automatically on first start, see [docs/10-migration.md](docs/10-migration.md).
 
@@ -60,6 +60,8 @@ On GitHub press **Code → Download ZIP**, unzip it, and double-click `Start Mod
 
 Details and what is still to verify: [docs/02-game-notes.md](docs/02-game-notes.md).
 
+**Bannerlord** works differently (modules with a `SubModule.xml`, started with a module list on the command line, no load file, no conflict analysis) and is **unverified on a real install**: see [docs/17-bannerlord.md](docs/17-bannerlord.md).
+
 ## Logo and trademarks
 No game artwork is stored in this repository. The header shows each game's logo, read from your own Steam cache, a `logo.*` in the game's config folder, or a file passed with `--logo`. If none is found, the app downloads Steam's public logo once and keeps it on your PC (turn this off under Settings → App & updates, or with `MODMANAGER_FETCH_LOGOS=0`).
 
@@ -98,6 +100,8 @@ Set `MODMANAGER_CONFIG_DIR` to keep the config somewhere else (tests do).
 | [docs/11-presets-and-downloads.md](docs/11-presets-and-downloads.md) | Presets, Workshop downloads |
 | [docs/12-api.md](docs/12-api.md) | HTTP API reference |
 | [docs/13-verification-checklist.md](docs/13-verification-checklist.md) | Checks to run on a real install |
+| [docs/16-launcher-import.md](docs/16-launcher-import.md) | Importing the launcher's playsets |
+| [docs/17-bannerlord.md](docs/17-bannerlord.md) | Bannerlord: modules, order, launching |
 
 ## License
 [MIT](LICENSE) © 2026 Ronin1mil

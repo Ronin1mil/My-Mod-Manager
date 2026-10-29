@@ -99,6 +99,8 @@ class UserDirsAndConfig(unittest.TestCase):
         for g in ALL:
             self.assertTrue(any(p.name == g.user_dir_name and p.parent.name == "Paradox Interactive"
                                 for p in paths.user_dirs(g)), g.id)
+        bl = games.BANNERLORD  # directly in Documents, not under Paradox Interactive
+        self.assertTrue(any(p.name == "Mount and Blade II Bannerlord" and p.parent.name == "Documents" for p in paths.user_dirs(bl)))
 
     def test_config_dir_is_per_game_and_overridable(self):
         with tempfile.TemporaryDirectory() as r:
@@ -109,8 +111,8 @@ class UserDirsAndConfig(unittest.TestCase):
 
     def test_legacy_config_locations(self):
         with tempfile.TemporaryDirectory() as r, mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": r}):
-            names = {g.id: [p.parent.name for p in paths.legacy_config_files(g)] for g in ALL}
-            self.assertEqual(names, {"ck3": ["ck3mm"], "eu5": ["eu5mm"], "vic3": ["vic3mm"]})
+            names = {g.id: [p.parent.name for p in paths.legacy_config_files(g)] for g in games.GAMES.values()}
+            self.assertEqual(names, {"ck3": ["ck3mm"], "eu5": ["eu5mm"], "vic3": ["vic3mm"], "bannerlord": []})
 
 
 class Logos(unittest.TestCase):

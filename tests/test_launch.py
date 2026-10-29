@@ -36,7 +36,7 @@ class T(unittest.TestCase):
 
     @unittest.skipIf(sys.platform == "win32", "stub is a shebang script")
     def test_play_runs_game_with_exact_args_and_profile_mods_for_every_game(self):
-        for g in games.GAMES.values():
+        for g in (x for x in games.GAMES.values() if x.kind == "paradox"):
             with self.subTest(game=g.id), tempfile.TemporaryDirectory() as r:
                 r = Path(r)
                 with mock.patch.dict(os.environ, {"MODMANAGER_CONFIG_DIR": str(r / "cfg"), "STUB_USER_DIR": str(r / "user"),

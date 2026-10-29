@@ -26,7 +26,7 @@ class AllGames(GameCase):
 
     def test_games_index_lists_all_three_with_themes(self):
         s, idx, _ = self.req("GET", "/api/games")
-        self.assertEqual((s, [g["id"] for g in idx["games"]]), (200, ["ck3", "eu5", "vic3"]))
+        self.assertEqual((s, [g["id"] for g in idx["games"]]), (200, ["ck3", "eu5", "vic3", "bannerlord"]))
         self.assertTrue(all(g["theme"]["--acc"] for g in idx["games"]))
         self.assertEqual(idx["settings"]["auto_update_check"], False)
 

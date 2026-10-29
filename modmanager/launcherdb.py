@@ -114,9 +114,38 @@ def read_playsets(db_file):
     return out
 
 
+def read_bannerlord(user_dir):
+    """Bannerlord's launcher remembers one selection of modules in <Documents>/Mount and Blade II Bannerlord/Configs/
+    LauncherData.xml (<UserModData><Id/><IsSelected/>... in order). Returned as a single playset like read_playsets,
+    or [] when the file is missing. Best effort and unverified on a real install."""
+    import xml.etree.ElementTree as ET
+    f = Path(user_dir) / "Configs" / "LauncherData.xml" if user_dir else None
+    if not f or not f.is_file():
+        return []
+    try:
+        text = f.read_text(encoding="utf-8-sig", errors="replace")
+        if len(text) > 2 * 1024 * 1024 or "<!DOCTYPE" in text.upper() or "<!ENTITY" in text.upper():
+            raise ValueError("unexpected content")
+        root = ET.fromstring(text)
+    except (OSError, ValueError, ET.ParseError) as e:
+        raise ValueError(f"The launcher's selection file could not be read ({e}).")
+    scope = root.find(".//SingleplayerData")
+    items = []
+    for i, e in enumerate((scope if scope is not None else root).iter("UserModData")):
+        mid = (e.findtext("Id") or "").strip()
+        if mid:
+            items.append({"enabled": (e.findtext("IsSelected") or "").strip().lower() == "true", "position": i,
+                          "steam_id": "", "pdx_id": "", "registry_id": "", "dir_path": "", "name": mid, "source": "",
+                          "module_id": mid})
+    return [{"id": "selection", "name": "Launcher selection", "active": True, "mods": items}] if items else []
+
+
 def match_mod(item, mods):
     """The app's id for one launcher mod, or None. `mods` is the app's scanned {id: info}. Tried in order:
     Workshop id, the launcher's descriptor name (mod/ugc_123.mod or mod/name.mod), the folder, the display name."""
+    modid = item.get("module_id")
+    if modid:
+        return next((mid for mid, info in mods.items() if info.get("meta_id") == modid), None)
     sid = item.get("steam_id", "")
     if sid.isdigit() and f"ws:{sid}" in mods:
         return f"ws:{sid}"

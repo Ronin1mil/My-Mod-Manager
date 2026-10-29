@@ -31,7 +31,7 @@ def legacy_config_files(game):
 
 def user_dirs(game):
     home = Path.home()
-    rel = Path("Paradox Interactive") / game.user_dir_name
+    rel = (Path(game.user_parent) if game.user_parent else Path()) / game.user_dir_name
     c = [home / "Documents" / rel, home / ".local/share" / rel, home / "Library/Application Support" / rel,
          home / "OneDrive/Documents" / rel]
     if sys.platform == "win32":
@@ -113,10 +113,23 @@ def find_first(cands):
     return next((p for p in cands if p.is_dir()), None)
 
 
-def game_version(root):
-    """Installed game version (e.g. '1.7.6') from launcher/launcher-settings.json; '' when unknown."""
+def _bannerlord_version(root):
+    """'1.2.9' from the Native module's SubModule.xml (<Version value="v1.2.9.12345"/>)."""
+    try:
+        text = (Path(root) / "Modules" / "Native" / "SubModule.xml").read_text(encoding="utf-8-sig", errors="replace")
+    except OSError:
+        return ""
+    m = re.search(r'<Version\s+value\s*=\s*"[a-zA-Z]?(\d+\.\d+\.\d+)', text)
+    return m.group(1) if m else ""
+
+
+def game_version(root, game=None):
+    """Installed game version (e.g. '1.7.6') from launcher/launcher-settings.json (Paradox games) or the Native
+    module (Bannerlord); '' when unknown."""
     if not root:
         return ""
+    if game is not None and game.kind == "modules":
+        return _bannerlord_version(root)
     try:
         d = json.loads((Path(root) / "launcher" / "launcher-settings.json").read_text(encoding="utf-8-sig"))
     except (OSError, ValueError):

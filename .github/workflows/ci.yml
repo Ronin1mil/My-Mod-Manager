@@ -64,6 +64,7 @@ jobs:
       - run: node tests/e2e/culture.mjs
       - run: node tests/e2e/switch.mjs
       - run: node tests/e2e/launcher.mjs
+      - run: node tests/e2e/bannerlord.mjs
 
   build:
     name: Build app (${{ matrix.name }})

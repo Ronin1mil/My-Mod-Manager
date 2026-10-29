@@ -77,7 +77,7 @@ class GameApp:
         self.workshop_dir = pick(self.cli["workshop_dir"], "workshop_dir",
                                  (detect.workshop_dir_for(self.game_root, g) if self.game_root else None)
                                  or find_first(workshop_dirs(g, self.extra_libraries)))
-        self.game_version = self.cli["game_version"] or game_version(self.game_root)
+        self.game_version = self.cli["game_version"] or game_version(self.game_root, self.game)
         self.logo = find_logo(g, self.logo_arg, self.game_root, self.extra_libraries)
         if not self.logo and not self.logo_arg and self.fetch_logos and not self.logo_pending:
             self.logo_pending = True
@@ -129,17 +129,25 @@ class GameApp:
         self.apply_settings()
         self.auto_import()
 
+    def starting_mods(self, mods):
+        """What a new playset starts with: what was asked for, else the official modules a Bannerlord-style game needs."""
+        if mods or not self.game.seed_mods:
+            return mods
+        have = {m["meta_id"]: mid for mid, m in self.mods.items() if m.get("meta_id")}
+        return [have[i] for i in self.game.seed_mods if i in have and i != "Multiplayer"]
+
     # ---- the game's own launcher ----
     def launcher_info(self):
         """What the game's launcher has, for the Import menu."""
-        files = launcherdb.db_files(self.user_dir)
-        if not files:
-            return {"found": False, "db": "", "error": "", "playsets": [],
-                    "message": f"No launcher playsets found for {self.game.name} (looked for launcher-v2.sqlite in {self.user_dir or 'its user folder'})."}
+        what = "LauncherData.xml" if self.game.kind == "modules" else "launcher-v2.sqlite"
         try:
-            sets = launcherdb.read_playsets(files[0])
+            src = self._launcher_source()
         except ValueError as e:
-            return {"found": True, "db": str(files[0]), "error": str(e), "playsets": [], "message": str(e)}
+            return {"found": True, "db": "", "error": str(e), "playsets": [], "message": str(e)}
+        if not src or not src[1]:
+            return {"found": False, "db": "", "error": "", "playsets": [],
+                    "message": f"No launcher playsets found for {self.game.name} (looked for {what} in {self.user_dir or 'its user folder'})."}
+        files, sets = [src[0]], src[1]
         have = {ps.get("origin") for ps in self.store.data["playsets"].values()}
         seen = self.store.launcher_seen()
         return {"found": True, "db": str(files[0]), "error": "", "message": "",
@@ -150,10 +158,10 @@ class GameApp:
         """Create playsets from the launcher's. Without `ids` all of them are considered; one that is already here (it
         has the origin of that launcher playset) is skipped, so pressing the button again adds only what is new or what
         was deleted since. `only_unseen` (the automatic import) skips every playset that was ever imported before."""
-        files = launcherdb.db_files(self.user_dir)
-        if not files:
+        src = self._launcher_source()
+        if not src:
             return {"imported": [], "skipped": 0, "lost": []}
-        sets = launcherdb.read_playsets(files[0])
+        sets = src[1]
         have = {ps.get("origin") for ps in self.store.data["playsets"].values()}
         seen = self.store.launcher_seen()
         was_blank = all(not ps["mods"] for ps in self.store.data["playsets"].values())
@@ -187,8 +195,19 @@ class GameApp:
         except Exception as e:
             errorlog.write_exception("launcher-import", e, self.game.id)
 
+    def _launcher_source(self):
+        """(where it was read, playsets) from the game's launcher, or None when it has none here."""
+        if self.game.kind == "modules":
+            f = Path(self.user_dir) / "Configs" / "LauncherData.xml" if self.user_dir else None
+            return (f, launcherdb.read_bannerlord(self.user_dir)) if f and f.is_file() else None
+        files = launcherdb.db_files(self.user_dir)
+        return (files[0], launcherdb.read_playsets(files[0])) if files else None
+
     def rescan(self):
-        self.mods = scan.scan_mods(self.user_dir, self.workshop_dir)
+        if self.game.kind == "modules":
+            self.mods = scan.scan_modules(self.game_root, self.workshop_dir)
+        else:
+            self.mods = scan.scan_mods(self.user_dir, self.workshop_dir)
         self.files = {}  # file listings are cached per mod root until the next rescan
         self.diff = self.library.merge(self.mods)
 
@@ -233,6 +252,8 @@ class GameApp:
             van = (self.game_dir, self.game.vanilla_only)
 
         def run():
+            if not self.game.has_conflicts:  # Bannerlord modules do not share script folders: nothing meaningful to compare
+                return {"conflicts": [], "counts": {}, "truncated": False, "pending": False}
             conflicts = scan.find_conflicts(mods, ordr, files, defs, van)
             counts = {}
             for c in conflicts:
@@ -377,6 +398,10 @@ class GameApp:
 
     # ---- install / launch ----
     def install_zip(self, path, name):
+        if self.game.kind == "modules":
+            rep = install.install_modules_archive(path, self.game_root, name, self.cfg)
+            self.rescan()
+            return rep
         if not self.user_dir:
             raise ValueError(f"{self.game.name} user directory not found")
         rep = install.install_archive(path, self.user_dir, name, self.cfg)
@@ -384,6 +409,12 @@ class GameApp:
         return rep
 
     def uninstall(self, mid):
+        if self.game.kind == "modules":
+            if mid not in self.mods or not self.game_root:
+                raise ValueError("Unknown mod.")
+            where = install.uninstall_module(self.game_root, self.mods[mid], self.cfg)
+            self.rescan()
+            return {"backup": where}
         if not self.user_dir or mid not in self.mods:
             raise ValueError("Unknown mod.")
         where = install.uninstall(self.user_dir, self.mods[mid], self.cfg)
@@ -407,15 +438,9 @@ class GameApp:
         if a and b and a != b:
             raise SaveVersionWarning(a, b, source)
 
-    def launch(self, pid, only=None, ack_version=False):
-        """Start the game. `only` = a subset of this playset's enabled mods to launch with (the playset itself
-        is not changed); the reply says how many problems that subset has so the UI can warn."""
-        ps = self.store.get(pid)
-        if not self.user_dir:
-            raise ValueError(f"{self.game.name} user directory not found")
+    def _chosen(self, pid, only):
+        """Enabled mod ids (optionally a subset of them) and how many errors that subset has (None for no subset)."""
         ids = self.store.export(pid, self.mods)
-        if not ack_version:
-            self.check_save_version(pid)
         problems = None
         if only is not None:
             if not isinstance(only, list) or not all(isinstance(i, str) for i in only):
@@ -428,6 +453,35 @@ class GameApp:
             ids = [i for i in ids if i in want]
             problems = sum(1 for i in order.compute_order(self.mods, ids, False, self.game_version)["issues"]
                            if i["severity"] == "error")
+        return ids, problems
+
+    def _launch_modules(self, pid, ps, only):
+        """Bannerlord-style start: no load file; the game is run with the module list on its command line."""
+        if not self.game_root:
+            raise ValueError(f"The {self.game.name} install folder is not set. Open Settings → Game.")
+        exe = Path(self.game_exe) if self.game_exe else self.game_root.joinpath(*self.game.exe_rel)
+        if not exe.is_file():
+            raise ValueError(f"{self.game.name} was not found at {exe}. Set the game folder in Settings, or start it from Steam.")
+        ids, problems = self._chosen(pid, only)
+        modules = [self.mods[i]["meta_id"] for i in ids if i in self.mods and self.mods[i].get("meta_id")]
+        if not modules:
+            raise ValueError("Nothing to launch: no module in this playset can be found.")
+        args = [*self.game.launch_prefix, module_list_argument(modules), *launch.validate_launch_args(ps["launch_args"])]
+        res = launch.start(self.game, str(exe), args)
+        return {"written": len(modules), "file": "command line", "saves": None, "partial": only is not None,
+                "problems": problems, "modules": modules, **res}
+
+    def launch(self, pid, only=None, ack_version=False):
+        """Start the game. `only` = a subset of this playset's enabled mods to launch with (the playset itself
+        is not changed); the reply says how many problems that subset has so the UI can warn."""
+        ps = self.store.get(pid)
+        if self.game.kind == "modules":
+            return self._launch_modules(pid, ps, only)
+        if not self.user_dir:
+            raise ValueError(f"{self.game.name} user directory not found")
+        if not ack_version:
+            self.check_save_version(pid)
+        ids, problems = self._chosen(pid, only)
         f = write_load_file(self.game, self.user_dir, self.mods, ids)
         saves_note = None
         if ps["separate_saves"]:
@@ -438,6 +492,11 @@ class GameApp:
         saves.record_launch(self.cfg, self.saves_location(pid)[1], self.game_version)
         return {"written": len(ids), "file": f.name, "saves": saves_note, "partial": only is not None,
                 "problems": problems, **res}
+
+
+def module_list_argument(module_ids):
+    """The argument that tells a Bannerlord-style game which modules to load, in order."""
+    return "_MODULES_*" + "*".join(module_ids) + "*_MODULES_"
 
 
 class SaveVersionWarning(Exception):
@@ -703,7 +762,7 @@ def make_handler(hub):
                     app.rescan()
                     return self._send(200, app.state())
                 if parts == ["api", "playsets"]:
-                    pid = app.store.create(b.get("name") or "New playset", b.get("mods"))
+                    pid = app.store.create(b.get("name") or "New playset", app.starting_mods(b.get("mods")))
                     return self._send(200, {"id": pid})
                 if parts == ["api", "import"]:
                     return self._send(200, app.import_playset(b))

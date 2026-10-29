@@ -160,7 +160,7 @@ function render() {
   $('auto').checked = p.auto_sort;
   $('sortnow').style.display = p.auto_sort ? 'none' : '';
   const nIss = visIssues().length, nCon = A && !A.pending ? A.conflicts.filter(x => x.severity !== 'info' && !x.vanilla).length : 0;
-  $('tabs').innerHTML = [['order', 'Load order'], ['library', `Library (${S.mods.length})`], ['problems', `Warnings${nIss ? ` (${nIss})` : ''}`], ['conflicts', `Conflicts${A && A.pending ? ' …' : nCon ? ` (${nCon})` : ''}`], ['files', 'Files'], ['compare', 'Compare'], ['presets', 'Presets']]
+  $('tabs').innerHTML = [['order', 'Load order'], ['library', `Library (${S.mods.length})`], ['problems', `Warnings${nIss ? ` (${nIss})` : ''}`], ['conflicts', `Conflicts${A && A.pending ? ' …' : nCon ? ` (${nCon})` : ''}`], ['files', 'Files'], ['compare', 'Compare'], ['presets', 'Presets']].filter(([k]) => k !== 'conflicts' || S.game.has_conflicts)
     .map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('');
   const active = p.mods.length - p.disabled.length;
   $('status').innerHTML = `${esc(GNAME())}${S.game_version ? ` ${esc(S.game_version)}` : ''} · ${active} mod${active === 1 ? '' : 's'} active` +
@@ -344,7 +344,7 @@ async function openPaths(first) {
     <section data-pane="store" hidden>
       <div class="card">
         <h3>Mods &amp; saves</h3>
-        <p class="desc">The game's own folder in Documents. Your mods, saves and <code>${esc(S.game.load_file)}</code> live here.</p>
+        <p class="desc">${S.game.kind === 'modules' ? 'The game\'s folder in Documents, where it keeps saves and the launcher\'s settings. Mods themselves are read from the install\'s Modules folder and the Steam Workshop folder.' : `The game's own folder in Documents. Your mods, saves and <code>${esc(S.game.load_file)}</code> live here.`}</p>
         <label class="fld" for="p-user">User folder</label><input type="text" id="p-user" value="${esc(S.user_dir)}">
       </div>
       <div class="card">
@@ -357,8 +357,8 @@ async function openPaths(first) {
       <div class="card">
         <h3>Before you play</h3>
         <p class="desc">Checks the manager runs for you.</p>
-        <label class="srow"><span class="rt"><b>Warn about save versions</b><span class="hint">Warn if the saves were made on a different game release, for example 1.14 saves with 1.15 installed</span></span><input type="checkbox" class="sw" id="p-svc" ${S.save_version_check ? 'checked' : ''}></label>
-        <label class="srow"><span class="rt"><b>Compare mods with the base game</b><span class="hint">Shows what each mod overrides from the original game files</span></span><input type="checkbox" class="sw" id="p-van" ${S.include_vanilla ? 'checked' : ''}></label>
+        <label class="srow" style="${S.game.has_saves ? '' : 'display:none'}"><span class="rt"><b>Warn about save versions</b><span class="hint">Warn if the saves were made on a different game release, for example 1.14 saves with 1.15 installed</span></span><input type="checkbox" class="sw" id="p-svc" ${S.save_version_check ? 'checked' : ''}></label>
+        <label class="srow" style="${S.game.has_conflicts ? '' : 'display:none'}"><span class="rt"><b>Compare mods with the base game</b><span class="hint">Shows what each mod overrides from the original game files</span></span><input type="checkbox" class="sw" id="p-van" ${S.include_vanilla ? 'checked' : ''}></label>
       </div>
       <div class="card">
         <h3>Playsets</h3>
@@ -614,8 +614,8 @@ $('cfg').onclick = () => {
     <label>Name</label><input type="text" id="c-name" maxlength="60" value="${esc(p.name)}">
     <label>Notes</label><textarea id="c-notes" maxlength="2000">${esc(p.notes)}</textarea>
     <label>Extra launch arguments (one per line, e.g. -debug_mode)</label><textarea id="c-args">${esc(p.launch_args.join('\n'))}</textarea>
-    <label class="chk" style="color:var(--ink)"><input type="checkbox" id="c-saves" ${p.separate_saves ? 'checked' : ''}> Own save folder for this playset (off = every playset shares the game's normal saves)
-    </label><div class="mut" style="font-size:12px">Your existing "save games" folder is never deleted; it is moved aside to a backup the first time.</div>
+    <label class="chk" style="color:var(--ink);${S.game.has_saves ? '' : 'display:none'}"><input type="checkbox" id="c-saves" ${p.separate_saves ? 'checked' : ''}> Own save folder for this playset (off = every playset shares the game's normal saves)
+    </label><div class="mut" style="font-size:12px;${S.game.has_saves ? '' : 'display:none'}">Your existing "save games" folder is never deleted; it is moved aside to a backup the first time.</div>
     <div class="dlg-btns"><span><button id="c-dup">Duplicate</button> <button id="c-exp">Export</button> <button id="c-pre" title="Keep this Workshop mod list as a reusable preset">Save as preset</button> <button id="c-del" class="danger">Delete</button></span>
     <span><button id="c-cancel">Cancel</button> <button id="c-save" class="pri">Save</button></span></div>`;
   d.showModal();
@@ -717,7 +717,7 @@ $('launch').onclick = guard(async () => {
   const p = cur(), errs = visIssues().filter(i => i.severity === 'error').length; if (!p) return;
   if (errs && !confirm(`This playset has ${errs} error${errs === 1 ? '' : 's'} (see Warnings). Launch anyway?`)) return;
   const r = await launchCall(p, {}); if (!r) return;
-  toast(`Wrote ${r.written} mods to ${r.file} and started ${GNAME()}${r.via === 'steam' ? ' through Steam' : ''}.` +
+  toast((r.file === 'command line' ? `Started ${GNAME()} with ${r.written} module${r.written === 1 ? '' : 's'}.` : `Wrote ${r.written} mods to ${r.file} and started ${GNAME()}${r.via === 'steam' ? ' through Steam' : ''}.`) +
     (r.saves && r.saves.startsWith('linked_after_backup') ? ' Your old save folder was kept as a backup.' : ''));
 });
 function applyTheme(g) {

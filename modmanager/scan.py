@@ -2,6 +2,7 @@
 import json
 import os
 import re
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from .descriptor import META_PATHS, parse_descriptor, parse_metadata
@@ -125,6 +126,100 @@ def _listdir(d):
         return sorted(Path(d).iterdir())
     except OSError:
         return []
+
+
+# ---- Bannerlord-style modules: a folder with SubModule.xml ----
+OFFICIAL_MODULES = ("Native", "SandBoxCore", "CustomBattle", "Sandbox", "StoryMode", "BirthAndDeath", "NavalDLC", "Multiplayer")
+MAX_SUBMODULE = 1024 * 1024
+
+
+def parse_submodule(text):
+    """SubModule.xml -> dict of what the load order needs, or None if it is not a module description. Never raises.
+    Documents with a DOCTYPE or entities are refused (nothing legitimate needs them)."""
+    if len(text) > MAX_SUBMODULE or "<!DOCTYPE" in text.upper() or "<!ENTITY" in text.upper():
+        return None
+    try:
+        root = ET.fromstring(text.lstrip("\ufeff"))
+    except ET.ParseError:
+        return None
+    if root.tag != "Module":
+        return None
+    val = lambda tag: (root.find(tag).get("value") or "").strip() if root.find(tag) is not None else ""
+    mid = val("Id")
+    if not re.fullmatch(r"[A-Za-z0-9_.\-]{1,100}", mid):  # it goes onto the game's command line: letters, digits and _ . - only
+        return None
+    before_hard, before_soft, after_soft, incompatible = [], [], [], []
+    for e in root.findall("./DependedModules/DependedModule"):
+        i = (e.get("Id") or "").strip()
+        if i:
+            (before_soft if (e.get("Optional") or "").lower() == "true" else before_hard).append(i)
+    for e in root.findall("./DependedModules/OptionalDependModule") + root.findall("./OptionalDependModules/*"):
+        i = (e.get("Id") or "").strip()
+        if i:
+            before_soft.append(i)
+    for e in root.findall("./DependedModuleMetadatas/DependedModuleMetadata"):
+        i = (e.get("id") or "").strip()
+        if not i:
+            continue
+        optional = (e.get("optional") or "").lower() == "true"
+        if (e.get("incompatible") or "").lower() == "true":
+            incompatible.append(i)
+        elif e.get("order") == "LoadBeforeThis":
+            (before_soft if optional else before_hard).append(i)
+        elif e.get("order") == "LoadAfterThis":
+            after_soft.append(i)
+    for e in root.findall("./ModulesToLoadAfterThis/Module"):
+        if (e.get("Id") or "").strip():
+            after_soft.append(e.get("Id").strip())
+    for e in root.findall("./IncompatibleModules/Module"):
+        if (e.get("Id") or "").strip():
+            incompatible.append(e.get("Id").strip())
+    uniq = lambda xs: list(dict.fromkeys(xs))
+    hard = uniq(before_hard)
+    return {"id": mid, "name": val("Name") or mid, "version": val("Version"),
+            "official": val("Official").lower() == "true" or mid in OFFICIAL_MODULES,
+            "dependencies": hard, "load_after": [i for i in uniq(before_soft) if i not in hard],
+            "load_before": uniq(after_soft), "incompatible": uniq(incompatible), "url": val("Url")}
+
+
+def _module_info(mid_key, sub, root, source, remote_id):
+    info = _info(mid_key, {"name": sub["name"], "version": sub["version"], "dependencies": sub["dependencies"],
+                           "dependency_ids": {d: d for d in sub["dependencies"]}, "incompatible": sub["incompatible"],
+                           "meta_id": sub["id"]}, root, source, remote_id)
+    info.update({"load_after": sub["load_after"], "load_before": sub["load_before"], "official": sub["official"],
+                 "rank": 0 if sub["official"] else 1, "url": sub["url"]})
+    return info
+
+
+def scan_modules(game_root, workshop_dir=None):
+    """Modules of a Bannerlord-style game: <install>/Modules/<x>/SubModule.xml first, then the Workshop folder (each item
+    folder is itself a module). A module id found twice keeps its first copy, like the game does."""
+    mods, seen = {}, set()
+    if game_root and _isdir(Path(game_root) / "Modules"):
+        for d in _listdir(Path(game_root) / "Modules"):
+            try:
+                sm = d / "SubModule.xml"
+                if not (_isdir(d) and _isfile(sm)):
+                    continue
+                sub = parse_submodule(_read(sm))
+                if sub and sub["id"] not in seen:
+                    seen.add(sub["id"])
+                    mods[f"local:{sub['id']}"] = _module_info(f"local:{sub['id']}", sub, d, "local", None)
+            except OSError:
+                continue
+    if workshop_dir and _isdir(workshop_dir):
+        for d in _listdir(workshop_dir):
+            try:
+                sm = d / "SubModule.xml"
+                if not (_isdir(d) and _isfile(sm)):
+                    continue
+                sub = parse_submodule(_read(sm))
+                if sub and sub["id"] not in seen:
+                    seen.add(sub["id"])
+                    mods[f"ws:{d.name}"] = _module_info(f"ws:{d.name}", sub, d, "workshop", d.name)
+            except OSError:
+                continue
+    return mods
 
 
 def _info(mid, desc, root, source, remote_id):

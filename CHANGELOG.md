@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.0 - Mount & Blade II: Bannerlord
+Mount & Blade II: Bannerlord is now a supported game next to Crusader Kings III, Europa Universalis V and Victoria 3: its modules get playsets, dependency-aware auto-sort, one-click install from an archive and a Play button that starts the game with your module list.
+- Modules are read from `<install>/Modules` and the Steam Workshop folder (SubModule.xml: required and optional dependencies, load-after rules, incompatible modules); official modules always load first
+- A new playset starts with the official modules; Play runs `Bannerlord.exe /singleplayer _MODULES_*…*_MODULES_` with the enabled modules, or just a chosen part (Launch part…)
+- The Import menu can bring in the launcher's last module selection (`LauncherData.xml`); Install mod… puts a module archive into `Modules` (official modules are never replaced)
+- Not offered for this game because they do not apply: Conflicts tab, base-game comparison, save-version checks and per-playset save folders
+- **Unverified on a real Bannerlord install**; docs/17-bannerlord.md lists what to check. Everything is built from other mod managers' open-source code and tested with fake installs
 ## 0.7.0 - import the playsets you already have
 The new Import menu brings in the playsets that already exist in each game's own Paradox launcher, automatically when a game opens or on demand, so you do not rebuild them by hand. You can also hide the Import button if you do not use it.
 - The launcher's database (`launcher-v2.sqlite`) is only ever read, from a temporary copy; load order, enabled/disabled state and the launcher's active playset are kept. Mods that are in a playset but not installed stay in it as "not installed" so they can be downloaded; mods that exist only on Paradox's own mod service are listed as not matched

@@ -25,7 +25,7 @@ def find_install_root(p, game):
         if marker_ok(c, game):
             return c
         # the marker is "<root>/game/<x>": a path at or below game/ also resolves
-        if c.name.lower() == game.install_marker[0] and marker_ok(c.parent, game):
+        if c.name.lower() == game.install_marker[0].lower() and marker_ok(c.parent, game):
             return c.parent
     return None
 
@@ -42,7 +42,7 @@ def workshop_dir_for(root, game):
 def describe(root, game):
     root = Path(root)
     ws = workshop_dir_for(root, game)
-    return {"path": str(root), "game_dir": str(root / game.vanilla_dir_name), "version": game_version(root),
+    return {"path": str(root), "game_dir": str(root / game.vanilla_dir_name), "version": game_version(root, game),
             "workshop_dir": str(ws) if ws else "",
             "store": "steam" if "steamapps" in str(root).lower() else "manual"}
 

@@ -24,15 +24,34 @@ class Game:
     legacy_config: tuple = ()    # config folder names of the standalone managers this replaces
     theme: dict = field(default_factory=dict)
     verified: bool = False       # True once a real install confirmed the load file + layout
+    kind: str = "paradox"        # "paradox": playsets write a load file; "modules": Bannerlord-style modules (SubModule.xml)
+    user_parent: str = "Paradox Interactive"  # folder in Documents that holds user_dir_name ("" = directly in Documents)
+    seed_mods: tuple = ()        # module ids a new playset starts with (the official modules of a "modules" game)
+    exe_rel: tuple = ()          # game executable relative to the install root ("modules" games start it themselves)
+    launch_prefix: tuple = ()    # arguments before the module list
 
     @property
     def vanilla_dir_name(self):
-        return "game"
+        return "game" if self.kind == "paradox" else "Modules"
+
+    @property
+    def has_conflicts(self):
+        """File/definition conflict analysis only makes sense for the Paradox games' shared script folders."""
+        return self.kind == "paradox"
+
+    @property
+    def has_saves(self):
+        return self.kind == "paradox"
+
+    @property
+    def has_launcher_import(self):
+        return True
 
     def public(self):
         """What the browser needs to know."""
         return {"id": self.id, "name": self.name, "app_id": self.app_id, "load_file": self.load_file,
-                "theme": self.theme, "verified": self.verified,
+                "theme": self.theme, "verified": self.verified, "kind": self.kind,
+                "has_conflicts": self.has_conflicts, "has_saves": self.has_saves,
                 "install_marker": "/".join(self.install_marker)}
 
 
@@ -64,7 +83,20 @@ VIC3 = Game(
     theme={**_COMMON, "--bg": "#0f0b0d", "--side": "#150e12", "--panel": "#1e1519", "--line": "#3a2a31",
            "--acc": "#d4b883", "--accink": "#fbf3e2", "--p1": "#8c3a58", "--p2": "#a34868", "--p3": "#6a2640"})
 
-GAMES = {g.id: g for g in (CK3, EU5, VIC3)}
+# Mount & Blade II: Bannerlord. Mods are "modules" (a folder with SubModule.xml) in <install>/Modules and in the Steam
+# Workshop folder; the game is started with the chosen module list on its command line. Everything here comes from
+# other mod managers' code and is UNVERIFIED on a real install (docs/17-bannerlord.md).
+BANNERLORD = Game(
+    id="bannerlord", name="Mount & Blade II: Bannerlord", app_id="261550", user_dir_name="Mount and Blade II Bannerlord",
+    user_parent="", install_dir_name="Mount & Blade II Bannerlord", install_marker=("Modules", "Native"),
+    load_file="(command line)", load_style="modules", def_dirs=(), kind="modules",
+    seed_mods=("Native", "SandBoxCore", "CustomBattle", "Sandbox", "StoryMode"),
+    exe_rel=("bin", "Win64_Shipping_Client", "Bannerlord.exe"), launch_prefix=("/singleplayer",),
+    theme={**_COMMON, "--bg": "#0f120e", "--side": "#0b0e0a", "--panel": "#171c15", "--line": "#2f3a2b",
+           "--acc": "#cfa84a", "--accink": "#1a1405", "--p1": "#4d6b3a", "--p2": "#65884a", "--p3": "#3a5229",
+           "--mut": "#97a38f"})
+
+GAMES = {g.id: g for g in (CK3, EU5, VIC3, BANNERLORD)}
 DEFAULT_GAME = "ck3"
 
 
