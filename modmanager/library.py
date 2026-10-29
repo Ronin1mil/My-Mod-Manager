@@ -34,7 +34,8 @@ class Library:
             cur = e.get(mid)
             if cur is None:
                 e[mid] = {"name": m["name"], "version": m["version"], "present": True, "first_seen": now,
-                          "last_seen": now, "change": "none" if first else "new", "changed_at": now}
+                          "last_seen": now, "change": "none" if first else "new", "changed_at": now,
+                          "tags": list(m.get("tags") or []), "source": m.get("source", "")}
                 diff["added"] += 0 if first else 1
                 continue
             if not cur["present"]:
@@ -43,7 +44,8 @@ class Library:
             elif cur["version"] != m["version"]:
                 cur.update(change="updated", changed_at=now, previous_version=cur["version"])
                 diff["updated"] += 1
-            cur.update(name=m["name"], version=m["version"], present=True, last_seen=now)
+            cur.update(name=m["name"], version=m["version"], present=True, last_seen=now,
+                       tags=list(m.get("tags") or []), source=m.get("source", cur.get("source", "")))
         for mid, cur in e.items():
             if mid not in mods and cur["present"]:
                 cur.update(present=False, change="removed", changed_at=now)
@@ -62,3 +64,11 @@ class Library:
 
     def removed(self):
         return [{"id": k, "name": v["name"]} for k, v in self.data["entries"].items() if not v["present"]]
+
+    def tag_counts(self):
+        """{tag: how many known mods have it}, from what was stored at each scan (installed or not)."""
+        out = {}
+        for v in self.data["entries"].values():
+            for t in v.get("tags") or []:
+                out[t] = out.get(t, 0) + 1
+        return dict(sorted(out.items(), key=lambda kv: (-kv[1], kv[0].lower())))

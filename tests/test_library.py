@@ -35,3 +35,21 @@ class T(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StoredTags(unittest.TestCase):
+    def test_tags_and_source_are_stored_and_counted(self):
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as d:
+            lib = Library(Path(d) / "library.json")
+            lib.merge({"ws:1": {"name": "A", "version": "1", "tags": ["Gameplay", "Balance"], "source": "workshop"},
+                       "local:B": {"name": "B", "version": "1", "tags": ["Gameplay"], "source": "local"},
+                       "local:C": {"name": "C", "version": "1", "tags": [], "source": "local"}})
+            self.assertEqual(lib.tag_counts(), {"Gameplay": 2, "Balance": 1})
+            again = Library(Path(d) / "library.json")  # kept on disk
+            self.assertEqual(again.data["entries"]["ws:1"]["tags"], ["Gameplay", "Balance"])
+            self.assertEqual(again.data["entries"]["local:B"]["source"], "local")
+            # a changed tag list replaces the old one at the next scan
+            again.merge({"ws:1": {"name": "A", "version": "1", "tags": ["Map"], "source": "workshop"}})
+            self.assertEqual(again.data["entries"]["ws:1"]["tags"], ["Map"])

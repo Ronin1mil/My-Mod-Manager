@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- **Library sorting and tags.** Sort by Name, by Workshop then Local, by Tag, or (the new default) Workshop / Local and then tag, with a heading and count for each group (mods without tags last). A tag menu lists every tag with its count and shows only the mods that have it, and each row shows its first tags. The tags are read from each mod's own descriptor or metadata at every scan and also stored in the library file; your sort choice is remembered
+
 ## 0.8.3 - colour schemes and text size, No mods on top
 - **Settings -> UI:** pick a colour scheme (Game look, Midnight, Parchment, Forest, Slate, Rose, High contrast) and a text size (Small to Extra large) for each game; "Use these for all games" copies them to the others
 - The built-in "No mods" playset is now at the top of the sidebar

@@ -193,16 +193,51 @@ function viewOrder(p) {
   }).join('') || '<div class="empty">This playset is empty.<br>Add mods from the Library tab.</div>';
 }
 
-function viewLibrary(p) {
-  const f = q.toLowerCase();
-  const list = S.mods.filter(m => !f || m.name.toLowerCase().includes(f) || (m.tags || []).some(t => t.toLowerCase().includes(f)));
-  const rem = S.removed.length ? `<div class="row static"><span class="warn">Removed since last scan:</span> ${S.removed.map(r => esc(r.name)).join(', ')}</div>` : '';
-  $('view').innerHTML = `<div class="bar"><input type="search" id="q" placeholder="Search name or tag…" value="${esc(q)}"><button id="addall">Add all shown</button><button id="modupd" title="Ask Steam which Workshop mods have a newer version">Check mod updates</button></div>${updPanel()}${rem}` +
-    (list.map(m => {
-      const inn = p.mods.includes(m.id);
-      return `<div class="row ${m.id === sel ? 'sel' : ''}"><span class="nm" data-sel="${esc(m.id)}" title="${esc(m.root)}">${esc(m.name)}</span>${badges(m)}
+// Library sorting: by name, by where the mod comes from (Workshop / Local), by its tags, or source then tag.
+// The tags come from each mod's own descriptor or metadata, read at every scan and kept in the library file.
+const SORTS = {name: 'Name', source: 'Workshop, then Local', 'source-tag': 'Workshop / Local, then tag', tag: 'Tag'};
+let libSort = 'source-tag', libTag = '';
+try { libSort = localStorage.getItem('libSort') || libSort; } catch (e) { /* storage blocked: the default is fine */ }
+if (!SORTS[libSort]) libSort = 'source-tag';
+const SRC_ORDER = {workshop: 0, local: 1};
+const SRC_NAME = {workshop: 'Workshop', local: 'Local'};
+const byName = (a, b) => a.name.localeCompare(b.name, undefined, {sensitivity: 'base'});
+const firstTag = m => ((m.tags || []).slice().sort((a, b) => a.localeCompare(b, undefined, {sensitivity: 'base'}))[0]) || '';
+function libGroups(list) {
+  // -> [{h: header text, sub: [...]|null, mods}] in display order
+  const srcKey = m => (m.source in SRC_ORDER ? m.source : 'local');
+  const cmpTag = (a, b) => (firstTag(a) === '' ? 1 : 0) - (firstTag(b) === '' ? 1 : 0) || firstTag(a).localeCompare(firstTag(b), undefined, {sensitivity: 'base'}) || byName(a, b);
+  const grp = (items, key, label, order) => {
+    const m = new Map();
+    items.forEach(x => { const k = key(x); if (!m.has(k)) m.set(k, []); m.get(k).push(x); });
+    return [...m.entries()].sort(order).map(([k, v]) => ({key: k, h: label(k), mods: v}));
+  };
+  if (libSort === 'name') return [{h: '', mods: list.slice().sort(byName)}];
+  if (libSort === 'tag') return grp(list.slice().sort(cmpTag), firstTag, k => k || 'No tags', (a, b) => (a[0] === '') - (b[0] === '') || a[0].localeCompare(b[0], undefined, {sensitivity: 'base'}));
+  const bySrc = grp(list, srcKey, k => SRC_NAME[k], (a, b) => SRC_ORDER[a[0]] - SRC_ORDER[b[0]]);
+  if (libSort === 'source') return bySrc.map(g => ({...g, mods: g.mods.sort(byName)}));
+  return bySrc.map(g => ({...g, sub: grp(g.mods.sort(cmpTag), firstTag, k => k || 'No tags', (a, b) => (a[0] === '') - (b[0] === '') || a[0].localeCompare(b[0], undefined, {sensitivity: 'base'}))}));
+}
+function libRow(m, p) {
+  const inn = p.mods.includes(m.id), tags = (m.tags || []).slice(0, 4);
+  return `<div class="row ${m.id === sel ? 'sel' : ''}"><span class="nm" data-sel="${esc(m.id)}" title="${esc(m.root)}">${esc(m.name)}</span>${tags.map(t => `<span class="tg">${esc(t)}</span>`).join('')}${badges(m)}
         <button class="sm" data-add="${esc(m.id)}" ${inn || !m.exists ? 'disabled' : ''}>${inn ? '✓ Added' : '+ Add'}</button></div>`;
-    }).join('') || `<div class="empty">No mods found.<br>${S.user_dir ? 'Drop a mod archive (.zip, .tar.gz) here to install one, or check the folders in Settings.' : esc(GNAME()) + ' user folder not found. Set it in Settings → Game folders.'}</div>`);
+}
+function viewLibrary(p) {
+  if (libTag && !(libTag in (S.tag_counts || {}))) libTag = '';   // a tag of another game
+  const f = q.toLowerCase();
+  const list = S.mods.filter(m => (!f || m.name.toLowerCase().includes(f) || (m.tags || []).some(t => t.toLowerCase().includes(f))) && (!libTag || (m.tags || []).includes(libTag)));
+  const rem = S.removed.length ? `<div class="row static"><span class="warn">Removed since last scan:</span> ${S.removed.map(r => esc(r.name)).join(', ')}</div>` : '';
+  const tagOpts = Object.entries(S.tag_counts || {}).map(([t, n]) => `<option value="${esc(t)}" ${t === libTag ? 'selected' : ''}>${esc(t)} (${n})</option>`).join('');
+  const rows = libGroups(list).map(g => (g.h ? `<div class="grp">${esc(g.h)} <span class="mut">${g.sub ? g.sub.reduce((n, s) => n + s.mods.length, 0) : g.mods.length}</span></div>` : '') +
+    (g.sub ? g.sub.map(s => `<div class="grp sub">${esc(s.h)} <span class="mut">${s.mods.length}</span></div>` + s.mods.map(m => libRow(m, p)).join('')).join('') : g.mods.map(m => libRow(m, p)).join(''))).join('');
+  $('view').innerHTML = `<div class="bar"><input type="search" id="q" placeholder="Search name or tag…" value="${esc(q)}">
+    <select id="lib-sort" title="Sort the library" aria-label="Sort">${Object.entries(SORTS).map(([k, n]) => `<option value="${k}" ${k === libSort ? 'selected' : ''}>Sort: ${n}</option>`).join('')}</select>
+    <select id="lib-tag" title="Show only mods with this tag" aria-label="Tag"><option value="">All tags</option>${tagOpts}</select>
+    <button id="addall">Add all shown</button><button id="modupd" title="Ask Steam which Workshop mods have a newer version">Check mod updates</button></div>${updPanel()}${rem}` +
+    (rows || `<div class="empty">No mods found.<br>${S.user_dir ? 'Drop a mod archive (.zip, .tar.gz) here to install one, or check the folders in Settings.' : esc(GNAME()) + ' user folder not found. Set it in Settings → Game folders.'}</div>`);
+  $('lib-sort').onchange = () => { libSort = $('lib-sort').value; try { localStorage.setItem('libSort', libSort); } catch (e) { /* only a convenience */ } viewLibrary(cur()); };
+  $('lib-tag').onchange = () => { libTag = $('lib-tag').value; viewLibrary(cur()); };
   $('modupd').onclick = guard(async () => { $('modupd').disabled = true; try { U = await api('mod-updates', {}); } finally { $('modupd').disabled = false; } viewLibrary(cur()); });
   const qi = $('q');
   qi.oninput = () => { q = qi.value; const pos = qi.selectionStart; viewLibrary(cur()); const n = $('q'); n.focus(); n.setSelectionRange(pos, pos); };

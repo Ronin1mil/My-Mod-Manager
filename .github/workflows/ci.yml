@@ -67,6 +67,7 @@ jobs:
       - run: node tests/e2e/bannerlord.mjs
       - run: node tests/e2e/erase.mjs
       - run: node tests/e2e/ui-settings.mjs
+      - run: node tests/e2e/library-sort.mjs
 
   build:
     name: Build app (${{ matrix.name }})
