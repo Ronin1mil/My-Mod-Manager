@@ -62,7 +62,7 @@ try {
 
   // a script error is written to the log file with its stack
   await page.evaluate(() => setTimeout(() => { throw new Error('test-boom'); }, 0));
-  const logfile = path.join(logs, 'ModManager-errors.log');
+  const logfile = path.join(logs, 'Mod Manager', 'ModManager-errors.log');
   for (let i = 0; i < 40 && !(fs.existsSync(logfile) && /test-boom/.test(fs.readFileSync(logfile, 'utf8'))); i++) await new Promise(r => setTimeout(r, 100));
   const txt = fs.readFileSync(logfile, 'utf8');
   assert.match(txt, /\[page\] .*test-boom/);

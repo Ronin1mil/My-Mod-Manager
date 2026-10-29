@@ -3,6 +3,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from modmanager import games, order, scan
 from modmanager.descriptor import parse_descriptor, parse_metadata
@@ -19,6 +20,50 @@ class Base(unittest.TestCase):
 
     def mods(self):
         return scan.scan_mods(self.r)
+
+
+class UnreadableFolders(Base):
+    """Windows answers some folders with an OSError instead of True/False (WinError 448 'untrusted mount point')."""
+
+    def run_with_bad_folder(self, bad):
+        real = {n: getattr(Path, n) for n in ("is_dir", "exists")}
+
+        def failing(name):
+            def fn(self_):
+                if self_.name == bad:
+                    raise OSError(448, "The path cannot be traversed because it contains an untrusted mount point", str(self_))
+                return real[name](self_)
+            return fn
+        with mock.patch.object(Path, "is_dir", failing("is_dir")), mock.patch.object(Path, "exists", failing("exists")):
+            return self.mods()
+
+    def test_one_unreadable_folder_is_skipped_not_fatal(self):
+        mkmod(self.r, "good", "Good Mod")
+        mkmod(self.r, "arcane_industrial_age", "Arcane", stub=False)
+        mkmod(self.r, "also_good", "Also Good")
+        mods = self.run_with_bad_folder("arcane_industrial_age")
+        self.assertEqual({m["name"] for m in mods.values()}, {"Good Mod", "Also Good"})
+
+    def test_a_stub_pointing_at_an_unreadable_folder_shows_as_missing(self):
+        mkmod(self.r, "arcane_industrial_age", "Arcane")  # with its .mod stub
+        mods = self.run_with_bad_folder("arcane_industrial_age")
+        self.assertEqual(len(mods), 1)
+        self.assertFalse(next(iter(mods.values()))["exists"])
+
+    def test_an_unreadable_workshop_folder_is_skipped(self):
+        ws = self.r / "ws"
+        for wid in ("111", "222"):
+            (ws / wid / ".metadata").mkdir(parents=True)
+            (ws / wid / ".metadata/metadata.json").write_text(json.dumps({"name": "W" + wid}))
+        real_is_dir = Path.is_dir
+
+        def is_dir(self_):
+            if self_.name == "111":
+                raise OSError(448, "untrusted mount point")
+            return real_is_dir(self_)
+        with mock.patch.object(Path, "is_dir", is_dir):
+            mods = scan.scan_mods(None, ws)
+        self.assertEqual(list(mods), ["ws:222"])
 
 
 class MetadataLayouts(Base):

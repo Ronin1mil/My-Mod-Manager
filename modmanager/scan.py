@@ -17,6 +17,29 @@ MAX_PER_KIND = 500
 VANILLA = "__vanilla__"  # pseudo-mod id for the base game when comparing against it
 
 
+def _isdir(p):
+    """is_dir() that says False instead of raising: Windows reports some links and mounts (WinError 448, 'untrusted
+    mount point', and similar) as errors, and one such folder must not stop the whole mod list from loading."""
+    try:
+        return Path(p).is_dir()
+    except OSError:
+        return False
+
+
+def _isfile(p):
+    try:
+        return Path(p).is_file()
+    except OSError:
+        return False
+
+
+def _exists(p):
+    try:
+        return Path(p).exists()
+    except OSError:
+        return False
+
+
 def _read(p):
     return Path(p).read_text(encoding="utf-8-sig", errors="replace")
 
@@ -24,13 +47,13 @@ def _read(p):
 def _meta_file(root):
     for rel in META_PATHS:
         f = Path(root) / rel
-        if f.is_file():
+        if _isfile(f):
             return f
     return None
 
 
 def looks_like_mod(d):
-    return _meta_file(d) is not None or (Path(d) / "descriptor.mod").is_file()
+    return _meta_file(d) is not None or _isfile(Path(d) / "descriptor.mod")
 
 
 def _load_desc(desc_file, root):
@@ -62,30 +85,46 @@ def _mod_root(desc_file, desc):
 
 
 def scan_mods(user_dir=None, workshop_dir=None):
-    """Return {mod_id: info}. mod_id is 'ws:<id>' or 'local:<name>'."""
+    """Return {mod_id: info}. mod_id is 'ws:<id>' or 'local:<name>'. An entry that cannot be read is skipped."""
     mods = {}
-    if workshop_dir and Path(workshop_dir).is_dir():
-        for d in sorted(Path(workshop_dir).iterdir()):
-            if d.is_dir() and looks_like_mod(d):
-                df = d / "descriptor.mod"
-                desc = _load_desc(df if df.is_file() else None, d)
-                mods[f"ws:{d.name}"] = _info(f"ws:{d.name}", desc, d, "workshop", d.name)
-    if user_dir and (Path(user_dir) / "mod").is_dir():
-        mod_dir = Path(user_dir) / "mod"
-        for f in sorted(mod_dir.glob("*.mod")):
-            desc = parse_descriptor(_read(f))
-            rid = desc.get("remote_file_id")
-            root = _mod_root(f, desc)
-            mid = f"ws:{rid}" if rid and f"ws:{rid}" in mods else f"local:{f.stem}"
-            if mid in mods:  # descriptor stub for a workshop mod we already found
+    if workshop_dir and _isdir(workshop_dir):
+        for d in _listdir(workshop_dir):
+            try:
+                if _isdir(d) and looks_like_mod(d):
+                    df = d / "descriptor.mod"
+                    desc = _load_desc(df if _isfile(df) else None, d)
+                    mods[f"ws:{d.name}"] = _info(f"ws:{d.name}", desc, d, "workshop", d.name)
+            except OSError:
                 continue
-            mods[mid] = _info(mid, _load_desc(f, root), root, "local", rid)
-        for d in sorted(mod_dir.iterdir()):  # bare folders with their own metadata
-            if d.is_dir() and looks_like_mod(d) and not any(m["root"] == str(d) for m in mods.values()):
-                df = d / "descriptor.mod"
-                mid = f"local:{d.name}"
-                mods.setdefault(mid, _info(mid, _load_desc(df if df.is_file() else None, d), d, "local", None))
+    if user_dir and _isdir(Path(user_dir) / "mod"):
+        mod_dir = Path(user_dir) / "mod"
+        for f in [x for x in _listdir(mod_dir) if x.suffix == ".mod"]:
+            try:
+                desc = parse_descriptor(_read(f))
+                rid = desc.get("remote_file_id")
+                root = _mod_root(f, desc)
+                mid = f"ws:{rid}" if rid and f"ws:{rid}" in mods else f"local:{f.stem}"
+                if mid in mods:  # descriptor stub for a workshop mod we already found
+                    continue
+                mods[mid] = _info(mid, _load_desc(f, root), root, "local", rid)
+            except OSError:
+                continue
+        for d in _listdir(mod_dir):  # bare folders with their own metadata
+            try:
+                if _isdir(d) and looks_like_mod(d) and not any(m["root"] == str(d) for m in mods.values()):
+                    df = d / "descriptor.mod"
+                    mid = f"local:{d.name}"
+                    mods.setdefault(mid, _info(mid, _load_desc(df if _isfile(df) else None, d), d, "local", None))
+            except OSError:
+                continue
     return mods
+
+
+def _listdir(d):
+    try:
+        return sorted(Path(d).iterdir())
+    except OSError:
+        return []
 
 
 def _info(mid, desc, root, source, remote_id):
@@ -106,7 +145,7 @@ def _info(mid, desc, root, source, remote_id):
         "source": source,
         "remote_id": remote_id,
         "root": str(root) if root else "",
-        "exists": bool(root and Path(root).exists()),
+        "exists": bool(root and _exists(root)),
     }
 
 

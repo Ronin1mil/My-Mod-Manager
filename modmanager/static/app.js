@@ -75,7 +75,7 @@ function fail(e, where) {
 function showFatal(e) {
   const b = $('banner'); if (!b) return;
   b.hidden = false; b.className = 'bad';
-  b.innerHTML = `<b>Something went wrong:</b> ${esc(e.message)}<br><span class="mut">Details were saved to <code>${esc(logFile || 'your Documents folder (ModManager-errors.log)')}</code>.</span> <button class="sm" id="bn-x">Hide</button>`;
+  b.innerHTML = `<b>Something went wrong:</b> ${esc(e.message)}<br><span class="mut">Details were saved to <code>${esc(logFile || 'your Documents folder (Mod Manager/ModManager-errors.log)')}</code>.</span> <button class="sm" id="bn-x">Hide</button>`;
   $('bn-x').onclick = () => { b.hidden = true; };
 }
 window.addEventListener('error', ev => { if (ev.error instanceof Stale) return; report(ev.message, ev.error && ev.error.stack, `${ev.filename}:${ev.lineno}`); showFatal(new Error(ev.message)); });
@@ -383,7 +383,7 @@ async function openPaths(first) {
       </div>
       <div class="card">
         <h3>Problems</h3>
-        <p class="desc">Errors are saved to <code>${esc(GI.log_file || 'Documents/ModManager-errors.log')}</code>. Send that file when reporting a bug.</p>
+        <p class="desc">Errors are saved to <code>${esc(GI.log_file || 'Documents/Mod Manager/ModManager-errors.log')}</code>. Send that file when reporting a bug.</p>
       </div>
     </section>
     </div>

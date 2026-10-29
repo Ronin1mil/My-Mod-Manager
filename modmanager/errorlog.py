@@ -1,4 +1,4 @@
-"""One plain-text error log in the user's Documents folder, so a problem can be read (and sent) without a console.
+"""One plain-text error log in its own folder inside the user's Documents (Documents/Mod Manager), so a problem can be read (and sent) without a console.
 
 Written by the server (unexpected errors, crashes) and by the web page (script errors, failed requests) through
 /api/client-error. Never raises, never grows past ~1 MB (one rotated copy), and records no mod contents or
@@ -15,10 +15,14 @@ from pathlib import Path
 from . import __version__
 
 LOG_NAME = "ModManager-errors.log"
+LOG_DIR = "Mod Manager"
+REPEAT_SECONDS = 30  # the same error again within this time is not written again (a failing page retries a lot)
 MAX_BYTES = 1024 * 1024
 MAX_ENTRY = 20000
 _lock = threading.Lock()
 _path = None
+_recent = {}
+_moved = False
 
 
 def documents_dir():
@@ -48,8 +52,24 @@ def documents_dir():
 def log_path():
     global _path
     if _path is None or os.environ.get("MODMANAGER_LOG_DIR"):
-        _path = documents_dir() / LOG_NAME
+        _path = documents_dir() / LOG_DIR / LOG_NAME
     return _path
+
+
+def _move_old_log(p):
+    """Versions up to 0.5.0 wrote the log straight into Documents: bring it into the folder once."""
+    global _moved
+    if _moved:
+        return
+    _moved = True
+    old = p.parent.parent / LOG_NAME
+    try:
+        for suffix in ("", ".1"):
+            src, dst = Path(str(old) + suffix), Path(str(p) + suffix)
+            if src.is_file() and not dst.exists():
+                os.replace(src, dst)
+    except OSError:
+        pass
 
 
 def _header():
@@ -70,7 +90,15 @@ def write(source, message, detail="", where=""):
         body = "\n".join(entry) + "\n\n"
         p = log_path()
         with _lock:
+            now = time.time()
+            key = (source, text, str(where)[:300])
+            if now - _recent.get(key, -1e9) < REPEAT_SECONDS:
+                return str(p)
+            if len(_recent) > 500:
+                _recent.clear()
+            _recent[key] = now
             p.parent.mkdir(parents=True, exist_ok=True)
+            _move_old_log(p)
             if p.is_file() and p.stat().st_size > MAX_BYTES:
                 os.replace(p, p.with_suffix(".log.1"))
             with open(p, "a", encoding="utf-8", errors="replace") as f:

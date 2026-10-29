@@ -473,6 +473,12 @@ def make_handler(hub):
             pass
 
         def _send(self, code, body, ctype="application/json", headers=()):
+            try:
+                self._send_now(code, body, ctype, headers)
+            except (ConnectionError, TimeoutError):  # the window or tab went away mid-answer: nothing to report
+                self.close_connection = True
+
+        def _send_now(self, code, body, ctype, headers):
             b = body if isinstance(body, bytes) else json.dumps(body).encode()
             self.send_response(code)
             self.send_header("Content-Type", ctype)

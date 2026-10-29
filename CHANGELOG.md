@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.1 - one unreadable folder no longer breaks loading
+- Fixed: a mod folder Windows cannot open (for example a link or mount it does not trust, WinError 448) stopped the whole game from loading; such folders are now skipped, and a mod that points at one shows as missing
+- The error log now lives in its own folder, `Documents/Mod Manager/ModManager-errors.log`; an older log in Documents is moved there
+- The same error repeated within 30 seconds is written once, and a window closed mid-answer is no longer reported as an error
+
 ## 0.5.0 - its own window
 - Opens in its own application window instead of a browser tab; closing the window quits the app. Windows and macOS use the system web view (WebView2 / WebKit) through pywebview; elsewhere an installed Edge, Chrome or Chromium is opened as a chromeless "app" window; the default browser is the last resort (`--browser` forces it)
 - The Windows app has no console window and its own icon; startup failures are shown in a message box and written to the error log

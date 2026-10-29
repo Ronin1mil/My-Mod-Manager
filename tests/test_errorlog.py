@@ -12,14 +12,34 @@ class Log(unittest.TestCase):
     def test_writes_readable_entries_and_rotates(self):
         with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {"MODMANAGER_LOG_DIR": d}):
             p = errorlog.write("page", "TypeError: boom", "at foo (app.js:1:2)", "ck3 app.js:1")
-            self.assertEqual(Path(p), Path(d) / errorlog.LOG_NAME)
+            self.assertEqual(Path(p), Path(d) / errorlog.LOG_DIR / errorlog.LOG_NAME)
             txt = Path(p).read_text(encoding="utf-8")
             for want in ("[page] TypeError: boom", "at foo (app.js:1:2)", "where: ck3 app.js:1", "Mod Manager ", "Python "):
                 self.assertIn(want, txt)
             Path(p).write_text("x" * (errorlog.MAX_BYTES + 1))
             errorlog.write("server", "second")
-            self.assertTrue(Path(d, errorlog.LOG_NAME + ".1").is_file() or Path(d, "ModManager-errors.log.1").is_file())
+            self.assertTrue(Path(d, errorlog.LOG_DIR, errorlog.LOG_NAME + ".1").is_file())
             self.assertIn("second", Path(p).read_text())
+
+    def test_old_log_in_documents_moves_into_the_folder_once(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {"MODMANAGER_LOG_DIR": d}), \
+                mock.patch.object(errorlog, "_moved", False):
+            (Path(d) / errorlog.LOG_NAME).write_text("=== old entry\n")
+            (Path(d) / (errorlog.LOG_NAME + ".1")).write_text("=== older entry\n")
+            p = Path(errorlog.write("server", "new entry"))
+            self.assertFalse((Path(d) / errorlog.LOG_NAME).exists())
+            text = p.read_text()
+            self.assertIn("old entry", text)
+            self.assertIn("new entry", text)
+            self.assertIn("older entry", Path(str(p) + ".1").read_text())
+
+    def test_the_same_error_again_within_seconds_is_written_once(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {"MODMANAGER_LOG_DIR": d}):
+            p = errorlog.write("server", "OSError: same", "tb", "/api/x/logo")
+            for _ in range(5):
+                errorlog.write("server", "OSError: same", "tb", "/api/x/logo")
+            errorlog.write("server", "OSError: same", "tb", "/api/x/state")  # another place: kept
+            self.assertEqual(Path(p).read_text().count("=== "), 2)
 
     def test_never_raises_even_when_the_folder_is_unusable(self):
         with tempfile.TemporaryDirectory() as d:
@@ -46,7 +66,7 @@ class Http(GameCase):
         self.addCleanup(p.stop)
 
     def logtext(self):
-        return (self.r / "logs" / errorlog.LOG_NAME).read_text(encoding="utf-8")
+        return (self.r / "logs" / errorlog.LOG_DIR / errorlog.LOG_NAME).read_text(encoding="utf-8")
 
     def test_page_errors_are_logged_with_their_stack_and_capped(self):
         s, res, _ = self.post("/api/client-error", {"message": "Cannot read properties of null (reading 'playsets')",
