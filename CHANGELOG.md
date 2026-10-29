@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.8.3 - colour schemes and text size, No mods on top
 - **Settings -> UI:** pick a colour scheme (Game look, Midnight, Parchment, Forest, Slate, Rose, High contrast) and a text size (Small to Extra large) for each game; "Use these for all games" copies them to the others
 - The built-in "No mods" playset is now at the top of the sidebar
 - In the load order a warning or error tag sits just left of the Workshop/Local tag, so that tag always ends the row
