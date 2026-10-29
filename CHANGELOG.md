@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- Fixed: adding several mods quickly could silently lose one (changes now queue and each builds on the previous result)
+
 ## 0.4.0 - cleaner settings
 - Settings window redesigned: side navigation (Game, Storage, Playing, Downloads, App & updates), a card per topic, larger text, toggle switches and more spacing
 - Windows installer (`Mod-Manager-Setup.exe`), MIT license, game logos always shown (downloaded once from Steam's public art if missing)

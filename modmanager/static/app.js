@@ -122,11 +122,18 @@ async function analyse() {
   if (!S || id !== S.active || !A) return;
   Object.assign(A, c, {pending: false}); render();
 }
-async function patch(fields) {
-  const p = cur(); if (!p) return;
-  Object.assign(p, await api(`playsets/${p.id}/update`, fields));
-  render(); analyse();
-  if (tab === 'compare') loadCompare();
+let patchQ = Promise.resolve();
+// Changes to the playset run one after another, each building on the answer to the previous one: a quick second click
+// must add to the first click's result, not overwrite it. `fields` may be a function of the current playset.
+function patch(fields) {
+  const run = async () => {
+    const p = cur(); if (!p) return;
+    Object.assign(p, await api(`playsets/${p.id}/update`, typeof fields === 'function' ? fields(p) : fields));
+    render(); analyse();
+    if (tab === 'compare') loadCompare();
+  };
+  patchQ = patchQ.then(run, run);
+  return patchQ;
 }
 const WARN_CODES = {missing_module: 'Mod files missing', version_mismatch: 'Game version mismatch', metadata_error: 'Damaged mod metadata',
   missing_dependency: 'Missing dependency', disabled_dependency: 'Disabled dependency', incompatible: 'Incompatible mods',
@@ -192,7 +199,7 @@ function viewLibrary(p) {
   qi.oninput = () => { q = qi.value; const pos = qi.selectionStart; viewLibrary(cur()); const n = $('q'); n.focus(); n.setSelectionRange(pos, pos); };
   $('addall').onclick = guard(async () => {
     const add = list.filter(m => m.exists && !p.mods.includes(m.id)).map(m => m.id);
-    if (add.length) await patch({mods: [...p.mods, ...add]});
+    if (add.length) await patch(q => ({mods: [...q.mods, ...add.filter(id => !q.mods.includes(id))]}));
   });
 }
 
@@ -260,11 +267,11 @@ function wireCmp() {
 document.addEventListener('click', guard(async e => {
   const t = e.target, act = t.dataset && t.dataset.cmp, p = cur(); if (!p) return;
   if (!act) return;
-  if (act === 'add') await patch({mods: [...p.mods, t.dataset.id]});
-  if (act === 'addall') await patch({mods: [...p.mods, ...C.only_b.filter(id => !p.mods.includes(id))]});
+  if (act === 'add') await patch(q => ({mods: q.mods.includes(t.dataset.id) ? q.mods : [...q.mods, t.dataset.id]}));
+  if (act === 'addall') await patch(q => ({mods: [...q.mods, ...C.only_b.filter(id => !q.mods.includes(id))]}));
   if (act === 'state') {
     const id = t.dataset.id, on = t.dataset.to === 'enabled';
-    await patch({disabled: on ? p.disabled.filter(x => x !== id) : [...p.disabled, id]});
+    await patch(q => ({disabled: on ? q.disabled.filter(x => x !== id) : [...q.disabled, id]}));
   }
   if (act === 'order') {
     const common = new Set([...C.same, ...C.moved.map(m => m.id)]);
@@ -461,8 +468,8 @@ document.addEventListener('click', guard(async e => {
   if (ds.f) { flt = ds.f; render(); }
   if (ds.sel) { sel = sel === ds.sel ? null : ds.sel; render(); }
   if (ds.close) { sel = null; render(); }
-  if (ds.add) await patch({mods: [...p.mods, ds.add]});
-  if (ds.rm) await patch({mods: p.mods.filter(x => x !== ds.rm)});
+  if (ds.add) await patch(q => ({mods: q.mods.includes(ds.add) ? q.mods : [...q.mods, ds.add]}));
+  if (ds.rm) await patch(q => ({mods: q.mods.filter(x => x !== ds.rm)}));
   if (ds.mv) {
     const [i, d] = ds.mv.split(',').map(Number), j = i + d;
     if (j >= 0 && j < p.mods.length) { const m = [...p.mods]; [m[i], m[j]] = [m[j], m[i]]; await patch({mods: m}); }
@@ -500,7 +507,7 @@ document.addEventListener('click', guard(async e => {
 }));
 document.addEventListener('change', guard(async e => {
   const t = e.target, p = cur(); if (!p) return;
-  if (t.dataset.tog) { const id = t.dataset.tog; await patch({disabled: t.checked ? p.disabled.filter(x => x !== id) : [...p.disabled, id]}); }
+  if (t.dataset.tog) { const id = t.dataset.tog; await patch(q => ({disabled: t.checked ? q.disabled.filter(x => x !== id) : [...q.disabled, id]})); }
 }));
 const view = $('view');
 view.addEventListener('dragstart', e => { const r = e.target.closest('[data-i]'); if (r) { drag = +r.dataset.i; r.classList.add('drag'); } });
