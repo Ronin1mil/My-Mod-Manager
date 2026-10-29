@@ -103,7 +103,7 @@ try {
   await page.waitForSelector('text=RICE stack (draft)');
   assert.match(await page.textContent('#view'), /unverified/);
   await page.click('[data-preset="ck3-rice-stack"]');
-  await page.waitForSelector('text=Not installed yet (5)');
+  await page.waitForSelector('text=Not installed yet (4)');
   await page.click('[data-dl=steam]');
   await page.waitForSelector('#toast.on:has-text("Opened in Steam")');
   assert.match(await page.textContent('#view'), /Set steamcmd in Settings/);   // no steamcmd configured -> no download button
