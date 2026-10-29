@@ -50,3 +50,7 @@ If the game ignores the file, use this tool for analysis, presets and sharing, a
 
 ## Changing what is assumed
 Everything above is data (`games.py`) or one function (`store.mod_entry`). When a real-install check disagrees, fix the data, update the pinned values in `tests/test_games.py` / `tests/test_store_games.py`, set `verified=True` for that game, and update this page.
+
+## Saves and versions (unverified)
+- Default: all playsets of a game share the game's own `save games` folder. A playset may opt into its own folder (a link, see `saves.py`).
+- Save-version guard: compares major.minor of the installed game (`launcher/launcher-settings.json`) with the version the saves were made on. Source 1: a `version="x.y.z"` in the newest save's first 16 KB (works only if the header is readable text; **not confirmed for any game**). Source 2: the version recorded when this app last launched with that save folder (dependable). Patch releases are ignored. A wrong header guess only costs one "Launch anyway" click; switch it off in Settings.

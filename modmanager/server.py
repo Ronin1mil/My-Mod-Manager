@@ -11,7 +11,7 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import __version__, collections, compare, detect, games as gamesmod, install, launch, order, presets, saves, scan, update
+from . import __version__, collections, compare, detect, games as gamesmod, install, launch, order, presets, saves, scan, update, updates
 from . import workshop
 from .library import Library
 from .paths import LOGO_TYPES, config_dir, find_first, find_logo, game_version, user_dirs, workshop_dirs
@@ -24,6 +24,9 @@ MAX_JSON = 1024 * 1024
 MAX_UPLOAD = 1024**3
 CSP = ("default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
        "connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+
+
+MAX_TREE, MAX_RESULT = 5000, 30000
 
 
 class TooLarge(ValueError):
@@ -123,7 +126,7 @@ class GameApp:
                 "user_dir": str(self.user_dir or ""), "workshop_dir": str(self.workshop_dir or ""),
                 "game_root": str(self.game_root or ""), "game_version": self.game_version,
                 "has_logo": bool(self.logo), "include_vanilla": s["include_vanilla"],
-                "setup_done": s["setup_done"], "steamcmd": s["steamcmd"], "steam_user": s["steam_user"],
+                "setup_done": s["setup_done"], "save_version_check": s["save_version_check"], "steamcmd": s["steamcmd"], "steam_user": s["steam_user"],
                 "setup_needed": not s["setup_done"] and not (self.game_root and self.user_dir),
                 "imported_from": d.get("imported_from", "")}
 
@@ -208,6 +211,56 @@ class GameApp:
         doc = collections.import_collection(self.game, text, post or collections.default_post)
         return presets.save_user_preset(self.game, doc)
 
+    def mod_updates(self, post=None):
+        return updates.check(self.mods, self.workshop_dir, self.game.app_id, post or collections.default_post)
+
+    def _files_of(self, mid):
+        m = self.mods.get(mid)
+        if not m or not m["exists"]:
+            return {}
+        key = (m["root"], tuple(m.get("only", ())))
+        if key not in self.files:
+            self.files[key] = scan.list_files(m["root"], m.get("only", ()))
+        return self.files[key]
+
+    def _load_order(self, pid):
+        ps = self.store.get(pid)
+        enabled = [m for m in ps["mods"] if m not in ps["disabled"] and m in self.mods]
+        return order.compute_order(self.mods, enabled, ps["auto_sort"], self.game_version)["order"]
+
+    def mod_tree(self, pid, mid):
+        """Files of one mod, each with the other enabled mods that also provide it (later in order wins)."""
+        if mid not in self.mods:
+            raise ValueError("Unknown mod.")
+        ordr = self._load_order(pid)
+        pos = {m: i for i, m in enumerate(ordr)}
+        mine = self._files_of(mid)
+        others = {}
+        for o in ordr:
+            if o != mid:
+                for rel in self._files_of(o):
+                    if rel in mine:
+                        others.setdefault(rel, []).append(o)
+        out = []
+        for rel in sorted(mine)[:MAX_TREE]:
+            oth = others.get(rel, [])
+            later = [o for o in oth if pos[o] > pos.get(mid, -1)]
+            out.append({"path": rel, "overridden_by": later[-1] if later else None,
+                        "overrides": [o for o in oth if o not in later]})
+        return {"files": out, "total": len(mine), "truncated": len(mine) > MAX_TREE}
+
+    def result_tree(self, pid):
+        """The merged file list of the whole playset: for each path, which mod supplies the winning copy."""
+        ordr = self._load_order(pid)
+        win, count = {}, {}
+        for i, m in enumerate(ordr):
+            for rel in self._files_of(m):
+                win[rel] = i
+                count[rel] = count.get(rel, 0) + 1
+        paths = sorted(win)[:MAX_RESULT]
+        return {"mods": ordr, "files": [[r, win[r], count[r]] for r in paths],
+                "total": len(win), "truncated": len(win) > MAX_RESULT}
+
     def download(self, ids, method):
         ids = workshop.clean_ids(ids)
         if method == "steam":
@@ -233,13 +286,32 @@ class GameApp:
         self.rescan()
         return {"backup": where}
 
-    def launch(self, pid, only=None):
+    def saves_location(self, pid):
+        """(folder the game will read saves from, key for the launch record)."""
+        if self.store.get(pid)["separate_saves"]:
+            d = self.cfg / "saves" / pid
+            return d, f"playset:{pid}"
+        return self.user_dir / saves.SAVES_DIR_NAME, "shared"
+
+    def check_save_version(self, pid):
+        """Raise SaveVersionWarning when the saves about to be used were made on another minor release."""
+        if not self.store.settings()["save_version_check"] or not self.game_version or not self.user_dir:
+            return
+        folder, key = self.saves_location(pid)
+        saved, source = saves.saved_on(self.cfg, key, folder)
+        a, b = saves.minor_of(saved), saves.minor_of(self.game_version)
+        if a and b and a != b:
+            raise SaveVersionWarning(a, b, source)
+
+    def launch(self, pid, only=None, ack_version=False):
         """Start the game. `only` = a subset of this playset's enabled mods to launch with (the playset itself
         is not changed); the reply says how many problems that subset has so the UI can warn."""
         ps = self.store.get(pid)
         if not self.user_dir:
             raise ValueError(f"{self.game.name} user directory not found")
         ids = self.store.export(pid, self.mods)
+        if not ack_version:
+            self.check_save_version(pid)
         problems = None
         if only is not None:
             if not isinstance(only, list) or not all(isinstance(i, str) for i in only):
@@ -256,9 +328,24 @@ class GameApp:
         saves_note = None
         if ps["separate_saves"]:
             saves_note = saves.activate(self.user_dir / saves.SAVES_DIR_NAME, self.cfg / "saves" / pid)
+        else:  # shared: all playsets use the game's normal folder, so undo a playset link left by an earlier launch
+            saves_note = saves.deactivate(self.user_dir / saves.SAVES_DIR_NAME, self.cfg / "saves")
         res = launch.start(self.game, self.game_exe, launch.validate_launch_args(ps["launch_args"]))
+        saves.record_launch(self.cfg, self.saves_location(pid)[1], self.game_version)
         return {"written": len(ids), "file": f.name, "saves": saves_note, "partial": only is not None,
                 "problems": problems, **res}
+
+
+class SaveVersionWarning(Exception):
+    """Saves were made with a different game release than the one about to start. Needs the user's OK."""
+
+    def __init__(self, saved, current, source):
+        self.info = {"code": "save_version", "saved_on": saved, "game_version": current, "source": source}
+        newer = tuple(map(int, saved.split("."))) > tuple(map(int, current.split(".")))
+        self.message = (f"Your saves were made on game version {saved} but {('an older ' if newer else 'a newer ')}"
+                        f"version ({current}) is about to start. Saves from {'newer' if newer else 'older'} versions can fail "
+                        "to load or be damaged. Back them up, or launch anyway.")
+        super().__init__(self.message)
 
 
 class Hub:
@@ -377,7 +464,7 @@ def make_handler(hub):
 
         def do_POST(self):
             parts = self.path.strip("/").split("/")
-            if parts[-1] in ("install", "update-check", "downloads", "import-collection"):
+            if parts[-1] in ("install", "update-check", "downloads", "import-collection", "mod-updates"):
                 return self._post()  # slow network/disk work must not hold the lock
             with hub.lock:
                 self._post()
@@ -394,6 +481,10 @@ def make_handler(hub):
                         return self._send(200, app.state())
                     if parts[:2] == ["api", "analyse"] and len(parts) == 3:
                         return self._send(200, app.analyse(parts[2]))
+                    if parts[:2] == ["api", "tree"] and len(parts) == 3:
+                        return self._send(200, app.result_tree(parts[2]))
+                    if parts[:2] == ["api", "tree"] and len(parts) == 4:
+                        return self._send(200, app.mod_tree(parts[2], urllib.parse.unquote(parts[3])))
                     if parts[:2] == ["api", "compare"] and len(parts) == 4:
                         return self._send(200, app.compare(parts[2], parts[3]))
                     if parts[:2] == ["api", "playsets"] and len(parts) == 4 and parts[3] == "share":
@@ -457,6 +548,8 @@ def make_handler(hub):
                     return self._send(200, app.apply_preset(parts[2]))
                 if parts == ["api", "presets", "import-collection"]:
                     return self._send(200, app.import_collection(str(b.get("url", "")), getattr(self.server, "collection_post", None)))
+                if parts == ["api", "mod-updates"]:
+                    return self._send(200, app.mod_updates(getattr(self.server, "collection_post", None)))
                 if parts == ["api", "downloads"]:
                     return self._send(200, app.download(b.get("ids"), str(b.get("method", "steam"))))
                 if len(parts) == 4 and parts[:2] == ["api", "mods"] and parts[3] == "uninstall":
@@ -486,12 +579,14 @@ def make_handler(hub):
                     if act == "save-preset":
                         return self._send(200, app.save_preset(pid, str(b.get("id", "")), str(b.get("name", ""))))
                     if act == "launch":
-                        res = app.launch(pid, b.get("only"))
+                        res = app.launch(pid, b.get("only"), b.get("ack_version") is True)
                         hub.settings.update(last_game=app.game.id)
                         return self._send(200, res)
                 self._send(404, {"error": "not found"})
             except KeyError:
                 self._send(404, {"error": "no such playset"})
+            except SaveVersionWarning as e:
+                self._send(409, {"error": e.message, **e.info})
             except TooLarge as e:
                 self.close_connection = True  # the unread body is never consumed
                 self._send(413, {"error": str(e)})

@@ -17,7 +17,7 @@ DEFAULTS = {"notes": "", "launch_args": [], "auto_sort": True, "separate_saves":
 
 # per-game settings (folders + base-game comparison); app-wide ones live in GlobalSettings
 SETTINGS_DEFAULTS = {"game_dir": "", "user_dir": "", "workshop_dir": "", "include_vanilla": True,
-                     "setup_done": False, "steamcmd": "", "steam_user": ""}
+                     "setup_done": False, "steamcmd": "", "steam_user": "", "save_version_check": True}
 GLOBAL_DEFAULTS = {"auto_update_check": False, "dismissed_update": "", "last_game": ""}
 
 

@@ -63,3 +63,5 @@ dialog input[type=text],dialog textarea{width:100%}dialog textarea{min-height:90
 .warnbox{border:1px solid var(--warn);color:var(--warn);border-radius:var(--r);padding:8px 10px;font-size:13px;margin-bottom:10px}
 .paths input[type=text]{width:100%}.paths .st{font-size:12px;margin-top:2px}
 dialog h3.sec{font:600 13px var(--serif);color:var(--acc);margin:18px 0 0;border-top:1px solid var(--line);padding-top:12px}
+
+.tree details{margin-left:14px}.tree summary{cursor:pointer;padding:2px 0}.tree .tf{margin-left:30px;font-size:13px;padding:1px 0}.tree{font-size:13px;margin-top:6px}

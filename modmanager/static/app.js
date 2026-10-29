@@ -6,7 +6,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '
 const call = async (url, b) => {
   const r = await fetch(url, b === undefined ? {} : {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(b)});
   const j = await r.json();
-  if (!r.ok) throw new Error(j.error || 'Request failed');
+  if (!r.ok) { const e = new Error(j.error || 'Request failed'); e.body = j; throw e; }
   return j;
 };
 const api = (p, b) => call(`/api/${G}/${p}`, b);   // current game
@@ -16,7 +16,36 @@ const M = id => S.mods.find(m => m.id === id);
 const cur = () => S.playsets.find(p => p.id === S.active);
 const nameOf = id => { const m = M(id); return id === '__vanilla__' ? 'Base game' : m ? m.name : id; };
 const KINDS = {file: 'File', definition: 'Definition', patch: 'Patch', replace: 'Replace path', localization: 'Localization', vanilla: 'Base game'};
-let toastT;
+let toastT, U = null, T = null, tq = '';
+function updPanel() {
+  if (!U) return '';
+  const up = U.filter(x => x.status === 'update'), unk = U.filter(x => x.status === 'unknown').length;
+  return `<div class="pre"><h3>Mod updates <span class="b ${up.length ? 'warn' : 'ok'}">${up.length ? up.length + ' available' : 'all up to date'}</span></h3>` +
+    (up.map(x => `<div class="row static"><span class="nm" style="cursor:default">${esc(x.name)}</span><span class="b">updated ${esc(new Date(x.remote * 1000).toLocaleDateString())}</span>
+      <button class="sm" data-dl1="${esc(x.remote_id)}">Open in Steam</button></div>`).join('')) +
+    (unk ? `<p class="mut">${unk} mod(s) could not be compared (no Steam record yet, or the item is hidden).</p>` : '') +
+    '<p class="mut">Steam normally downloads updates itself; open the page only if it has not.</p></div>';
+}
+// ---- file trees ----
+function mountTree(box, entries) {
+  const root = {d: {}, f: []};
+  for (const e of entries) { let n = root; const parts = e.path.split('/'); for (const part of parts.slice(0, -1)) n = n.d[part] ||= {d: {}, f: []}; n.f.push([parts[parts.length - 1], e.tag || '']); }
+  const count = n => n.f.length + Object.values(n.d).reduce((a, c) => a + count(c), 0);
+  const nodes = new Map();
+  const kids = (n, key) => Object.keys(n.d).sort().map(k => { nodes.set(key + k, n.d[k]); return `<details data-k="${esc(key + k)}"><summary>${esc(k)}/ <span class="mut">${count(n.d[k])}</span></summary></details>`; }).join('') +
+    n.f.sort((a, b) => a[0].localeCompare(b[0])).map(([nm, tag]) => `<div class="tf">${esc(nm)} ${tag}</div>`).join('');
+  box.className = 'tree'; box.innerHTML = kids(root, '');
+  box.addEventListener('toggle', e => { const d = e.target; if (d.open && !d.dataset.done) { d.dataset.done = 1; d.insertAdjacentHTML('beforeend', kids(nodes.get(d.dataset.k), d.dataset.k + '/')); } }, true);
+}
+async function loadFiles() { T = await api(`tree/${S.active}`); if (tab === 'files') render(); }
+function viewFiles() {
+  if (!T) { $('view').innerHTML = '<div class="empty">Loading…</div>'; loadFiles(); return; }
+  const f = tq.toLowerCase(), list = T.files.filter(([p]) => !f || p.toLowerCase().includes(f)).slice(0, 4000);
+  $('view').innerHTML = `<div class="bar"><input type="search" id="tq" placeholder="Filter files…" value="${esc(tq)}"></div>
+    <p class="mut">What the game sees: every file of the enabled mods in load order, tagged with the mod that wins. ${T.total} files${list.length < T.total ? ` · showing ${list.length}` : ''}${T.truncated ? ' · list cut off' : ''}. <span class="b">2×</span> = more than one mod has this file.</p><div id="ft"></div>`;
+  mountTree($('ft'), list.map(([p, w, c]) => ({path: p, tag: `<span class="mut">${esc(nameOf(T.mods[w]))}</span>${c > 1 ? ` <span class="b warn">${c}×</span>` : ''}`})));
+  const qi = $('tq'); qi.oninput = () => { tq = qi.value; const pos = qi.selectionStart; viewFiles(); const n = $('tq'); n.focus(); n.setSelectionRange(pos, pos); };
+}
 function toast(msg, bad) {
   const t = $('toast'); t.textContent = msg; t.className = 'on' + (bad ? ' bad' : '');
   clearTimeout(toastT); toastT = setTimeout(() => t.className = '', 4500);
@@ -24,6 +53,7 @@ function toast(msg, bad) {
 const guard = fn => async (...a) => { try { await fn(...a); } catch (e) { toast(e.message, true); } };
 
 async function load(rescanMsg) {
+  T = null;
   S = await api('state');
   if (!S.playsets.length) { await api('playsets', {name: 'Default'}); return load(); }
   if (!cur()) { S.active = S.playsets[0].id; await api(`playsets/${S.active}/activate`, {}); }
@@ -89,12 +119,12 @@ function render() {
   $('auto').checked = p.auto_sort;
   $('sortnow').style.display = p.auto_sort ? 'none' : '';
   const nIss = visIssues().length, nCon = A ? A.conflicts.filter(x => x.severity !== 'info' && !x.vanilla).length : 0;
-  $('tabs').innerHTML = [['order', 'Load order'], ['library', `Library (${S.mods.length})`], ['problems', `Warnings${nIss ? ` (${nIss})` : ''}`], ['conflicts', `Conflicts${nCon ? ` (${nCon})` : ''}`], ['compare', 'Compare'], ['presets', 'Presets']]
+  $('tabs').innerHTML = [['order', 'Load order'], ['library', `Library (${S.mods.length})`], ['problems', `Warnings${nIss ? ` (${nIss})` : ''}`], ['conflicts', `Conflicts${nCon ? ` (${nCon})` : ''}`], ['files', 'Files'], ['compare', 'Compare'], ['presets', 'Presets']]
     .map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('');
   const active = p.mods.length - p.disabled.length;
   $('status').innerHTML = `${esc(GNAME())}${S.game_version ? ` ${esc(S.game_version)}` : ''} · ${active} mod${active === 1 ? '' : 's'} active` +
     (errs ? ` · <span class="err">${errs} error${errs === 1 ? '' : 's'}</span>` : A && nIss ? ` · <span class="warn">${nIss} warning${nIss === 1 ? '' : 's'}</span>` : '');
-  ({order: viewOrder, library: viewLibrary, problems: viewProblems, conflicts: viewConflicts, compare: viewCompare, presets: viewPresets})[tab](p);
+  ({order: viewOrder, library: viewLibrary, problems: viewProblems, conflicts: viewConflicts, compare: viewCompare, presets: viewPresets, files: viewFiles})[tab](p);
   drawer();
 }
 
@@ -117,12 +147,13 @@ function viewLibrary(p) {
   const f = q.toLowerCase();
   const list = S.mods.filter(m => !f || m.name.toLowerCase().includes(f) || (m.tags || []).some(t => t.toLowerCase().includes(f)));
   const rem = S.removed.length ? `<div class="row static"><span class="warn">Removed since last scan:</span> ${S.removed.map(r => esc(r.name)).join(', ')}</div>` : '';
-  $('view').innerHTML = `<div class="bar"><input type="search" id="q" placeholder="Search name or tag…" value="${esc(q)}"><button id="addall">Add all shown</button></div>${rem}` +
+  $('view').innerHTML = `<div class="bar"><input type="search" id="q" placeholder="Search name or tag…" value="${esc(q)}"><button id="addall">Add all shown</button><button id="modupd" title="Ask Steam which Workshop mods have a newer version">Check mod updates</button></div>${updPanel()}${rem}` +
     (list.map(m => {
       const inn = p.mods.includes(m.id);
       return `<div class="row ${m.id === sel ? 'sel' : ''}"><span class="nm" data-sel="${esc(m.id)}" title="${esc(m.root)}">${esc(m.name)}</span>${badges(m)}
         <button class="sm" data-add="${esc(m.id)}" ${inn || !m.exists ? 'disabled' : ''}>${inn ? '✓ Added' : '+ Add'}</button></div>`;
     }).join('') || `<div class="empty">No mods found.<br>${S.user_dir ? 'Drop a mod archive (.zip, .tar.gz) here to install one, or check the folders in Settings.' : esc(GNAME()) + ' user folder not found. Set it in Settings → Game folders.'}</div>`);
+  $('modupd').onclick = guard(async () => { $('modupd').disabled = true; try { U = await api('mod-updates', {}); } finally { $('modupd').disabled = false; } viewLibrary(cur()); });
   const qi = $('q');
   qi.oninput = () => { q = qi.value; const pos = qi.selectionStart; viewLibrary(cur()); const n = $('q'); n.focus(); n.setSelectionRange(pos, pos); };
   $('addall').onclick = guard(async () => {
@@ -239,6 +270,7 @@ async function openPaths(first) {
     <label for="p-game">Game folder (paste any path inside your install)</label><input type="text" id="p-game" value="${esc(S.game_root)}"><div class="st" id="p-gst"></div>
     <label for="p-user">User folder (mods, ${esc(S.game.load_file)})</label><input type="text" id="p-user" value="${esc(S.user_dir)}">
     <label for="p-ws">Steam Workshop folder</label><input type="text" id="p-ws" value="${esc(S.workshop_dir)}"></div>
+    <label class="chk" style="color:var(--ink);margin-top:12px"><input type="checkbox" id="p-svc" ${S.save_version_check ? 'checked' : ''}> Warn before starting if the saves were made on a different game release (e.g. 1.14 → 1.15)</label>
     <label class="chk" style="color:var(--ink);margin-top:12px"><input type="checkbox" id="p-van" ${S.include_vanilla ? 'checked' : ''}> Compare mods with the base game (flags what each mod overrides)</label>
     <h3 class="sec">Downloading Workshop mods</h3>
     <div class="mut" style="font-size:12px">Optional. "Open in Steam" needs nothing. To download straight from here, give the path to <code>steamcmd</code> and the Steam account name it is already logged in with (log in once in a terminal; this app never sees or stores a password).</div>
@@ -255,7 +287,7 @@ async function openPaths(first) {
   $('p-game').oninput = () => { clearTimeout(inspectT); inspectT = setTimeout(guard(inspect), 250); };
   $('p-save').onclick = guard(async () => {
     S = await api('paths', {game_dir: $('p-game').value.trim(), user_dir: $('p-user').value.trim(), workshop_dir: $('p-ws').value.trim(),
-      include_vanilla: $('p-van').checked, steamcmd: $('p-cmd').value.trim(), steam_user: $('p-su').value.trim()});
+      include_vanilla: $('p-van').checked, save_version_check: $('p-svc').checked, steamcmd: $('p-cmd').value.trim(), steam_user: $('p-su').value.trim()});
     d.close(); await load(true);
   });
   $('s-auto').onchange = guard(async () => { GI.settings = await app('settings', {auto_update_check: $('s-auto').checked}); toast($('s-auto').checked ? 'Will check for updates on start.' : 'Automatic update checks are off.'); });
@@ -310,6 +342,7 @@ function drawer() {
     ${idx >= 0 && note ? `<h3>Why is it here?</h3><p>${esc(note.reason)}</p>` : ''}
     ${issuesOf(m.id).length ? `<h3>Issues</h3>${issuesOf(m.id).map(i => `<p class="${i.severity === 'error' ? 'err' : 'warn'}">${esc(i.message)} ${fixBtn(i)}</p>`).join('')}` : ''}
     <h3>Location</h3><p class="mut"><code>${esc(m.root || '—')}</code></p>
+    <h3>Files</h3><div id="d-files"><button class="sm" data-filesof="${esc(m.id)}">Show file tree</button></div>
     ${m.source === 'local' && m.exists ? `<p><button class="danger sm" data-uninstall="${esc(m.id)}">Uninstall (kept in backups)</button></p>` : ''}`;
 }
 
@@ -318,7 +351,7 @@ document.addEventListener('click', guard(async e => {
   const t = e.target, p = cur(), ds = t.dataset;
   const psRow = t.closest('[data-ps]');
   if (psRow) { await api(`playsets/${psRow.dataset.ps}/activate`, {}); sel = null; return load(); }
-  if (ds.tab) { tab = ds.tab; render(); if (tab === 'compare') await loadCompare(); }
+  if (ds.tab) { tab = ds.tab; render(); if (tab === 'compare') await loadCompare(); if (tab === 'files') await loadFiles(); }
   if (ds.f) { flt = ds.f; render(); }
   if (ds.sel) { sel = sel === ds.sel ? null : ds.sel; render(); }
   if (ds.close) { sel = null; render(); }
@@ -339,6 +372,12 @@ document.addEventListener('click', guard(async e => {
     lastMissing = r.missing; await api(`playsets/${r.id}/activate`, {}); await load();
     tab = 'presets'; render();
     toast(r.missing.length ? `Playset created. ${r.missing.length} mod(s) still need downloading.` : 'Playset created. Everything is installed.');
+  }
+  if (ds.dl1) await api('downloads', {ids: [ds.dl1], method: 'steam'});
+  if (ds.filesof) {
+    const r = await api(`tree/${S.active}/${encodeURIComponent(ds.filesof)}`);
+    $('d-files').innerHTML = '<div class="mut">' + r.total + ' files' + (r.truncated ? ' (first ' + r.files.length + ')' : '') + '</div><div id="d-ft"></div>';
+    mountTree($('d-ft'), r.files.map(f => ({path: f.path, tag: f.overridden_by ? `<span class="b warn">overridden by ${esc(nameOf(f.overridden_by))}</span>` : f.overrides.length ? `<span class="b ok">wins over ${f.overrides.length}</span>` : ''})));
   }
   if (ds.dl === 'rescan') { await load(true); lastMissing = lastMissing.filter(m => !S.mods.some(x => String(x.remote_id) === m.workshop_id)); render(); }
   if (ds.dl === 'steam' || ds.dl === 'steamcmd') {
@@ -408,7 +447,7 @@ $('cfg').onclick = () => {
     <label>Name</label><input type="text" id="c-name" maxlength="60" value="${esc(p.name)}">
     <label>Notes</label><textarea id="c-notes" maxlength="2000">${esc(p.notes)}</textarea>
     <label>Extra launch arguments (one per line, e.g. -debug_mode)</label><textarea id="c-args">${esc(p.launch_args.join('\n'))}</textarea>
-    <label class="chk" style="color:var(--ink)"><input type="checkbox" id="c-saves" ${p.separate_saves ? 'checked' : ''}> Separate save folder for this playset
+    <label class="chk" style="color:var(--ink)"><input type="checkbox" id="c-saves" ${p.separate_saves ? 'checked' : ''}> Own save folder for this playset (off = every playset shares the game's normal saves)
     </label><div class="mut" style="font-size:12px">Your existing "save games" folder is never deleted; it is moved aside to a backup the first time.</div>
     <div class="dlg-btns"><span><button id="c-dup">Duplicate</button> <button id="c-exp">Export</button> <button id="c-pre" title="Keep this Workshop mod list as a reusable preset">Save as preset</button> <button id="c-del" class="danger">Delete</button></span>
     <span><button id="c-cancel">Cancel</button> <button id="c-save" class="pri">Save</button></span></div>`;
@@ -488,16 +527,26 @@ $('launchpart').onclick = guard(async () => {
   $('lp-go').onclick = guard(async () => {
     const only = chosen(); if (!only.length) return toast('Tick at least one mod.');
     d.close();
-    const r = await api(`playsets/${p.id}/launch`, {only});
+    const r = await launchCall(p, {only}); if (!r) return;
     toast(`Started ${GNAME()} with ${r.written} of ${ids.length} mods.` + (r.problems ? ` ${r.problems} problem(s) in that selection.` : ''));
   });
   check(); d.showModal();
 });
 
+async function launchCall(p, body) {
+  try { return await api(`playsets/${p.id}/launch`, body); }
+  catch (e) {
+    if (e.body && e.body.code === 'save_version') {
+      if (!confirm(e.message + '\n\nLaunch anyway?')) return null;
+      return api(`playsets/${p.id}/launch`, {...body, ack_version: true});
+    }
+    throw e;
+  }
+}
 $('launch').onclick = guard(async () => {
   const p = cur(), errs = visIssues().filter(i => i.severity === 'error').length;
   if (errs && !confirm(`This playset has ${errs} error${errs === 1 ? '' : 's'} (see Warnings). Launch anyway?`)) return;
-  const r = await api(`playsets/${p.id}/launch`, {});
+  const r = await launchCall(p, {}); if (!r) return;
   toast(`Wrote ${r.written} mods to ${r.file} and started ${GNAME()}${r.via === 'steam' ? ' through Steam' : ''}.` +
     (r.saves && r.saves.startsWith('linked_after_backup') ? ' Your old save folder was kept as a backup.' : ''));
 });

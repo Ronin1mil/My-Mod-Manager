@@ -15,6 +15,10 @@ One app for Crusader Kings III, Europa Universalis V and Victoria 3, replacing `
 - Problems tab is now **Warnings**, with a gear that hides chosen kinds of warning (per game, saved in the browser)
 - **Launch part…** starts the game with only the mods you tick (dependency helper; the playset is not changed)
 - Install mods from `.tar`, `.tar.gz/.tgz`, `.tar.bz2`, `.tar.xz` as well as `.zip`, with the same safety rules (no links, scripts, traversal, bombs). `.7z`/`.rar` need non-standard-library code and are not supported
+- Saves: by default every playset shares the game's normal save folder (a playset that had its own folder is un-linked on the next launch; its saves are kept where they were). "Own save folder" stays optional per playset
+- Save-version guard: before starting, compares the game release (1.14 vs 1.15, patch releases ignored) with the one the saves were made on (read from the newest save's header when readable, otherwise the release of the last launch from this app) and asks before continuing. Setting: Settings -> warn about save versions
+- Mod update check (Library tab, button only): Steam's last-updated time vs Steam's own local record; Workshop mods only
+- Files tab: merged file tree of the playset with the winning mod per file; per-mod file tree in the details drawer showing what overrides what
 - Playsets imported (copied) from the standalone managers on first start; their share files still import; share files carry the game
 - Enable all / disable all / prune; rolling `.bak` of the playset file; damaged playset file never overwritten
 - App-wide settings split from per-game settings; `MODMANAGER_CONFIG_DIR`; `MODMANAGER_GITHUB_TOKEN`
