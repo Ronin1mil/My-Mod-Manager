@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.0 - import the playsets you already have
+The new Import menu brings in the playsets that already exist in each game's own Paradox launcher, automatically when a game opens or on demand, so you do not rebuild them by hand. You can also hide the Import button if you do not use it.
+- The launcher's database (`launcher-v2.sqlite`) is only ever read, from a temporary copy; load order, enabled/disabled state and the launcher's active playset are kept. Mods that are in a playset but not installed stay in it as "not installed" so they can be downloaded; mods that exist only on Paradox's own mod service are listed as not matched
+- Pressing Import again adds only what is new (or what you deleted here); the automatic import never brings back a playset you deleted on purpose
+- Settings → Playing has the same two switches (import automatically, show the Import button)
+- New tests build launcher databases (including an older layout and a damaged file) and drive the menu in a browser
+
 ## 0.5.1 - one unreadable folder no longer breaks loading
 Fixes a crash where one mod folder Windows could not open stopped a whole game from loading, moves the error log into its own folder, and brings a new icon. It also adds eight Steam Workshop collections as ready-made presets (four for Victoria 3, three for Crusader Kings III, one for Europa Universalis V).
 

@@ -18,7 +18,8 @@ DEFAULTS = {"notes": "", "launch_args": [], "auto_sort": True, "separate_saves":
 # per-game settings (folders + base-game comparison); app-wide ones live in GlobalSettings
 SETTINGS_DEFAULTS = {"game_dir": "", "user_dir": "", "workshop_dir": "", "include_vanilla": True,
                      "setup_done": False, "steamcmd": "", "steam_user": "", "save_version_check": True}
-GLOBAL_DEFAULTS = {"auto_update_check": False, "dismissed_update": "", "last_game": "", "fetch_logos": True}
+GLOBAL_DEFAULTS = {"auto_update_check": False, "dismissed_update": "", "last_game": "", "fetch_logos": True,
+                   "auto_import_launcher": True, "show_import_button": True}
 
 
 def _defaults():
@@ -120,6 +121,18 @@ class Store:
         self.data["active"] = self.data["active"] or pid
         self.save()
         return pid
+
+    def set_origin(self, pid, origin):
+        """Remember where a playset came from (for example 'launcher:<id>') so it is not imported twice."""
+        self.get(pid)["origin"] = str(origin)[:200]
+        seen = self.data.setdefault("launcher_seen", [])
+        if str(origin).startswith("launcher:") and origin not in seen:
+            seen.append(origin)
+            del seen[:-500]
+        self.save()
+
+    def launcher_seen(self):
+        return set(self.data.get("launcher_seen", []))
 
     def get(self, pid):
         ps = self.data["playsets"][pid]

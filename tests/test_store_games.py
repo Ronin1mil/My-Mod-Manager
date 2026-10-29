@@ -138,7 +138,8 @@ class StoreBasics(Base):
 
     def test_global_settings(self):
         g = GlobalSettings(self.r / "g.json")
-        self.assertEqual(g.get(), {"auto_update_check": False, "dismissed_update": "", "last_game": "", "fetch_logos": True})
+        self.assertEqual(g.get(), {"auto_update_check": False, "dismissed_update": "", "last_game": "", "fetch_logos": True,
+                                   "auto_import_launcher": True, "show_import_button": True})
         g.update(last_game="eu5")
         self.assertEqual(GlobalSettings(self.r / "g.json").get()["last_game"], "eu5")
         for bad in ({"x": 1}, {"auto_update_check": "y"}, {"last_game": "z" * 50}):

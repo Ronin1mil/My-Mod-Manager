@@ -13,7 +13,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from . import __version__, collections, compare, detect, games as gamesmod, install, launch, order, presets, saves, scan, update, updates
-from . import errorlog, selfupdate, workshop
+from . import errorlog, launcherdb, selfupdate, workshop
 from .library import Library
 from .paths import LOGO_TYPES, config_dir, fetch_best_logo, find_first, find_logo, game_version, user_dirs, workshop_dirs
 from .store import GlobalSettings, Store, write_load_file
@@ -39,8 +39,9 @@ class GameApp:
 
     def __init__(self, game, user_dir=None, workshop_dir=None, game_dir=None, game_version_=None, game_exe=None,
                  store=None, library=None, logo=None, detect_libraries=(), opener=None, autodetect=True,
-                 fetch_logos=False):
+                 fetch_logos=False, auto_import_launcher=False):
         self.game = game
+        self.auto_import_launcher = auto_import_launcher
         self.cfg = config_dir(game)
         self.store = store or Store(game=game)
         self.library = library or Library(game=game)
@@ -62,6 +63,8 @@ class GameApp:
             if found:  # take the first install; the UI asks the user to confirm it
                 self.store.update_settings(game_dir=found[0]["path"])
         self.apply_settings()
+        if not self.first_boot:
+            self.auto_import()
 
     # ---- paths ----
     def apply_settings(self):
@@ -124,6 +127,65 @@ class GameApp:
             if k in new:
                 self.cli[k] = None
         self.apply_settings()
+        self.auto_import()
+
+    # ---- the game's own launcher ----
+    def launcher_info(self):
+        """What the game's launcher has, for the Import menu."""
+        files = launcherdb.db_files(self.user_dir)
+        if not files:
+            return {"found": False, "db": "", "error": "", "playsets": [],
+                    "message": f"No launcher playsets found for {self.game.name} (looked for launcher-v2.sqlite in {self.user_dir or 'its user folder'})."}
+        try:
+            sets = launcherdb.read_playsets(files[0])
+        except ValueError as e:
+            return {"found": True, "db": str(files[0]), "error": str(e), "playsets": [], "message": str(e)}
+        have = {ps.get("origin") for ps in self.store.data["playsets"].values()}
+        seen = self.store.launcher_seen()
+        return {"found": True, "db": str(files[0]), "error": "", "message": "",
+                "playsets": [{"id": s["id"], "name": s["name"], "mods": len(s["mods"]), "active": s["active"],
+                              "imported": f"launcher:{s['id']}" in have, "offered": f"launcher:{s['id']}" in seen} for s in sets]}
+
+    def launcher_import(self, ids=None, only_unseen=False):
+        """Create playsets from the launcher's. Without `ids` all of them are considered; one that is already here (it
+        has the origin of that launcher playset) is skipped, so pressing the button again adds only what is new or what
+        was deleted since. `only_unseen` (the automatic import) skips every playset that was ever imported before."""
+        files = launcherdb.db_files(self.user_dir)
+        if not files:
+            return {"imported": [], "skipped": 0, "lost": []}
+        sets = launcherdb.read_playsets(files[0])
+        have = {ps.get("origin") for ps in self.store.data["playsets"].values()}
+        seen = self.store.launcher_seen()
+        was_blank = all(not ps["mods"] for ps in self.store.data["playsets"].values())
+        names = {ps["name"] for ps in self.store.data["playsets"].values()}
+        done, skipped, lost, activate = [], 0, [], None
+        for s in sets:
+            origin = f"launcher:{s['id']}"
+            if (ids is not None and s["id"] not in ids) or origin in have or (only_unseen and origin in seen):
+                skipped += 1
+                continue
+            order_, off, gone = launcherdb.convert(s, self.mods)
+            name = s["name"] if s["name"] not in names else f"{s['name']} (launcher)"
+            pid = self.store.create(name, order_, off)
+            self.store.set_origin(pid, origin)
+            names.add(name)
+            lost += [f"{s['name']}: {n}" for n in gone]
+            done.append({"id": pid, "name": name, "mods": len(order_), "missing": sum(1 for m in order_ if m not in self.mods)})
+            if s["active"]:
+                activate = pid
+        if done and was_blank and activate:
+            self.store.data["active"] = activate
+            self.store.save()
+        return {"imported": done, "skipped": skipped, "lost": lost[:50]}
+
+    def auto_import(self):
+        """When the game opens: bring in launcher playsets that were never imported (never raises)."""
+        if not self.auto_import_launcher:
+            return
+        try:
+            self.launcher_import(only_unseen=True)
+        except Exception as e:
+            errorlog.write_exception("launcher-import", e, self.game.id)
 
     def rescan(self):
         self.mods = scan.scan_mods(self.user_dir, self.workshop_dir)
@@ -421,6 +483,7 @@ class Hub:
         with self.lock:
             if game_id not in self.apps:
                 self.apps[game_id] = self.factory(self.games[game_id], fetch_logos=self.settings.get()["fetch_logos"] and os.environ.get("MODMANAGER_FETCH_LOGOS") != "0",
+                                                  auto_import_launcher=self.settings.get()["auto_import_launcher"] and os.environ.get("MODMANAGER_AUTO_IMPORT") != "0",
                                                   **self.overrides.get(game_id, {}))
             return self.apps[game_id]
 
@@ -579,6 +642,8 @@ def make_handler(hub):
                     if parts[:2] == ["api", "playsets"] and len(parts) == 4 and parts[3] == "share":
                         doc = app.store.share(parts[2], app.mods, app.game.id)
                         return self._send(200, doc)
+                    if parts == ["api", "launcher"]:
+                        return self._send(200, app.launcher_info())
                     if parts == ["api", "presets"]:
                         return self._send(200, app.list_presets())
                     if parts == ["api", "downloads"]:
@@ -632,6 +697,7 @@ def make_handler(hub):
                     return self._send(200, app.state())
                 if parts == ["api", "skip-setup"]:
                     app.store.update_settings(setup_done=True)
+                    app.auto_import()
                     return self._send(200, app.state())
                 if parts == ["api", "rescan"]:
                     app.rescan()
@@ -641,6 +707,11 @@ def make_handler(hub):
                     return self._send(200, {"id": pid})
                 if parts == ["api", "import"]:
                     return self._send(200, app.import_playset(b))
+                if parts == ["api", "launcher", "import"]:
+                    ids = b.get("ids")
+                    if ids is not None and not (isinstance(ids, list) and all(isinstance(x, str) for x in ids)):
+                        raise ValueError("'ids' must be a list of launcher playset ids.")
+                    return self._send(200, app.launcher_import(ids))
                 if parts[:2] == ["api", "presets"] and len(parts) == 4 and parts[3] == "apply":
                     return self._send(200, app.apply_preset(parts[2]))
                 if parts == ["api", "presets", "import-collection"]:

@@ -90,7 +90,7 @@ async function load(rescanMsg) {
     const d = S.diff, bits = [d.added && `${d.added} new`, d.updated && `${d.updated} updated`, d.removed && `${d.removed} removed`].filter(Boolean);
     toast(bits.length ? `Scan: ${bits.join(', ')} (${d.total} mods)` : `Scan: no changes (${d.total} mods)`);
   }
-  setLogo(G);
+  setLogo(G); showImportButton();
   document.title = GNAME() + ' Mod Manager';
   render(); analyse(); banner(); pollUpdate();
   if (S.setup_needed && !setupShown) { setupShown = true; openPaths(true); }
@@ -360,6 +360,12 @@ async function openPaths(first) {
         <label class="srow"><span class="rt"><b>Warn about save versions</b><span class="hint">Warn if the saves were made on a different game release, for example 1.14 saves with 1.15 installed</span></span><input type="checkbox" class="sw" id="p-svc" ${S.save_version_check ? 'checked' : ''}></label>
         <label class="srow"><span class="rt"><b>Compare mods with the base game</b><span class="hint">Shows what each mod overrides from the original game files</span></span><input type="checkbox" class="sw" id="p-van" ${S.include_vanilla ? 'checked' : ''}></label>
       </div>
+      <div class="card">
+        <h3>Playsets</h3>
+        <p class="desc">How playsets get into the manager. The Import menu (sidebar) does the same by hand.</p>
+        <label class="srow"><span class="rt"><b>Import launcher playsets automatically</b><span class="hint">When the game opens, bring in playsets from the game's own launcher that were never imported before</span></span><input type="checkbox" class="sw" id="s-imp-auto" ${st.auto_import_launcher ? 'checked' : ''}></label>
+        <label class="srow"><span class="rt"><b>Show the Import button</b><span class="hint">The Import button above the playset list</span></span><input type="checkbox" class="sw" id="s-imp-show" ${st.show_import_button ? 'checked' : ''}></label>
+      </div>
     </section>
     <section data-pane="dl" hidden>
       <div class="card">
@@ -394,6 +400,8 @@ async function openPaths(first) {
     d.querySelectorAll('[data-st]').forEach(b => b.classList.toggle('on', b.dataset.st === k));
     d.querySelectorAll('[data-pane]').forEach(x => { x.hidden = x.dataset.pane !== k; });
   };
+  $('s-imp-auto').onchange = guard(async () => { GI.settings = await app('settings', {auto_import_launcher: $('s-imp-auto').checked}); });
+  $('s-imp-show').onchange = guard(async () => { GI.settings = await app('settings', {show_import_button: $('s-imp-show').checked}); showImportButton(); });
   $('s-logos').onchange = guard(async () => { GI.settings = await app('settings', {fetch_logos: $('s-logos').checked}); });
   d.showModal();
   $('p-cancel').onclick = guard(async () => { if (first) { S = await api('skip-setup', {}); } d.close(); });
@@ -531,7 +539,46 @@ $('new').onclick = guard(async () => {
   const n = prompt('Playset name'); if (!n) return;
   const r = await api('playsets', {name: n}); await api(`playsets/${r.id}/activate`, {}); load();
 });
-$('imp').onclick = () => $('impf').click();
+$('imp').onclick = guard(() => openImport());
+function showImportButton() { $('imp').hidden = GI.settings.show_import_button === false; }
+// The Import menu: playsets from the game's own launcher, a file, and the two preferences.
+async function openImport() {
+  const d = $('dlg'); d.className = 'menu';
+  d.innerHTML = '<h2>Import playsets</h2><p class="mut">Loading…</p>';
+  d.showModal();
+  const g = gen; let L;
+  try { L = await api('launcher'); } catch (e) { d.close(); throw e; }
+  if (g !== gen) return d.close();
+  const st = GI.settings, fresh = L.playsets.filter(p => !p.imported);
+  const rows = L.playsets.map(p => `<label class="srow"><span class="rt"><b>${esc(p.name)}</b><span class="hint">${p.mods} mod${p.mods === 1 ? '' : 's'}${p.active ? ' · active in the launcher' : ''} · ${p.imported ? 'already here' : 'not imported yet'}</span></span>
+      <input type="checkbox" class="sw" data-lp="${esc(p.id)}" ${p.imported ? '' : 'checked'}></label>`).join('');
+  d.innerHTML = `<h2>Import playsets</h2>
+    <div class="card"><h3>From the ${esc(GNAME())} launcher</h3>
+      ${L.error ? `<p class="warn">${esc(L.error)}</p>` : !L.found ? `<p class="desc">${esc(L.message)}</p>` : L.playsets.length ? `<p class="desc">Playsets already in the game's own launcher. Switch off the ones you do not want. The launcher itself is only read, never changed.</p>${rows}` : '<p class="desc">The launcher has no playsets yet.</p>'}
+      <div class="acts"><button class="pri" id="lp-go" ${L.playsets.length ? '' : 'disabled'}>Import ${fresh.length ? fresh.length + ' new' : 'selected'}</button><span id="lp-msg" class="mut"></span></div></div>
+    <div class="card"><h3>From a file</h3><p class="desc">A playset file someone shared with you (Playset settings → Export).</p>
+      <div class="acts"><button id="lp-file">Choose a file…</button></div></div>
+    <div class="card"><h3>Preferences</h3>
+      <label class="srow"><span class="rt"><b>Import launcher playsets automatically</b><span class="hint">When the game opens, bring in launcher playsets that were never imported before. One you deleted here does not come back by itself.</span></span><input type="checkbox" class="sw" id="im-auto" ${st.auto_import_launcher ? 'checked' : ''}></label>
+      <label class="srow"><span class="rt"><b>Show this Import button</b><span class="hint">Hide it if you do not need it. You can bring it back under Settings → Playing.</span></span><input type="checkbox" class="sw" id="im-show" ${st.show_import_button ? 'checked' : ''}></label></div>
+    <div class="dlg-btns"><span></span><button id="lp-close">Close</button></div>`;
+  $('lp-close').onclick = () => d.close();
+  $('lp-file').onclick = () => { d.close(); $('impf').click(); };
+  $('im-auto').onchange = guard(async () => { GI.settings = await app('settings', {auto_import_launcher: $('im-auto').checked}); });
+  $('im-show').onchange = guard(async () => { GI.settings = await app('settings', {show_import_button: $('im-show').checked}); showImportButton(); });
+  $('lp-go').onclick = guard(async () => {
+    const ids = [...d.querySelectorAll('[data-lp]')].filter(c => c.checked).map(c => c.dataset.lp);
+    if (!ids.length) { $('lp-msg').textContent = 'Nothing is switched on.'; return; }
+    $('lp-go').disabled = true;
+    try {
+      const r = await api('launcher/import', {ids});
+      await load();
+      d.close();
+      const n = r.imported.length, miss = r.imported.reduce((a, i) => a + i.missing, 0);
+      toast(n ? `Imported ${n} playset${n === 1 ? '' : 's'}${miss ? ` (${miss} mod${miss === 1 ? '' : 's'} not installed yet)` : ''}${r.lost.length ? `; ${r.lost.length} could not be matched` : ''}.` : 'Everything selected is already here.');
+    } finally { $('lp-go').disabled = false; }
+  });
+}
 $('impf').onchange = guard(async e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
   if (f.size > 1024 * 1024) throw new Error('That file is too large to be a playset.');
