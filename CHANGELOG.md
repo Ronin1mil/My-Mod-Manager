@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.1 - fix the crash after updating
+Fixes "No module named '_sqlite3'" that appeared when an older copy (0.5.0 and earlier) updated itself to 0.7.0 or 0.8.0. If you hit it, just start the app again; it works from then on.
+- The old copy restarted the new one while still handing it its own unpacked files, which did not contain the database library the new version needs. The updater now starts the new copy with a clean environment so it unpacks its own files
+- Reading the launcher's database no longer blocks the app from starting: if the database library is ever missing the app still opens and only the import reports a readable message
+- Added tests for both
+- Added `docs/18-more-games-plan.md`: the plan for Stellaris, Imperator: Rome, Civilization VI and Cities: Skylines (not built yet)
+- macOS and Linux apps are not built for now (saved for later); releases contain the Windows app and installer
+
 ## 0.8.0 - Mount & Blade II: Bannerlord
 Mount & Blade II: Bannerlord is now a supported game next to Crusader Kings III, Europa Universalis V and Victoria 3: its modules get playsets, dependency-aware auto-sort, one-click install from an archive and a Play button that starts the game with your module list.
 - Modules are read from `<install>/Modules` and the Steam Workshop folder (SubModule.xml: required and optional dependencies, load-after rules, incompatible modules); official modules always load first

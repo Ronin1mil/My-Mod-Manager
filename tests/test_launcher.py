@@ -192,3 +192,21 @@ class Importing(GameCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WithoutSqlite(unittest.TestCase):
+    """A copy of the app whose sqlite3 cannot be loaded must still start; only reading the launcher fails, readably."""
+
+    def test_read_playsets_reports_missing_sqlite(self):
+        import sys
+        from unittest import mock
+        with mock.patch.dict(sys.modules, {"sqlite3": None}):
+            with self.assertRaises(ValueError) as cm:
+                launcherdb.read_playsets("nonexistent.sqlite")
+        self.assertIn("cannot read the launcher", str(cm.exception))
+
+    def test_module_has_no_top_level_sqlite_import(self):
+        import ast
+        tree = ast.parse(Path(launcherdb.__file__).read_text(encoding="utf-8"))
+        top = [n for n in tree.body if isinstance(n, (ast.Import, ast.ImportFrom))]
+        self.assertFalse([n for n in top if any(a.name.split(".")[0] == "sqlite3" for a in getattr(n, "names", []))])

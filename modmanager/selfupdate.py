@@ -140,9 +140,18 @@ def cleanup_old():
             pass
 
 
+def child_environment():
+    """Environment for the new copy. A one-file PyInstaller app leaves variables that tell a child of the same app to
+    reuse THIS copy's unpacked files; the new version must unpack its own (the old copy's folder lacks libraries the
+    new one needs, e.g. _sqlite3 after 0.5.0)."""
+    env = {k: v for k, v in os.environ.items() if k != "_MEIPASS2" and not k.startswith("_PYI_")}
+    env.update(MODMANAGER_RESTARTED="1", PYINSTALLER_RESET_ENVIRONMENT="1")
+    return env
+
+
 def restart(exe, argv):
     """Start the new version (it waits for this one's port) and leave."""
-    env = dict(os.environ, MODMANAGER_RESTARTED="1")
+    env = child_environment()
     flags = 0
     if sys.platform == "win32":
         flags = 0x00000008 | 0x00000200  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP

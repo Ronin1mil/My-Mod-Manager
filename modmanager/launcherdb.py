@@ -13,7 +13,6 @@ damage it or the launcher's playsets. Everything is best effort and never raises
 import os
 import re
 import shutil
-import sqlite3
 import tempfile
 from pathlib import Path
 
@@ -32,6 +31,16 @@ def db_files(user_dir):
         return sorted(found, key=lambda p: p.stat().st_mtime, reverse=True)
     except OSError:
         return []
+
+
+def _sqlite():
+    """sqlite3 is loaded when first needed, so a copy of the app without it still starts (only the import fails)."""
+    try:
+        import sqlite3
+    except ImportError as e:
+        raise ValueError(f"This copy of the app cannot read the launcher's database ({e}). Start the app again; "
+                         f"if it persists, reinstall it from the Releases page.")
+    return sqlite3
 
 
 def _columns(con, table):
@@ -66,6 +75,7 @@ def _num(v, default=0):
 def read_playsets(db_file):
     """-> list of {id, name, active, mods: [{enabled, position, steam_id, pdx_id, registry_id, dir_path, name, source}]}
     in the launcher's order. Raises ValueError with a readable message if the file cannot be read."""
+    sqlite3 = _sqlite()
     tmp = tempfile.mkdtemp(prefix="modmanager-launcher-")
     try:
         copy = Path(tmp) / "launcher.sqlite"

@@ -47,6 +47,22 @@ class Parts(unittest.TestCase):
                     su.swap(exe, new)
 
 
+class ChildEnvironment(unittest.TestCase):
+    """After an update the new copy must unpack its own files, not reuse the old copy's (a one-file PyInstaller app
+    passes its unpack folder to children through the environment; 0.5.0 -> 0.8.0 then failed with No module named _sqlite3)."""
+
+    def test_unpack_variables_are_dropped_and_reset_is_requested(self):
+        import os
+        from unittest import mock
+        with mock.patch.dict(os.environ, {"_MEIPASS2": "C:/old", "_PYI_APPLICATION_HOME_DIR": "C:/old", "_PYI_ARCHIVE_FILE": "x",
+                                          "MODMANAGER_MODE": "window", "PATH": os.environ.get("PATH", "")}):
+            env = su.child_environment()
+        self.assertFalse([k for k in env if k == "_MEIPASS2" or k.startswith("_PYI_")])
+        self.assertEqual(env["PYINSTALLER_RESET_ENVIRONMENT"], "1")
+        self.assertEqual(env["MODMANAGER_RESTARTED"], "1")
+        self.assertEqual(env["MODMANAGER_MODE"], "window")  # the window mode is kept
+
+
 class Flow(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
