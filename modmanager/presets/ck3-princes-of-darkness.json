@@ -1,0 +1,13 @@
+{
+  "format": "modmanager-preset",
+  "version": 1,
+  "id": "ck3-princes-of-darkness",
+  "game": "ck3",
+  "name": "Princes of Darkness (draft)",
+  "status": "unverified",
+  "description": "Princes of Darkness (World of Darkness / vampires). DRAFT: id confirmed by title on its Workshop page on 2026-10-29, but the page reader showed a 'removed/incompatible' notice that may be an artifact; confirm in Steam. Its changelog says to load Community Flavor Pack and Full Screen Barbershop BEFORE it. Add those yourself if you use them.",
+  "source": "https://steamcommunity.com/sharedfiles/filedetails/?id=2216659254",
+  "mods": [
+    {"workshop_id": "2216659254", "name": "Princes of Darkness"}
+  ]
+}
