@@ -2,6 +2,7 @@
 import os
 import re
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -88,7 +89,11 @@ class Instrumented(GameCase):
         self.req("GET", f"/api/conflicts/{pid}")
         self.req("GET", f"/api/analyse/{pid}?fast=1")
         self.req("GET", "/api/state")
-        text = perflog.log_path().read_text(encoding="utf-8")
+        for _ in range(100):  # the closing line is written just after the answer is sent
+            text = perflog.log_path().read_text(encoding="utf-8")
+            if re.search(r"< GET /api/vic3/state ", text):
+                break
+            time.sleep(0.02)
         for want in (r"> GET /api/vic3/state", r"< GET /api/vic3/state [\d.]+ ms status=200", r"> POST /api/vic3/playsets",
                      r"conflict scan", r"load-order check"):
             self.assertRegex(text, want)
