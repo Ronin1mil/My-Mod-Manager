@@ -30,7 +30,7 @@ const api = async (p, b) => {
   const g = gen, r = await call(`/api/${G}/${p}`, b); if (g !== gen) throw new Stale(); return r; };   // current game
 const app = (p, b) => call('/api/' + p, b);        // app-wide
 // GitHub gives times in UTC; show them in the viewer's own time zone (the date alone can be a day ahead of their calendar)
-const when = r => { const d = new Date(r.published_at || ''); return isNaN(d) ? r.published : d.toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'}); };
+const when = r => { const d = new Date(r.published_at || ''); return isNaN(d) ? r.published : d.toLocaleString([], {dateStyle: 'medium', timeStyle: 'long'}); };
 const GNAME = () => (S && S.game ? S.game.name : G);
 const M = id => S.mods.find(m => m.id === id);
 const cur = () => (S && S.playsets ? S.playsets.find(p => p.id === S.active) || (S.no_mods && S.no_mods.id === S.active ? S.no_mods : null) : null);
