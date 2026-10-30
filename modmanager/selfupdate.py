@@ -131,14 +131,22 @@ def _asset_url(a, token):
 
 
 def swap(exe, new):
-    """Put `new` in place of the running `exe`. The old file stays as <exe>.old (removed on the next start)."""
+    """Put `new` in place of the running `exe`. The old file stays as <exe>.old (removed on the next start). If an
+    earlier <exe>.old cannot be removed (it can be a program that is still running, left by an update whose restart
+    failed) the next free name .old1, .old2, ... is used instead of failing with "Access is denied"."""
     exe, new = Path(exe), Path(new)
-    old = exe.with_name(exe.name + ".old")
-    try:
-        if old.exists():
-            old.unlink()
-    except OSError:
-        pass
+    old = None
+    for suffix in (".old", *(f".old{n}" for n in range(1, 6))):
+        cand = exe.with_name(exe.name + suffix)
+        try:
+            if cand.exists():
+                cand.unlink()
+            old = cand
+            break
+        except OSError:
+            continue
+    if old is None:
+        raise PermissionError("Older copies of this app are still running. Close them (check Task Manager) and try again.")
     if sys.platform != "win32":
         os.chmod(new, 0o755)
     os.replace(exe, old)  # a running program can be renamed (not overwritten) on Windows; fine everywhere else
@@ -185,11 +193,12 @@ def can_run(path):
 def cleanup_old():
     """Remove the previous version left by an update. Called at start-up; never raises."""
     if frozen() or pyz_path():
-        try:
-            f = app_file()
-            f.with_name(f.name + ".old").unlink()
-        except OSError:
-            pass
+        f = app_file()
+        for suffix in (".old", *(f".old{n}" for n in range(1, 6))):
+            try:
+                f.with_name(f.name + suffix).unlink()
+            except OSError:
+                pass
 
 
 def child_environment():

@@ -155,6 +155,22 @@ class Flow(unittest.TestCase):
         self.assertEqual(self.exe.read_text(), "old-version")
         self.assertEqual(self.exited, [])
 
+    def test_a_locked_old_copy_does_not_stop_the_next_update(self):
+        """A leftover <exe>.old can be a program that is still running (an update whose restart failed): it cannot be
+        deleted, and the swap used to fail with "Access is denied" every time after that."""
+        (self.d / "app.old").write_text("still running")
+        real = Path.unlink
+        def locked(self_, *a, **k):
+            if self_.name == "app.old":
+                raise PermissionError(5, "Access is denied")
+            return real(self_, *a, **k)
+        u = self.updater()
+        with mock.patch.object(Path, "unlink", locked):
+            self.assertEqual(u.start(run_async=False)["status"], "restarting")
+        self.assertEqual(self.exe.read_bytes(), self.payload)
+        self.assertEqual((self.d / "app.old1").read_text(), "old-version")
+        self.assertEqual((self.d / "app.old").read_text(), "still running")   # untouched
+
     def test_the_test_build_channel_uses_its_own_check(self):
         calls = []
         nightly = self.info(latest="test build abc1234")
