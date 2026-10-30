@@ -831,6 +831,62 @@ $('cfg').onclick = () => {
   });
 };
 
+// ---- right-click menu on a playset in the list ("No mods" is built in: it has none) ----
+function closePsMenu() { const m = $('psmenu'); if (m) m.remove(); }
+document.addEventListener('contextmenu', e => {
+  const row = e.target.closest && e.target.closest('#pslist [data-ps]');
+  closePsMenu();
+  if (!row) return;
+  e.preventDefault();
+  const p = S.playsets.find(x => x.id === row.dataset.ps); if (!p) return;
+  const m = document.createElement('div');
+  m.id = 'psmenu'; m.className = 'ctx'; m.setAttribute('role', 'menu');
+  m.innerHTML = `<div class="ctx-h">${esc(p.name)}</div>
+    ${p.id === S.active ? '' : '<button data-pm="open" role="menuitem">Open</button>'}
+    <button data-pm="rename" role="menuitem">Rename…</button>
+    <button data-pm="dup" role="menuitem">Duplicate…</button>
+    <button data-pm="fav" role="menuitem">${p.favorite ? 'Remove from favourites' : 'Add to favourites'}</button>
+    <button data-pm="cfg" role="menuitem">Settings…</button>
+    <hr><button data-pm="del" class="danger" role="menuitem">Delete…</button>`;
+  document.body.appendChild(m);
+  const r = m.getBoundingClientRect();
+  m.style.left = Math.max(4, Math.min(e.clientX, innerWidth - r.width - 4)) + 'px';
+  m.style.top = Math.max(4, Math.min(e.clientY, innerHeight - r.height - 4)) + 'px';
+  m.querySelector('button').focus();
+  const open = async () => { if (p.id !== S.active) { S.active = p.id; render(); await api(`playsets/${p.id}/activate`, {}); await load(); } };
+  m.onclick = guard(async ev => {
+    const k = ev.target.dataset && ev.target.dataset.pm; if (!k) return;
+    closePsMenu();
+    if (k === 'open') { await open(); return analyse(); }
+    if (k === 'rename') {
+      const n = prompt('New name', p.name); if (!n || !n.trim() || n === p.name) return;
+      await api(`playsets/${p.id}/update`, {name: n.trim().slice(0, 60)}); return load();
+    }
+    if (k === 'dup') {
+      const n = prompt('Name for the copy', p.name + ' copy'); if (!n) return;
+      const x = await api(`playsets/${p.id}/duplicate`, {name: n}); await api(`playsets/${x.id}/activate`, {}); return load();
+    }
+    if (k === 'fav') { await api(`playsets/${p.id}/update`, {favorite: !p.favorite}); return load(); }
+    if (k === 'cfg') { await open(); return $('cfg').click(); }
+    if (k === 'del') {
+      if (!confirm(`Delete playset "${p.name}"? Mods are not touched.` + (p.separate_saves ? '\n\nIts own saves stay on disk in the app folder.' : ''))) return;
+      await api(`playsets/${p.id}/delete`, {}); toast(`Deleted "${p.name}".`); return load();
+    }
+  });
+});
+document.addEventListener('mousedown', e => { if (!e.target.closest || !e.target.closest('#psmenu')) closePsMenu(); });
+document.addEventListener('keydown', e => {
+  const m = $('psmenu'); if (!m) return;
+  if (e.key === 'Escape') { closePsMenu(); return; }
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    const b = [...m.querySelectorAll('button')], i = b.indexOf(document.activeElement);
+    b[(i + (e.key === 'ArrowDown' ? 1 : b.length - 1)) % b.length].focus(); e.preventDefault();
+  }
+});
+addEventListener('blur', closePsMenu);
+addEventListener('resize', closePsMenu);
+document.addEventListener('scroll', closePsMenu, true);
+
 document.addEventListener('click', e => { if (e.target.id === 'warn-cfg') openWarnCfg(); });
 function openWarnCfg() {
   const d = $('dlg'), h = hiddenCodes();
