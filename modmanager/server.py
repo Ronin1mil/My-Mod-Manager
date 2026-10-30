@@ -273,8 +273,8 @@ class GameApp:
 
     def start_prewarm(self):
         """Work out the conflicts of every playset in the background (only when a Hub asked for it), so a click on a
-        playset finds its answer ready. The first run after install is slow; its file parses are saved to disk, so
-        later starts only look for changes."""
+        playset finds its answer ready. Its file parses are saved to disk, so later runs only re-read changed files;
+        the comparing itself is not saved and is done again."""
         if self.prewarm_lock is None or (self._prewarm and self._prewarm.is_alive()):
             return
         self._prewarm = threading.Thread(target=self._prewarm_run, daemon=True, name=f"prewarm-{self.game.id}")
@@ -1285,14 +1285,15 @@ def make_handler(hub):
 
 def boot(hub, say=print, first=None):
     """Everything slow, done once before the window opens: read the mod folders of every game that has been used, load what
-    was read last time, and work out the conflicts of every playset. A later start finds most of it saved, so this is
-    quick; the first start with a big mod list is the long one. Progress goes to `say` (the terminal, when there is one)."""
+    was read last time, and work out the conflicts of every playset. Only the file reads are saved between starts; the
+    comparing is done again every time, so a start takes about as long as the last one (~33 s for 12 CK3 and 3 Victoria 3
+    playsets on the dev PC, most of it comparing). Progress goes to `say` (the terminal, when there is one)."""
     t0 = time.time()
     last = hub.settings.get().get("last_game")
     used = [g for g in hub.games if g == first or g == last or (config_dir() / g).is_dir()]
     if not used:
         return
-    say("Getting ready. The first start with many mods takes a while; later starts are quick.")
+    say("Getting ready: reading mods and checking every playset for conflicts.")
     for gid in used:
         name = hub.games[gid].name
         t = time.time()
