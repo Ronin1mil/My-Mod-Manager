@@ -55,30 +55,55 @@ class LoadFiles(Base):
         self.assertEqual(json.loads(f.read_text())["enabled_mods"], ["mod/A", str(self.r / "ws/123")])
         self.assertFalse((self.user / "mod/ugc_123.mod").exists())
 
-    def test_eu5_starts_with_the_active_playset_of_its_own_list_so_ours_is_put_there_and_made_active(self):
+    def _eu5_file(self):
         f = self.user / "playsets.json"
-        f.write_text(json.dumps({"x": 1, "playsets": [
-            {"name": "Mine", "isActive": True, "DLC": ["d1"], "orderedListMods": [{"path": "C:\\a\\b\\3450310\\9\\", "isEnabled": True}]},
-            {"name": "Other", "isActive": False, "orderedListMods": []}]}))
-        write_load_file(games.EU5, self.user, self.mods, ["local:A", "ws:123"])
+        f.write_text(json.dumps({"file_version": "1.0.0", "playsets": [
+            {"name": "Mine", "isAutomaticallySorted": False, "orderedListMods": [{"path": "C:/a/b/3450310/9/", "isEnabled": True}],
+             "DLC": [{"paradoxAppId": "d1", "isEnabled": True}]},
+            {"name": "Other", "isActive": True, "orderedListMods": [{"path": "C:/a/b/3450310/8/", "isEnabled": True}], "DLC": []}]}))
+        return f
+
+    def test_eu5_updates_the_game_playset_with_the_same_name_and_makes_it_the_only_active_one(self):
+        f = self._eu5_file()
+        write_load_file(games.EU5, self.user, self.mods, ["local:A", "ws:123"], "Mine")
         got = json.loads(f.read_text())
-        self.assertEqual(got["x"], 1)
-        self.assertEqual([(p["name"], p["isActive"]) for p in got["playsets"]], [("Mine", False), ("Other", False), ("Ronin Mod Manager", True)])
-        ours = got["playsets"][2]
-        self.assertEqual(ours["DLC"], ["d1"])
-        self.assertEqual([m["isEnabled"] for m in ours["orderedListMods"]], [True, True])
-        self.assertEqual([m["path"] for m in ours["orderedListMods"]],
-                         [str(self.user / "mod" / "A").replace("/", "\\") + "\\", str(self.r / "ws" / "123").replace("/", "\\") + "\\"])
-        self.assertEqual(json.loads((self.user / "playsets.json.bak").read_text())["playsets"][0]["isActive"], True)
-        write_load_file(games.EU5, self.user, self.mods, ["ws:123"])   # the next launch updates ours, no second copy
+        self.assertEqual(got["file_version"], "1.0.0")
+        self.assertEqual([p["name"] for p in got["playsets"]], ["Mine", "Other"])   # no extra playset
+        self.assertEqual([p.get("isActive") for p in got["playsets"]], [True, None])   # written the way the game writes it
+        mine = got["playsets"][0]
+        self.assertEqual(mine["DLC"], [{"paradoxAppId": "d1", "isEnabled": True}])
+        self.assertEqual(mine["isAutomaticallySorted"], False)
+        self.assertEqual(mine["orderedListMods"], [
+            {"path": str(self.user / "mod" / "A").replace("\\", "/") + "/", "isEnabled": True},
+            {"path": str(self.r / "ws" / "123").replace("\\", "/") + "/", "isEnabled": True}])
+        self.assertEqual(len(got["playsets"][1]["orderedListMods"]), 1)   # the other playset is untouched
+        self.assertTrue(json.loads((self.user / "playsets.json.bak").read_text())["playsets"][1]["isActive"])
+        write_load_file(games.EU5, self.user, self.mods, ["ws:123"], "Mine")   # again: still in place, not copied
         again = json.loads(f.read_text())["playsets"]
-        self.assertEqual([p["name"] for p in again], ["Mine", "Other", "Ronin Mod Manager"])
-        self.assertEqual(len(again[2]["orderedListMods"]), 1)
+        self.assertEqual([p["name"] for p in again], ["Mine", "Other"])
+        self.assertEqual(len(again[0]["orderedListMods"]), 1)
+
+    def test_eu5_a_playset_the_game_does_not_have_yet_is_added_with_the_settings_of_the_active_one(self):
+        f = self._eu5_file()
+        write_load_file(games.EU5, self.user, self.mods, ["local:A"], "Brand new")
+        got = json.loads(f.read_text())["playsets"]
+        self.assertEqual([p["name"] for p in got], ["Mine", "Other", "Brand new"])
+        self.assertEqual([p.get("isActive") for p in got], [None, None, True])
+        self.assertEqual(got[2]["DLC"], [])   # the DLC choice of the playset that was active
+
+    def test_eu5_backslash_paths_stay_backslash_and_no_name_uses_ours(self):
+        f = self.user / "playsets.json"
+        f.write_text(json.dumps({"playsets": [{"name": "X", "isActive": True, "orderedListMods": [{"path": "C:\\a\\b\\1\\", "isEnabled": True}]}]}))
+        write_load_file(games.EU5, self.user, self.mods, ["local:A"])
+        got = json.loads(f.read_text())["playsets"]
+        self.assertEqual([p["name"] for p in got], ["X", "Ronin Mod Manager"])
+        self.assertTrue(got[1]["orderedListMods"][0]["path"].endswith("\\A\\") or got[1]["orderedListMods"][0]["path"].endswith("A\\"))
+        self.assertNotIn("/", got[1]["orderedListMods"][0]["path"])
 
     def test_eu5_without_a_list_yet_gets_one_and_the_other_games_get_none(self):
-        write_load_file(games.EU5, self.user, self.mods, ["local:A"])
+        write_load_file(games.EU5, self.user, self.mods, ["local:A"], "Mine")
         got = json.loads((self.user / "playsets.json").read_text())["playsets"]
-        self.assertEqual([(p["name"], p["isActive"]) for p in got], [("Ronin Mod Manager", True)])
+        self.assertEqual([(p["name"], p["isActive"]) for p in got], [("Mine", True)])
         self.assertTrue(got[0]["orderedListMods"][0]["path"].endswith("A"))
         for g in (games.CK3, games.VIC3):
             u = self.r / ("u" + g.id)

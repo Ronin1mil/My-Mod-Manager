@@ -311,8 +311,9 @@ def ensure_descriptor_stub(game, user_dir, m):
     return True
 
 
-def write_load_file(game, user_dir, mods, ids):
-    """Write the game's load file (what it reads at startup), backing up the previous one."""
+def write_load_file(game, user_dir, mods, ids, name=None):
+    """Write the game's load file (what it reads at startup), backing up the previous one. `name` is the playset's name,
+    used by games that start with a playset of their own list."""
     user_dir = Path(user_dir)
     for mid in ids:
         ensure_descriptor_stub(game, user_dir, mods[mid])
@@ -330,17 +331,17 @@ def write_load_file(game, user_dir, mods, ids):
     cur.setdefault("disabled_dlcs", [])
     _atomic_write(f, json.dumps(cur, indent=2))
     if game.playsets_file:
-        write_launcher_playset(game, user_dir, mods, ids)
+        write_launcher_playset(game, user_dir, mods, ids, name)
     return f
 
 
-LAUNCH_PLAYSET = "Ronin Mod Manager"
-
-
-def write_launcher_playset(game, user_dir, mods, ids):
+def write_launcher_playset(game, user_dir, mods, ids, name=None):
     """Games that start with the active playset of their own list (EU5: <user dir>/playsets.json) ignore the load file.
-    Put the chosen mods into a playset of ours in that list and make it the active one. Everything else in the file
-    (other playsets, keys we do not know) is kept; the old file is saved as playsets.json.bak."""
+    Put the chosen mods into the playset of that list with the playset's name (a new one when there is none) and make it
+    the active one, so the app works as a front end for the game's own playsets. Everything else in the file (other
+    playsets, keys we do not know) is kept, and flags are written the way the game writes them (only the active playset
+    has `isActive`); the old file is saved as playsets.json.bak."""
+    name = (name or LAUNCH_PLAYSET).strip() or LAUNCH_PLAYSET
     f = Path(user_dir) / game.playsets_file
     data = {}
     if f.is_file():
@@ -355,22 +356,28 @@ def write_launcher_playset(game, user_dir, mods, ids):
     if not isinstance(sets, list):
         sets = []
     sets = [p for p in sets if isinstance(p, dict)]
-    mine = next((p for p in sets if p.get("name") == LAUNCH_PLAYSET), None)
+    live = [p for p in sets if not p.get("isRemoved")]
+    same = [p for p in live if p.get("name") == name]
+    mine = next((p for p in same if p.get("isActive")), same[0] if same else None)
     paths = [m.get("path") for p in sets for m in (p.get("orderedListMods") or []) if isinstance(m, dict) and isinstance(m.get("path"), str)]
     sep = "\\" if any("\\" in p for p in paths) else "/"
     trailing = bool(paths) and all(p.endswith(("/", "\\")) for p in paths)
     if mine is None:   # start from the playset in use so settings we do not know (DLC choice) carry over
-        base = next((p for p in sets if p.get("isActive") is True and not p.get("isRemoved")), None) or {}
+        base = next((p for p in live if p.get("isActive")), None) or (live[0] if live else {})
         mine = {k: v for k, v in base.items() if k not in ("name", "isActive", "orderedListMods", "id", "isRemoved")}
         sets.append(mine)
     for p in sets:
-        p["isActive"] = p is mine
-    mine["name"] = LAUNCH_PLAYSET
-    mine["isRemoved"] = False
+        p.pop("isActive", None)
+    mine["name"] = name
+    mine["isActive"] = True
+    mine.pop("isRemoved", None)
     mine["orderedListMods"] = [{"path": _launcher_path(game, user_dir, mods[mid], sep, trailing), "isEnabled": True} for mid in ids]
     data["playsets"] = sets
     _atomic_write(f, json.dumps(data, indent=2))
     return f
+
+
+LAUNCH_PLAYSET = "Ronin Mod Manager"
 
 
 def _launcher_path(game, user_dir, m, sep, trailing):

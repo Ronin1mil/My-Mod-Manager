@@ -509,7 +509,7 @@ async function openPaths(first) {
       </div>
       <div class="card">
         <h3>Problems</h3>
-        <p class="desc">Errors are saved to <code>${esc(GI.log_file || 'Documents/Ronin Mod Manager/RoninModManager-errors.log')}</code>. Send that file when reporting a bug.</p>
+        <p class="desc">Errors are saved to <code>${esc(GI.log_file || 'Documents/Ronin Mod Manager/RoninModManager-errors.log')}</code>. What the app did with this game (what it found, every Play and the files it wrote) is saved to <code>${esc(S.game_log || 'Documents/Ronin Mod Manager/RoninModManager-' + G + '.log')}</code>. Send that file when a game does not start the way the app said.</p>
       </div>
     </section>
     </div>

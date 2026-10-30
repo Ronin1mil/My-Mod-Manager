@@ -15,7 +15,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from . import APP_NAME, BUILD, __version__, collections, compare, detect, games as gamesmod, install, launch, order, presets, saves, scan, update, updates
-from . import customgames, errorlog, launcherdb, perflog, selfupdate, workshop
+from . import customgames, errorlog, gamelog, launcherdb, perflog, selfupdate, workshop
 from .library import Library
 from .paths import LOGO_TYPES, config_dir, fetch_best_logo, find_first, find_logo, game_version, user_dirs, workshop_dirs
 from .store import GlobalSettings, Store, write_load_file
@@ -77,6 +77,24 @@ class GameApp:
             self.apply_settings()
         if not self.first_boot:
             self.auto_import()
+        try:
+            self._log_start()
+        except Exception as e:   # the log is a help, never a reason for the game not to open
+            errorlog.write_exception("gamelog", e, self.game.id)
+
+    def _log_start(self):
+        by = {}
+        for m in self.mods.values():
+            by[m["source"]] = by.get(m["source"], 0) + 1
+        g = self.game
+        gamelog.log(g.id, f"{g.name} opened in the app", [
+            f"game folder: {self.game_root or 'not set'}  (version {self.game_version or 'unknown'})",
+            f"user folder: {self.user_dir or 'not found'}",
+            f"workshop folder: {self.workshop_dir or 'not found'}",
+            "mods found: " + (", ".join(f"{n} {k}" for k, n in sorted(by.items())) or "none"),
+            f"playsets in the app: {', '.join(repr(p['name']) for p in self.store.data['playsets'].values()) or 'none'}",
+            f"Play starts the game through: {'the game executable' if self.game_exe else 'Steam'}",
+            *(["the game's own files:"] + ["  " + l for l in gamelog.snapshot(g, self.user_dir)] if g.kind == "paradox" else [])])
 
     # ---- paths ----
     def apply_settings(self):
@@ -367,7 +385,7 @@ class GameApp:
                 "playsets": list(d["playsets"].values()), "no_mods": self.store.no_mods(), "fav_mods": list(self.store.data.get("fav_mods", [])), "active": d["active"],
                 "user_dir": str(self.user_dir or ""), "workshop_dir": str(self.workshop_dir or ""),
                 "game_root": str(self.game_root or ""), "game_version": self.game_version,
-                "has_logo": bool(self.logo), "logo_pending": self.logo_pending, "include_vanilla": s["include_vanilla"],
+                "game_log": str(gamelog.log_path(self.game.id)), "has_logo": bool(self.logo), "logo_pending": self.logo_pending, "include_vanilla": s["include_vanilla"],
                 "ui_scheme": s["ui_scheme"], "ui_text": s["ui_text"], "setup_done": s["setup_done"], "save_version_check": s["save_version_check"], "steamcmd": s["steamcmd"], "steam_user": s["steam_user"],
                 "setup_needed": not s["setup_done"] and not (self.game_root and self.user_dir)}
 
@@ -638,7 +656,11 @@ class GameApp:
         if not modules:
             raise ValueError("Nothing to launch: no module in this playset can be found.")
         args = [*self.game.launch_prefix, module_list_argument(modules), *launch.validate_launch_args(ps["launch_args"])]
+        gamelog.log(self.game.id, f"PLAY: playset {ps['name']!r}, {len(modules)} modules", [
+            f"{i}. {mid}  {self.mods[mid]['name']!r}  {self.mods[mid]['root']}" for i, mid in enumerate(ids, 1) if mid in self.mods
+        ] + [f"start: {exe} {' '.join(args)}"])
         res = launch.start(self.game, str(exe), args)
+        gamelog.log(self.game.id, f"started the game: {res}")
         return {"written": len(modules), "file": "command line", "saves": None, "partial": only is not None,
                 "problems": problems, "modules": modules, **res}
 
@@ -653,14 +675,26 @@ class GameApp:
         if not ack_version:
             self.check_save_version(pid)
         ids, problems = self._chosen(pid, only)
-        with perflog.timed(f"{self.game.id}: write load file", mods=len(ids)):
-            f = write_load_file(self.game, self.user_dir, self.mods, ids)
-        saves_note = None
-        if ps["separate_saves"]:
-            saves_note = saves.activate(self.user_dir / saves.SAVES_DIR_NAME, self.cfg / "saves" / pid)
-        else:  # shared: all playsets use the game's normal folder, so undo a playset link left by an earlier launch
-            saves_note = saves.deactivate(self.user_dir / saves.SAVES_DIR_NAME, self.cfg / "saves")
-        res = launch.start(self.game, self.game_exe, launch.validate_launch_args(ps["launch_args"]))
+        gid = self.game.id
+        gamelog.log(gid, f"PLAY: playset {ps['name']!r} ({pid}), {len(ids)} enabled mods" + (" (a chosen part of it)" if only is not None else ""), [
+            f"{i}. {mid}  {self.mods[mid]['name']!r}  [{self.mods[mid]['source']}]  {self.mods[mid]['root']}" for i, mid in enumerate(ids, 1)])
+        gamelog.log(gid, "before writing, the game's files say", gamelog.snapshot(self.game, self.user_dir))
+        try:
+            with perflog.timed(f"{gid}: write load file", mods=len(ids)):
+                f = write_load_file(self.game, self.user_dir, self.mods, ids, ps["name"])
+            gamelog.log(gid, f"wrote {f.name}" + (f" and {self.game.playsets_file} (playset {ps['name']!r} made the active one)" if self.game.playsets_file else ""),
+                        gamelog.snapshot(self.game, self.user_dir))
+            saves_note = None
+            if ps["separate_saves"]:
+                saves_note = saves.activate(self.user_dir / saves.SAVES_DIR_NAME, self.cfg / "saves" / pid)
+            else:  # shared: all playsets use the game's normal folder, so undo a playset link left by an earlier launch
+                saves_note = saves.deactivate(self.user_dir / saves.SAVES_DIR_NAME, self.cfg / "saves")
+            res = launch.start(self.game, self.game_exe, launch.validate_launch_args(ps["launch_args"]))
+        except Exception as e:
+            gamelog.log(gid, f"PLAY FAILED: {type(e).__name__}: {e}")
+            raise
+        gamelog.log(gid, f"started the game: {res}; saves: {saves_note or 'shared'}")
+        gamelog.follow_up(self.game, self.user_dir)
         saves.record_launch(self.cfg, self.saves_location(pid)[1], self.game_version)
         return {"written": len(ids), "file": f.name, "saves": saves_note, "partial": only is not None,
                 "problems": problems, **res}

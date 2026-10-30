@@ -31,7 +31,7 @@ Legend: **[known]** documented or confirmed by the working standalone managers' 
 | Steam app id | 3450310 |
 | Install marker | `game/in_game` |
 | Definition folders | `common/` anywhere in the first two path levels (`in_game/common/...`); events are not scanned |
-| Active playset | `<user dir>/playsets.json` (`{"playsets":[{name,isActive,orderedListMods:[{path,isEnabled}],DLC}]}`): the game starts with the playset marked `isActive`. Play writes a playset called `Ronin Mod Manager` there and makes it active (backup `playsets.json.bak`) **[verify on a real install]** |
+| Active playset | `<user dir>/playsets.json` (`{"playsets":[{name,isActive,orderedListMods:[{path,isEnabled}],DLC}]}`): the game starts with the playset marked `isActive`. Play writes the mods into the playset there with the same name as the app's playset (adds one if missing) and makes it the only one with `isActive` (backup `playsets.json.bak`) **[verify on a real install]** |
 | Load file | `<user dir>/dlc_load.json` with `"enabled_mods": ["mod/<folder>", "<workshop path>"]` (folder for local, absolute Workshop folder for Workshop) **[assumed]**; the previous standalone manager could not confirm EU5 reads load order from this file **[verify]** |
 | Base game | `in_game`, `main_menu`, `loading_screen` under `game/` |
 | Metadata | `metadata.json` in `.metadata/` or `metadata/` **[assumed]** |
