@@ -610,13 +610,27 @@ async function openPaths(first) {
 }
 
 // ---- presets ----
+// "Open in Steam" goes through the missing mods one at a time: open one page, Subscribe there, then Next.
+let steamQ = null;   // {list: [{workshop_id, name}], i: index of the page opened last}
+function steamStepHtml() {
+  if (!steamQ) return '';
+  const {list, i} = steamQ, m = list[i], last = i >= list.length - 1;
+  return `<div class="steam-step"><b>${i + 1} of ${list.length}:</b> ${esc(m.name)} <span class="mut">#${esc(m.workshop_id)}</span> is open in Steam. Press Subscribe there, then
+    ${last ? '' : `<button data-dl="steam-next" class="pri">Next mod →</button>`}
+    <button data-dl="steam-again">Open it again</button> <button data-dl="steam-stop">${last ? 'Done' : 'Stop'}</button>
+    ${last ? '<div>That was the last one. Press <b>Rescan</b> once Steam has finished downloading.</div>' : ''}</div>`;
+}
+async function steamOpen() {
+  const el = $('dlstat'); if (el) el.innerHTML = steamStepHtml();   // show the step at once; Steam can take a moment
+  await api('downloads', {ids: [steamQ.list[steamQ.i].workshop_id], method: 'steam'});
+}
 async function loadPresets() { P = await api('presets'); if (tab === 'presets') render(); }
 function viewPresets() {
   if (!P) { $('view').innerHTML = '<div class="empty">Loading…</div>'; loadPresets(); return; }
   const miss = lastMissing.length ? `<div class="pre"><h3>Not installed yet (${lastMissing.length})</h3>
     <p>${lastMissing.map(m => `${esc(m.name)} <span class="mut">#${esc(m.workshop_id)}</span>`).join('<br>')}</p>
-    <div class="acts"><button data-dl="steam">Open in Steam…</button>${S.steamcmd && S.steam_user ? '<button data-dl="steamcmd" class="pri">Download with steamcmd</button>' : `<span class="mut">Set steamcmd in Settings to download from here (<a href="${STEAMCMD_URL}" target="_blank" rel="noopener noreferrer">get steamcmd</a>).</span>`}
-    <button data-dl="rescan">Rescan</button></div><div id="dlstat" class="mut"></div></div>` : '';
+    <div class="acts"><button data-dl="steam" title="Opens the first missing mod's Steam page; Next opens the one after it">Open in Steam, one by one…</button>${S.steamcmd && S.steam_user ? '<button data-dl="steamcmd" class="pri">Download with steamcmd</button>' : `<span class="mut">Set steamcmd in Settings to download from here (<a href="${STEAMCMD_URL}" target="_blank" rel="noopener noreferrer">get steamcmd</a>).</span>`}
+    <button data-dl="rescan">Rescan</button></div><div id="dlstat" class="mut">${steamStepHtml()}</div></div>` : '';
   const imp = `<div class="pre"><h3>Import a Workshop collection</h3><p class="mut">Paste a Steam Workshop collection link. Only the list of mods is fetched from Steam (nothing is downloaded) and saved as a preset.</p>
     <div class="acts"><input id="col-url" placeholder="https://steamcommunity.com/sharedfiles/filedetails/?id=…" style="flex:1;min-width:0"><button id="col-go" class="pri">Import</button></div></div>`;
   $('view').innerHTML = imp + miss + (P.map(x => `<div class="pre"><h3>${esc(x.name)} ${x.status === 'verified' ? '<span class="b ok">verified</span>' : '<span class="b warn">unverified</span>'} <span class="b">${x.installed}/${x.total} installed</span></h3>
@@ -679,7 +693,7 @@ document.addEventListener('click', guard(async e => {
   }
   if (ds.preset) {
     const r = await api(`presets/${ds.preset}/apply`, {});
-    lastMissing = r.missing; await api(`playsets/${r.id}/activate`, {}); await load();
+    lastMissing = r.missing; steamQ = null; await api(`playsets/${r.id}/activate`, {}); await load();
     tab = 'presets'; render();
     toast(r.missing.length ? `Playset created. ${r.missing.length} mod(s) still need downloading.` : 'Playset created. Everything is installed.');
   }
@@ -690,11 +704,11 @@ document.addEventListener('click', guard(async e => {
     mountTree($('d-ft'), r.files.map(f => ({path: f.path, tag: f.overridden_by ? `<span class="b warn">overridden by ${esc(nameOf(f.overridden_by))}</span>` : f.overrides.length ? `<span class="b ok">wins over ${f.overrides.length}</span>` : ''})));
   }
   if (ds.dl === 'rescan') { await load(await api('rescan', {})); lastMissing = lastMissing.filter(m => !S.mods.some(x => String(x.remote_id) === m.workshop_id)); render(); }
-  if (ds.dl === 'steam' || ds.dl === 'steamcmd') {
-    const r = await api('downloads', {ids: lastMissing.map(m => m.workshop_id), method: ds.dl});
-    if (ds.dl === 'steam') toast('Opened in Steam. Press Subscribe on each, then Rescan once Steam has finished.');
-    else pollDownload(r.job.id);
-  }
+  if (ds.dl === 'steam') { steamQ = {list: lastMissing.slice(), i: 0}; await steamOpen(); }
+  if (ds.dl === 'steam-next' && steamQ) { steamQ.i = Math.min(steamQ.i + 1, steamQ.list.length - 1); await steamOpen(); }
+  if (ds.dl === 'steam-again' && steamQ) await steamOpen();
+  if (ds.dl === 'steam-stop') { steamQ = null; const el = $('dlstat'); if (el) el.innerHTML = ''; }
+  if (ds.dl === 'steamcmd') { steamQ = null; pollDownload((await api('downloads', {ids: lastMissing.map(m => m.workshop_id), method: 'steamcmd'})).job.id); }
   if (ds.fix === 'enable') { Object.assign(p, await api(`playsets/${p.id}/enable`, {id: ds.id})); render(); analyse(); }
   if (ds.fix === 'autosort') { Object.assign(p, await api(`playsets/${p.id}/autosort`, {})); render(); analyse(); }
   if (ds.uninstall && confirm(`Uninstall "${nameOf(ds.uninstall)}"? Its files are moved to the backups folder, not deleted.`)) {
@@ -1011,7 +1025,7 @@ function setLogo(id) {
   img.onerror = () => { if (logoTry++ < 2 && box.dataset.k === id) setTimeout(() => { if (box.dataset.k === id) img.src = `/api/${encodeURIComponent(id)}/logo?r=${logoTry}`; }, 1500); };
 }
 async function useGame(id, first) {
-  gen++; G = id; S = A = C = P = null; sel = null; tab = 'order'; cmpWith = null; lastMissing = []; setupShown = false;
+  gen++; G = id; S = A = C = P = null; sel = null; tab = 'order'; cmpWith = null; lastMissing = []; steamQ = null; setupShown = false;
   try { localStorage.setItem('mm-game', id); } catch (e) { /* storage may be blocked */ }
   if (location.hash.slice(1) !== id) history.replaceState(null, '', '#' + id);
   const g = GI.games.find(x => x.id === id);
