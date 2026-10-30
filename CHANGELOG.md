@@ -1,7 +1,14 @@
 # Changelog
 
 ## 0.9.1 - Fast switching between big playsets
-Clicking between playsets with many mods is now instant after the first time, and the window no longer seems to ignore clicks. Still the Python edition only: install it as described under 0.9.0 below, or let a 0.9.0 copy update itself.
+Clicking between playsets with many mods is now instant after the first time, and the window no longer seems to ignore clicks.
+
+**How to install (Python edition only, no exe)**
+- You need Windows 10 or 11, **Python 3.8 or newer** from python.org (keep "py launcher" ticked; check with `py --version` in PowerShell) and Edge or Chrome. Nothing else
+- Download **`Mod-Manager-python.pyzw`** below and double-click it, or run `py Mod-Manager-python.pyzw`. Your playsets and settings are kept
+- Already on 0.9.0? Use **Check for updates** in the app: it updates itself
+
+**What changed**
 
 - Clicking a playset shows it at once. Before, every click read every file of every mod again, and slow scans from earlier clicks piled up behind each other until the window seemed to ignore clicks
 - The file/definition conflicts of each playset are kept: going back to a playset you already opened is instant
