@@ -117,6 +117,14 @@ _LOGIN_ERRORS = ("cached credentials not found", "login failure", "invalid passw
                  "account logon denied", "password:")
 
 
+def failure_line(out):
+    """The line that says why steamcmd failed: its last 'ERROR'/'failed' line, not the shutdown noise it prints after
+    it (e.g. 'CWorkThreadPool::~CWorkThreadPool: work processing queue not empty')."""
+    lines = [ln.strip() for ln in out.splitlines() if ln.strip()]
+    why = [ln for ln in lines if "error" in ln.lower() or "failed" in ln.lower()]
+    return ((why or lines or ["steamcmd failed"])[-1])[:200]
+
+
 def _needs_login(out):
     o = out.lower()
     return any(e in o for e in _LOGIN_ERRORS)
@@ -170,7 +178,7 @@ class Downloads:
                 out = (r.stdout or "") + (r.stderr or "")
                 ok = r.returncode == 0 and "Success" in out and (Path(job["dir"]) / wid).is_dir()
                 it["state"] = "done" if ok else "failed"
-                it["message"] = "" if ok else (out.strip().splitlines() or ["steamcmd failed"])[-1][:200]
+                it["message"] = "" if ok else failure_line(out)
                 if not ok and _needs_login(out):   # every other item would fail the same way: stop and say what to do
                     msg = login_help(exe, user)
                     for rest in job["items"].values():

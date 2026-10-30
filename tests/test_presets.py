@@ -199,6 +199,13 @@ class Downloads(unittest.TestCase):
         self.assertIn("not logged in", msg)
         self.assertNotIn("password=", msg.lower())
 
+    def test_the_reason_is_reported_not_steamcmds_shutdown_noise(self):
+        out = ("Downloading item 3627110143 ...\nERROR! Download item 3627110143 failed (Timeout).\n"
+               "CWorkThreadPool::~CWorkThreadPool: work processing queue not empty: 2 items discarded.\n")
+        self.assertEqual(workshop.failure_line(out), "ERROR! Download item 3627110143 failed (Timeout).")
+        self.assertEqual(workshop.failure_line("just one line\n"), "just one line")
+        self.assertEqual(workshop.failure_line(""), "steamcmd failed")
+
     def test_missing_binary_and_timeouts_become_item_failures(self):
         for exc in (OSError("cannot execute"), subprocess.TimeoutExpired("x", 1)):
             dl = workshop.Downloads(games.CK3, mock.Mock(side_effect=exc))
