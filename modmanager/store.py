@@ -1,5 +1,6 @@
 """Playset persistence (JSON), sharing, and export to the game's load file (dlc_load.json / content_load.json)."""
 import json
+import os
 import shutil
 import time
 import uuid
@@ -288,7 +289,9 @@ class GlobalSettings:
 
 def mod_entry(game, m):
     """How the game's load file names a mod. 'descriptor' games list mod/<x>.mod stubs; 'path' games list the
-    mod folder (local) or its Workshop folder."""
+    mod folder (local) or its Workshop folder; 'enabled_paths' games list {"path": <absolute folder>} for both."""
+    if game.load_style == "enabled_paths":
+        return {"path": os.path.normpath(m["root"])}
     if game.load_style == "path":
         return f"mod/{Path(m['root']).name}" if m["source"] == "local" else m["root"]
     if m["source"] == "workshop" or (m["remote_id"] and m["id"].startswith("ws:")):
@@ -327,8 +330,13 @@ def write_load_file(game, user_dir, mods, ids, name=None):
         if not isinstance(cur, dict):
             cur = {}
         shutil.copy2(f, f.with_suffix(".json.bak"))
-    cur["enabled_mods"] = [mod_entry(game, mods[mid]) for mid in ids]
-    cur.setdefault("disabled_dlcs", [])
+    if game.load_style == "enabled_paths":
+        cur["enabledMods"] = [mod_entry(game, mods[mid]) for mid in ids]
+        cur.setdefault("enabledUGC", [])
+        cur.setdefault("disabledDLC", [])
+    else:
+        cur["enabled_mods"] = [mod_entry(game, mods[mid]) for mid in ids]
+        cur.setdefault("disabled_dlcs", [])
     _atomic_write(f, json.dumps(cur, indent=2))
     if game.playsets_file:
         write_launcher_playset(game, user_dir, mods, ids, name)

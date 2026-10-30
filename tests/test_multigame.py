@@ -1,6 +1,7 @@
 """The same user-visible behaviour, for every game, through one running server."""
 import http.client
 import json
+import os
 import unittest
 import urllib.parse
 from pathlib import Path
@@ -54,11 +55,16 @@ class AllGames(GameCase):
                 s, res, _ = self.post(f"/api/playsets/{pid}/launch", game=g)
             self.assertEqual((s, res["written"], res["file"], res["via"]), (200, 3, g.load_file, "steam"))
             op.assert_called_once_with(f"steam://run/{g.app_id}")
-            enabled = json.loads((self.user(g) / g.load_file).read_text())["enabled_mods"]
-            if g.load_style == "descriptor":
-                self.assertEqual(enabled, ["mod/lib.mod", "mod/ugc_123.mod", "mod/a.mod"])
+            written = json.loads((self.user(g) / g.load_file).read_text())
+            if g.load_style == "enabled_paths":
+                self.assertEqual(written["enabledMods"], [{"path": os.path.normpath(p)} for p in (
+                    self.user(g) / "mod/lib", self.ws(g) / "123", self.user(g) / "mod/a")])
+                self.assertNotIn("enabled_mods", written)
+                self.assertFalse((self.user(g) / "mod/ugc_123.mod").exists())
+            elif g.load_style == "descriptor":
+                self.assertEqual(written["enabled_mods"], ["mod/lib.mod", "mod/ugc_123.mod", "mod/a.mod"])
             else:
-                self.assertEqual(enabled, ["mod/lib", str(self.ws(g) / "123"), "mod/a"])
+                self.assertEqual(written["enabled_mods"], ["mod/lib", str(self.ws(g) / "123"), "mod/a"])
             for other in ALL:  # nothing written for the other games
                 if other.id != g.id and other.load_file != g.load_file:
                     self.assertFalse((self.user(g) / other.load_file).exists())

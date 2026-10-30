@@ -320,12 +320,12 @@ class BuiltInNoMods(GameCase):
         mkmod(self.user(), "A", "A")
         first = self.new_playset(["local:A"])
         self.post(f"/api/playsets/{first}/launch", {"ack_version": True})
-        self.assertIn("mod/A.mod", (self.user() / "content_load.json").read_text(encoding="utf-8"))
+        self.assertEqual([Path(e["path"]).name for e in json.loads((self.user() / "content_load.json").read_text(encoding="utf-8"))["enabledMods"]], ["A"])
         self.assertEqual(self.post("/api/playsets/nomods/activate")[0], 200)
         self.assertEqual(self.req("GET", "/api/state")[1]["active"], "nomods")
         st, r, _ = self.post("/api/playsets/nomods/launch", {"ack_version": True})
         self.assertEqual(st, 200, r)
-        self.assertEqual(json.loads((self.user() / "content_load.json").read_text(encoding="utf-8"))["enabled_mods"], [])
+        self.assertEqual(json.loads((self.user() / "content_load.json").read_text(encoding="utf-8"))["enabledMods"], [])
 
     def test_it_cannot_be_changed_or_deleted(self):
         for act, body in (("update", {"name": "x"}), ("update", {"mods": ["local:A"]}), ("delete", {})):

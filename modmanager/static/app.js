@@ -972,7 +972,7 @@ const GAME_FORM = [   // [key, label, hint, only for kind]
   ['install_marker', 'Folder that proves it is the game', 'A folder inside the install, for example "common" or "game/common". Used to recognise the install when you point to it.'],
   ['content_dir', 'Base content folder', 'Where the game\'s own files live inside the install: "game" for most Paradox games, empty if they are straight in the install folder.'],
   ['load_file', 'Mod list file', 'The file in the Documents folder the game reads its mods from, usually dlc_load.json.', 'paradox'],
-  ['load_style', 'How mods are listed', '"descriptor" = mod/ugc_<id>.mod files; "path" = folder paths in the list.', 'paradox'],
+  ['load_style', 'How mods are listed', '"descriptor" = mod/ugc_<id>.mod files; "path" = folder paths in the list; "enabled_paths" = {"path": folder} entries under enabledMods (Victoria 3).', 'paradox'],
   ['def_dirs', 'Folders to check for conflicts', 'Script folders inside a mod where two mods can clash, comma separated.', 'paradox'],
   ['vanilla_only', 'Base game folders to compare', 'Optional. Only these folders of the base game are compared with mods (comma separated). Empty = all.', 'paradox'],
   ['seed_mods', 'Modules every playset starts with', 'Comma separated module ids.', 'modules'],

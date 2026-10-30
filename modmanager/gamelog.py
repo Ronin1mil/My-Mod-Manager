@@ -98,7 +98,7 @@ def _snapshot(game, user_dir):
                     out.append(f"  active playset {p.get('name')!r}, in order:")
                     out += [f"    {'+' if m.get('isEnabled', True) else '-'} {m.get('path')}" for m in p.get("orderedListMods") or [] if isinstance(m, dict)]
         else:
-            mods = data.get("enabled_mods")
+            mods = data.get("enabledMods" if game.load_style == "enabled_paths" else "enabled_mods")
             out.append(f"{name}: written {when}, {len(mods) if isinstance(mods, list) else '?'} mods enabled")
     out += recent_files(d)
     return out

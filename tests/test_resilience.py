@@ -89,7 +89,7 @@ class Unreadable(unittest.TestCase):
                 with mock.patch("modmanager.launch.start", return_value={"via": "exe"}):  # no real game here
                     res = a.launch(pid)  # writes the load file from the mods that can be read
                 data = json.loads((self.user / games.VIC3.load_file).read_text())
-                self.assertEqual(res["written"], len(data["enabled_mods"]))
+                self.assertEqual(res["written"], len(data["enabledMods"]))
 
     def test_everything_unreadable_at_once_gives_an_empty_list_not_a_crash(self):
         real = {n: getattr(Path, n) for n in PROBES}

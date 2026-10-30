@@ -20,7 +20,7 @@ _FILE = re.compile(r"^[\w][\w .\-]{0,63}$")
 _HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
 _ID = re.compile(r"^[A-Za-z0-9_.\-]{1,64}$")
 KINDS = ("paradox", "modules")
-STYLES = ("descriptor", "path")
+STYLES = ("descriptor", "path", "enabled_paths")
 
 # What the form starts from. All of it is from memory of other mod managers, not checked on a real install.
 TEMPLATES = [
@@ -106,7 +106,7 @@ def clean(d):
     content = _parts(d.get("content_dir", "game" if kind == "paradox" else "Modules"), "content_dir", allow_empty=True)
     style = _text(d, "load_style", "descriptor")
     if style not in STYLES:
-        raise ValueError("The load style must be 'descriptor' or 'path'.")
+        raise ValueError("The load style must be 'descriptor', 'path' or 'enabled_paths'.")
     load_file = _text(d, "load_file", "dlc_load.json" if kind == "paradox" else "(command line)", limit=64)
     if kind == "paradox" and not _FILE.match(load_file):
         raise ValueError("'load_file' is a file name like dlc_load.json.")

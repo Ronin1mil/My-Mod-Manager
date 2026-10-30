@@ -18,7 +18,7 @@ python -m modmanager --list-games
 
 The first time you open a game, a setup dialog finds the install (every Steam library, any drive, renamed folders) and asks you to confirm it. You can paste *any* path inside the install and it resolves to the root.
 
-> **Status:** everything is tested against fake installs and a stub game (see [docs/08-testing.md](docs/08-testing.md)). **Nothing has been run against a real CK3, EU5 or VIC3 install yet**, so the hand-off to the game (load file name and format, whether the stock launcher overrides it) is unverified. The in-app setup dialog says so, and [docs/13-verification-checklist.md](docs/13-verification-checklist.md) lists the five-minute checks that settle it per game.
+> **Status:** everything is tested against fake installs and a stub game (see [docs/08-testing.md](docs/08-testing.md)). **Europa Universalis V is confirmed on a real install** (Play starts the game with the playset's mods). The files of CK3, VIC3 and Bannerlord were checked on a real PC ([docs/22-checked-on-a-real-pc.md](docs/22-checked-on-a-real-pc.md)), but Play is not yet confirmed for them. The in-app setup dialog says so, and [docs/13-verification-checklist.md](docs/13-verification-checklist.md) lists the five-minute checks that settle it per game.
 
 ## Python edition (no exe; for PCs where Smart App Control blocks unsigned programs)
 Needs **Python 3.8+ from python.org** (keep "py launcher" ticked; check with `py --version`) and Edge or Chrome. Download **`Mod-Manager-python.pyzw`** from the Releases page and double-click it, or run `py Mod-Manager-python.pyzw`. It updates itself like the exe. Details and limits are in the release notes of 0.9.0 (install steps) and the changelog.
@@ -56,7 +56,8 @@ On GitHub press **Code → Download ZIP**, unzip it, and double-click `Start Ron
 |---|---|---|---|
 | Steam app id | 1158310 | 3450310 | 529340 |
 | Load file in the user folder | `dlc_load.json` | `dlc_load.json` | `content_load.json` |
-| Entries in it | `mod/<name>.mod`, `mod/ugc_<id>.mod` | `mod/<folder>`, or the Workshop path | `mod/<name>.mod`, `mod/ugc_<id>.mod` |
+| Entries in it | `mod/<name>.mod`, `mod/ugc_<id>.mod` | `mod/<folder>`, or the Workshop path; plus the game's own `playsets.json` | `enabledMods: [{"path": <absolute mod folder>}]` |
+| Play starts | the game's exe (from `launcher/launcher-settings.json`) | Steam | the game's exe (from `launcher/launcher-settings.json`) |
 | Install marker | `game/common` | `game/in_game` | `game/common` |
 | Definition folders | `common/`, `events/` | `in_game/common/` | `common/`, `events/` |
 | Base game compared | all of `game/` | `in_game`, `main_menu`, `loading_screen` | all of `game/` |
@@ -134,6 +135,7 @@ This project was written with the help of an AI coding assistant (see the note a
 | [docs/17-bannerlord.md](docs/17-bannerlord.md) | Bannerlord: modules, order, launching |
 | [docs/19-test-builds-and-releases.md](docs/19-test-builds-and-releases.md) | Test builds (nightly) and how releases are made |
 | [docs/20-v0.9-plan.md](docs/20-v0.9-plan.md) | Adding your own games (beta) and what was considered and left out |
+| [docs/22-checked-on-a-real-pc.md](docs/22-checked-on-a-real-pc.md) | What the four games' files look like on a real PC and what was fixed because of it |
 
 ## License
 [MIT](LICENSE) © 2026 Ronin1mil

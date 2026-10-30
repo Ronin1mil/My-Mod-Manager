@@ -146,7 +146,7 @@ class LoadOrder(Base):
         st, res, _ = self.post(f"/api/playsets/{pid}/launch")
         self.assertEqual((st, res["written"], res["via"]), (200, 3, "steam"))
         cl = json.loads((self.r / "user/content_load.json").read_text())
-        self.assertEqual(cl["enabled_mods"], ["mod/lib.mod", "mod/a.mod", "mod/b.mod"])
+        self.assertEqual([Path(e["path"]).name for e in cl["enabledMods"]], ["lib", "a", "b"])
         self.assertEqual(opened, ["steam://run/529340"])
 
     def test_duplicate_playset_is_independent(self):

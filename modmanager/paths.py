@@ -118,24 +118,62 @@ def _bannerlord_version(root):
     return m.group(1) if m else ""
 
 
-def game_version(root, game=None):
-    """Installed game version (e.g. '1.7.6') from launcher/launcher-settings.json (Paradox games) or the Native
-    module (Bannerlord); '' when unknown."""
+_LOGGED_VERSION = re.compile(r"game version (\d+\.\d+\.\d+)")
+_LAUNCHER_ARG = re.compile(r"^-[A-Za-z0-9_.\-]{1,63}$")
+
+
+def _launcher_settings(root):
+    try:
+        d = json.loads((Path(root) / "launcher" / "launcher-settings.json").read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError):
+        return {}
+    return d if isinstance(d, dict) else {}
+
+
+def _logged_version(user_dir):
+    """'1.4.5' from the game's own logs/debug.log ("... matched game version 1.4.5"). EU5 has no launcher folder, so
+    this is the only place its version shows; it is there once the game has started with a mod."""
+    try:
+        with open(Path(user_dir) / "logs" / "debug.log", encoding="utf-8", errors="replace") as f:
+            text = f.read(8 * 1024 * 1024)
+    except OSError:
+        return ""
+    found = _LOGGED_VERSION.findall(text)
+    return found[-1] if found else ""
+
+
+def game_version(root, game=None, user_dir=None):
+    """Installed game version (e.g. '1.7.6') from launcher/launcher-settings.json (Paradox games), else the game's
+    debug.log in the user folder, or the Native module (Bannerlord); '' when unknown."""
     if not root:
         return ""
     if game is not None and game.kind == "modules":
         return _bannerlord_version(root)
-    try:
-        d = json.loads((Path(root) / "launcher" / "launcher-settings.json").read_text(encoding="utf-8-sig"))
-    except (OSError, ValueError):
-        return ""
-    if not isinstance(d, dict):
-        return ""
+    d = _launcher_settings(root)
     for key in ("rawVersion", "version"):
         m = _VERSION.search(str(d.get(key, "")))
         if m:
             return m.group(0)
-    return ""
+    return _logged_version(user_dir) if user_dir else ""
+
+
+def launcher_exe(root):
+    """(game executable, its arguments) as the Paradox launcher starts it (launcher-settings.json `exePath`, relative to
+    the launcher folder, and `exeArgs`), or (None, []) when the install has no such file or the path leaves the install.
+    Starting this directly keeps the launcher from writing its own playset over the load file."""
+    if not root:
+        return None, []
+    d = _launcher_settings(root)
+    rel = d.get("exePath")
+    if not isinstance(rel, str) or not rel:
+        return None, []
+    base = Path(root).resolve()
+    exe = (base / "launcher" / rel).resolve()
+    if base not in exe.parents or not exe.is_file():
+        return None, []
+    args = d.get("exeArgs")
+    args = [a for a in args if isinstance(a, str) and _LAUNCHER_ARG.match(a)] if isinstance(args, list) else []
+    return exe, args
 
 
 # ---- logos: never bundled; the user's own Steam cache, a file they provide, or an explicit download ----

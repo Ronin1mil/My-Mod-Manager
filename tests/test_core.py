@@ -124,12 +124,12 @@ class T(unittest.TestCase):
             with self.assertRaises(ValueError):
                 s.import_shared({"nope": 1}, mods)
             s.update(pid, disabled=[])
-            (Path(r) / "content_load.json").write_text('{"enabled_mods": ["old"], "disabled_dlcs": ["x"]}')
-            f = write_load_file(games.VIC3, r, mods, s.export(pid, mods))
+            (Path(r) / "dlc_load.json").write_text('{"enabled_mods": ["old"], "disabled_dlcs": ["x"]}')
+            f = write_load_file(games.CK3, r, mods, s.export(pid, mods))
             d = json.loads(f.read_text())
             self.assertEqual(d["enabled_mods"], ["mod/A.mod", "mod/ugc_999.mod"])
             self.assertEqual(d["disabled_dlcs"], ["x"])
-            self.assertTrue((Path(r) / "content_load.json.bak").is_file())
+            self.assertTrue((Path(r) / "dlc_load.json.bak").is_file())
             self.assertIn('remote_file_id="999"', (Path(r) / "mod/ugc_999.mod").read_text())
 
     def test_app_analyse(self):

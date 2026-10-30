@@ -18,7 +18,8 @@ class Game:
     install_dir_name: str        # default folder under steamapps/common
     install_marker: tuple        # path (relative to the install root) that proves it is this game
     load_file: str               # file in the user dir the game reads its enabled mods from
-    load_style: str              # "descriptor": mod/ugc_<id>.mod entries; "path": mod folder / workshop path
+    load_style: str              # "descriptor": mod/ugc_<id>.mod entries; "path": mod folder / workshop path;
+                                 # "enabled_paths": {"enabledMods": [{"path": <absolute mod folder>}]} (Victoria 3)
     def_dirs: tuple              # script folders whose top-level keys are definitions
     vanilla_only: tuple = ()     # only these folders under <install>/game hold base content (empty = all)
     theme: dict = field(default_factory=dict)
@@ -73,15 +74,17 @@ EU5 = Game(
     id="eu5", name="Europa Universalis V", app_id="3450310", user_dir_name="Europa Universalis V",
     install_dir_name="Europa Universalis V", install_marker=("game", "in_game"),
     load_file="dlc_load.json", load_style="path", def_dirs=("common",),
-    vanilla_only=("in_game", "main_menu", "loading_screen"), playsets_file="playsets.json",
+    vanilla_only=("in_game", "main_menu", "loading_screen"), playsets_file="playsets.json", verified=True,
     theme={**_COMMON, "--bg": "#0e1621", "--side": "#0b121b", "--panel": "#15202d", "--line": "#2a3a4d",
            "--acc": "#d4a73a", "--accink": "#1a1407", "--p1": "#2b4a6e", "--p2": "#3a6291", "--p3": "#223a56",
            "--mut": "#8f9bab"})
 
+# Victoria 3's launcher writes content_load.json as {"enabledMods": [{"path": "<absolute folder>"}], "enabledUGC": [],
+# "disabledDLC": []}, with no mod/ugc_<id>.mod stubs (seen on a real install, docs/22-checked-on-a-real-pc.md).
 VIC3 = Game(
     id="vic3", name="Victoria 3", app_id="529340", user_dir_name="Victoria 3",
     install_dir_name="Victoria 3", install_marker=("game", "common"),
-    load_file="content_load.json", load_style="descriptor", def_dirs=("common", "events"),
+    load_file="content_load.json", load_style="enabled_paths", def_dirs=("common", "events"),
     theme={**_COMMON, "--bg": "#0f0b0d", "--side": "#150e12", "--panel": "#1e1519", "--line": "#3a2a31",
            "--acc": "#d4b883", "--accink": "#fbf3e2", "--p1": "#8c3a58", "--p2": "#a34868", "--p3": "#6a2640"})
 
@@ -92,7 +95,7 @@ BANNERLORD = Game(
     id="bannerlord", name="Mount & Blade II: Bannerlord", app_id="261550", user_dir_name="Mount and Blade II Bannerlord",
     user_parent="", install_dir_name="Mount & Blade II Bannerlord", install_marker=("Modules", "Native"),
     load_file="(command line)", load_style="modules", def_dirs=(), kind="modules",
-    seed_mods=("Native", "SandBoxCore", "CustomBattle", "Sandbox", "StoryMode"),
+    seed_mods=("Native", "SandBoxCore", "BirthAndDeath", "CustomBattle", "Sandbox", "StoryMode", "NavalDLC"),
     exe_rel=("bin", "Win64_Shipping_Client", "Bannerlord.exe"), launch_prefix=("/singleplayer",),
     theme={**_COMMON, "--bg": "#0f120e", "--side": "#0b0e0a", "--panel": "#171c15", "--line": "#2f3a2b",
            "--acc": "#cfa84a", "--accink": "#1a1405", "--p1": "#4d6b3a", "--p2": "#65884a", "--p3": "#3a5229",

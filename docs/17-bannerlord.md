@@ -1,6 +1,6 @@
 # Mount & Blade II: Bannerlord
 
-Bannerlord does not use Paradox's load files or `.mod` descriptors. Everything below comes from the open-source Bannerlord tooling of [BUTR](https://github.com/BUTR) ([Bannerlord.ModuleManager](https://github.com/BUTR/Bannerlord.ModuleManager), [Bannerlord.LauncherManager](https://github.com/BUTR/Bannerlord.LauncherManager)) and the [Bannerlord modding docs](https://docs.bannerlordmodding.com/), and has **not been checked against a real install** (`verified` stays false; the app says so).
+Bannerlord does not use Paradox's load files or `.mod` descriptors. Everything below comes from the open-source Bannerlord tooling of [BUTR](https://github.com/BUTR) ([Bannerlord.ModuleManager](https://github.com/BUTR/Bannerlord.ModuleManager), [Bannerlord.LauncherManager](https://github.com/BUTR/Bannerlord.LauncherManager)) and the [Bannerlord modding docs](https://docs.bannerlordmodding.com/), and is **not yet confirmed on a real install** (`verified` stays false; the app says so). The install layout, module ids and dependencies were read from a real 1.5.6 install ([22-checked-on-a-real-pc.md](22-checked-on-a-real-pc.md)).
 
 ## What a mod is
 A **module**: a folder with a `SubModule.xml`. Modules live in
@@ -23,7 +23,7 @@ If the same module id exists in both places the `Modules` copy wins, as in the g
 Not used: version ranges (`DependentVersion`, `version=`), `RequiredGameVersion` and `LoadAfterModules` (its direction is ambiguous). No game-version warnings are raised for this game.
 
 ## Playsets
-A new playset starts with the official modules (`Native`, `SandBoxCore`, `CustomBattle`, `Sandbox`, `StoryMode`) in that order. **Auto-sort** keeps dependencies first and official modules ahead of the rest; your own order is kept wherever no rule applies. The Conflicts tab, base-game comparison and the save-version/own-save-folder features are not offered: modules do not share script folders, and their saves are handled by the game.
+A new playset starts with the official modules that are installed (`Native`, `SandBoxCore`, `BirthAndDeath`, `CustomBattle`, `Sandbox`, `StoryMode`, `NavalDLC`), in that order, which follows their own dependencies. **Auto-sort** keeps dependencies first and official modules ahead of the rest; your own order is kept wherever no rule applies. The Conflicts tab, base-game comparison and the save-version/own-save-folder features are not offered: modules do not share script folders, and their saves are handled by the game.
 
 ## Play
 No file is written. The game is started directly, with the same arguments other launchers use:
@@ -34,7 +34,7 @@ The enabled modules of the playset (or the part chosen under **Launch part…**)
 **Install mod…** takes a `.zip` / `.tar*` that contains a module (with or without a `Modules/` wrapper) and puts it in `<install>/Modules/<ModuleId>`; an existing copy is moved to the backup folder first. Official modules are never replaced or uninstalled. Workshop modules are installed and updated by Steam.
 
 ## Import
-The launcher's last module selection (`Documents/Mount and Blade II Bannerlord/Configs/LauncherData.xml`, `<UserModData><Id/><IsSelected/>`) can be imported from the Import menu as one playset ("Launcher selection"); unselected modules stay in it, switched off; modules that are not installed are reported.
+The launcher's last module selection (`Documents/Mount and Blade II Bannerlord/Configs/LauncherData.xml`, `<UserModData><Id/><IsSelected/>`) can be imported. On the real PC checked this file did not exist (the Documents folder held only `Game Saves`), so there was nothing to import; where it exists it can be imported from the Import menu as one playset ("Launcher selection"); unselected modules stay in it, switched off; modules that are not installed are reported.
 
 ## To verify on a real PC
 1. The install is found (Steam library, or paste any path inside it) and the version in the corner matches the game.

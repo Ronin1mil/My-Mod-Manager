@@ -41,14 +41,28 @@ class LoadFiles(Base):
             self.assertTrue((self.user / g.load_file).is_file())
 
     def test_descriptor_style_lists_mod_stubs_and_creates_missing_workshop_stub(self):
-        for g in (games.CK3, games.VIC3):
-            (self.user / "mod/ugc_123.mod").unlink() if (self.user / "mod/ugc_123.mod").exists() else None
-            f = write_load_file(g, self.user, self.mods, ["local:A", "ws:123", "local:My Mod (v2)"])
-            self.assertEqual(json.loads(f.read_text())["enabled_mods"],
-                             ["mod/A.mod", "mod/ugc_123.mod", "mod/My Mod (v2).mod"], g.id)
-            stub = (self.user / "mod/ugc_123.mod").read_text()
-            self.assertIn('remote_file_id="123"', stub)
-            self.assertIn(str(self.r / "ws" / "123").replace("\\", "/"), stub)
+        f = write_load_file(games.CK3, self.user, self.mods, ["local:A", "ws:123", "local:My Mod (v2)"])
+        self.assertEqual(json.loads(f.read_text())["enabled_mods"], ["mod/A.mod", "mod/ugc_123.mod", "mod/My Mod (v2).mod"])
+        stub = (self.user / "mod/ugc_123.mod").read_text()
+        self.assertIn('remote_file_id="123"', stub)
+        self.assertIn(str(self.r / "ws" / "123").replace("\\", "/"), stub)
+
+    def test_vic3_lists_absolute_folders_under_enabledMods_like_its_launcher_and_writes_no_stubs(self):
+        (self.user / "content_load.json").write_text(json.dumps(
+            {"enabledMods": [{"path": "old"}], "disabledDLC": ["dlc1"], "enabledUGC": [], "x": 1}))
+        f = write_load_file(games.VIC3, self.user, self.mods, ["ws:123", "local:A"])
+        got = json.loads(f.read_text())
+        self.assertEqual(got["enabledMods"], [{"path": os.path.normpath(self.r / "ws" / "123")},
+                                              {"path": os.path.normpath(self.user / "mod" / "A")}])
+        self.assertEqual((got["disabledDLC"], got["enabledUGC"], got["x"]), (["dlc1"], [], 1))
+        self.assertNotIn("enabled_mods", got)
+        self.assertNotIn("disabled_dlcs", got)
+        self.assertFalse((self.user / "mod/ugc_123.mod").exists())
+        self.assertEqual(json.loads((self.user / "content_load.json.bak").read_text())["enabledMods"], [{"path": "old"}])
+
+    def test_vic3_without_a_file_gets_the_launchers_three_keys(self):
+        got = json.loads(write_load_file(games.VIC3, self.user, self.mods, []).read_text())
+        self.assertEqual(got, {"enabledMods": [], "enabledUGC": [], "disabledDLC": []})
 
     def test_path_style_lists_local_folders_and_workshop_paths_and_writes_no_stubs(self):
         f = write_load_file(games.EU5, self.user, self.mods, ["local:A", "ws:123"])
@@ -127,13 +141,14 @@ class LoadFiles(Base):
     def test_order_is_exactly_the_given_order_and_no_temp_files_remain(self):
         ids = ["local:My Mod (v2)", "ws:123", "local:A"]
         f = write_load_file(games.VIC3, self.user, self.mods, ids)
-        self.assertEqual(len(json.loads(f.read_text())["enabled_mods"]), 3)
+        self.assertEqual([Path(e["path"]).name for e in json.loads(f.read_text())["enabledMods"]], ["My Mod (v2)", "123", "A"])
         self.assertEqual([p.name for p in self.user.iterdir() if p.suffix == ".tmp"], [])
 
     def test_mod_entry_per_style(self):
         m = self.mods["local:A"]
         self.assertEqual(mod_entry(games.CK3, m), "mod/A.mod")
         self.assertEqual(mod_entry(games.EU5, m), "mod/A")
+        self.assertEqual(mod_entry(games.VIC3, m), {"path": os.path.normpath(m["root"])})
 
 
 class StoreBasics(Base):

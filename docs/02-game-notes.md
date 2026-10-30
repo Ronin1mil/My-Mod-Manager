@@ -1,6 +1,6 @@
 # Game notes
 
-Legend: **[known]** documented or confirmed by the working standalone managers' behaviour on the files they read; **[assumed]** best knowledge, not confirmed on a real install; **[verify]** a specific check in [13-verification-checklist.md](13-verification-checklist.md). The values below are exactly what `modmanager/games.py` encodes and `tests/test_games.py` pins. **No game is marked `verified`** until someone has run the checklist on a real install.
+Legend: **[known]** documented or confirmed by the working standalone managers' behaviour on the files they read; **[assumed]** best knowledge, not confirmed on a real install; **[verify]** a specific check in [13-verification-checklist.md](13-verification-checklist.md). The values below are exactly what `modmanager/games.py` encodes and `tests/test_games.py` pins. Only **EU5 is marked `verified`** (Play confirmed on a real install). What was read from a real PC for every game is in [22-checked-on-a-real-pc.md](22-checked-on-a-real-pc.md).
 
 ## Shared (all three games)
 - User dir: `Documents/Paradox Interactive/<Game>` (Windows, OneDrive-redirected Documents is handled), `~/.local/share/Paradox Interactive/<Game>` (Linux), `~/Library/Application Support/Paradox Interactive/<Game>` (macOS). **[known]**
@@ -8,7 +8,8 @@ Legend: **[known]** documented or confirmed by the working standalone managers' 
 - Workshop mods: `<steam library>/steamapps/workshop/content/<app id>/<id>/`. Every library in `libraryfolders.vdf`, the Windows registry and common hand-made libraries (`G:\SteamLibrary`) are searched. A `ugc_<id>.mod` stub in `mod/` for a Workshop mod we already found is ignored. **[known]**
 - Mod metadata, first hit wins: `.metadata/metadata.json`, `metadata/metadata.json`, `metadata.json`; falling back to `descriptor.mod` (Clausewitz `key="value"`, `key={ "a" "b" }`, `#` comments, `#` inside quotes is text). Metadata fields: `name`, `id`, `version`, `supported_game_version`, `tags`, `short_description`, `relationships[]` (`rel_type` or `type`: `dependency`, `incompatible`; `display_name`/`name`, `id`), `game_custom_data.{replace_paths,multiplayer_synchronized}`. **[assumed]** for EU5; **[known]** shape for CK3/VIC3 descriptors. Wrong-typed fields are ignored, damaged JSON becomes a warning on the mod.
 - Dependencies are matched by metadata id first, then by **name**, a Workshop id or `ugc_<id>`. Names are not unique; duplicates are reported.
-- Game version: `<install>/launcher/launcher-settings.json` (`rawVersion`, else `version`, first `1.2.3`-style number). Unknown version = no version warnings. **[verify]**
+- Game version: `<install>/launcher/launcher-settings.json` (`rawVersion`, else `version`, first `1.2.3`-style number); a game without that file (EU5) uses the last `game version 1.2.3` in `<user dir>/logs/debug.log`. Unknown version = no version warnings. **[known]** on a real CK3, VIC3 and EU5
+- Play: when `launcher/launcher-settings.json` names an `exePath` (CK3, VIC3), that exe is started directly with its `exeArgs` and the playset's arguments. Going through Steam opens the Paradox launcher, which writes its own playset over the load file when you press Play there. Games without that file (EU5) still start through Steam. **[verify]** that the game starts this way without the launcher
 - Load order: later mods override earlier ones. Same relative path: the whole file is replaced. **[known]**
 - Definitions: top-level `key = {` in the game's script folders is a definition. Two mods defining the same key **in the same script folder** (`common/traits`) but different files both load; the later wins (*definition* conflict). The same key in *different* folders is not a clash. `REPLACE:`/`TRY_REPLACE:`/`REPLACE_OR_CREATE:` are intentional overrides (info); `INJECT:`/`TRY_INJECT:`/`INJECT_OR_CREATE:` merge into the target and are listed as *patches*. **[known]** for the prefixes; per-folder merge rules beyond this are not modelled.
 - `replace_path` drops everything under that folder from *earlier* mods (and the base game). **[known]**
@@ -31,7 +32,7 @@ Legend: **[known]** documented or confirmed by the working standalone managers' 
 | Steam app id | 3450310 |
 | Install marker | `game/in_game` |
 | Definition folders | `common/` anywhere in the first two path levels (`in_game/common/...`); events are not scanned |
-| Active playset | `<user dir>/playsets.json` (`{"playsets":[{name,isActive,orderedListMods:[{path,isEnabled}],DLC}]}`): the game starts with the playset marked `isActive`. Play writes the mods into the playset there with the same name as the app's playset (adds one if missing) and makes it the only one with `isActive` (backup `playsets.json.bak`) **[verify on a real install]** |
+| Active playset | **[known]** `<user dir>/playsets.json` (`{"playsets":[{name,isActive,orderedListMods:[{path,isEnabled}],DLC}]}`): the game starts with the playset marked `isActive`. Play writes the mods into the playset there with the same name as the app's playset (adds one if missing) and makes it the only one with `isActive` (backup `playsets.json.bak`). Confirmed: the game's `debug.log` says `Switching to playset ... Name: <that playset>` and loads its mods |
 | Load file | `<user dir>/dlc_load.json` with `"enabled_mods": ["mod/<folder>", "<workshop path>"]` (folder for local, absolute Workshop folder for Workshop) **[assumed]**; the previous standalone manager could not confirm EU5 reads load order from this file **[verify]** |
 | Base game | `in_game`, `main_menu`, `loading_screen` under `game/` |
 | Metadata | `metadata.json` in `.metadata/` or `metadata/` **[assumed]** |
@@ -44,10 +45,10 @@ If the game ignores the file, use this tool for analysis, presets and sharing, a
 | Steam app id | 529340 |
 | Install marker | `game/common` |
 | Definition folders | `common/`, `events/` |
-| Load file | `<user dir>/content_load.json` = `{"enabled_mods": ["mod/ugc_123.mod", "mod/Local.mod"], "disabled_dlcs": []}` **[assumed]**, **[verify]** |
-| Workshop entries | need `mod/ugc_<id>.mod` (created if missing) |
+| Load file | `<user dir>/content_load.json` = `{"enabledMods": [{"path": "G:\\SteamLibrary\\steamapps\\workshop\\content\\529340\\123"}, {"path": "C:\\Users\\<user>\\Documents\\Paradox Interactive\\Victoria 3\\mod\\Local"}], "enabledUGC": [], "disabledDLC": []}` **[known]**: written this way by the launcher on a real install (`load_style="enabled_paths"`) |
+| Workshop entries | the Workshop folder itself; no `.mod` stubs (the real `mod/` folder has none, and the launcher database leaves `gameRegistryId` empty) |
 | Extras | `multiplayer_synchronized` from `game_custom_data` shows an "MP-unsafe" badge |
-| Launch arguments | `steam://run/529340//<args>/` argument passing **[verify]** |
+| Launch arguments | passed to `binaries/victoria3.exe` after `-gdpr-compliant` |
 
 ## Changing what is assumed
 Everything above is data (`games.py`) or one function (`store.mod_entry`). When a real-install check disagrees, fix the data, update the pinned values in `tests/test_games.py` / `tests/test_store_games.py`, set `verified=True` for that game, and update this page.

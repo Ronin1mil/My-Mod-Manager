@@ -17,7 +17,7 @@ from pathlib import Path
 from . import APP_NAME, BUILD, __version__, collections, compare, detect, games as gamesmod, install, launch, order, presets, saves, scan, update, updates
 from . import customgames, errorlog, gamelog, launcherdb, perflog, selfupdate, workshop
 from .library import Library
-from .paths import LOGO_TYPES, config_dir, fetch_best_logo, find_first, find_logo, game_version, user_dirs, workshop_dirs
+from .paths import LOGO_TYPES, config_dir, fetch_best_logo, find_first, find_logo, game_version, launcher_exe, user_dirs, workshop_dirs
 from .store import GlobalSettings, Store, write_load_file
 
 STATIC = Path(__file__).parent / "static"
@@ -93,7 +93,7 @@ class GameApp:
             f"workshop folder: {self.workshop_dir or 'not found'}",
             "mods found: " + (", ".join(f"{n} {k}" for k, n in sorted(by.items())) or "none"),
             f"playsets in the app: {', '.join(repr(p['name']) for p in self.store.data['playsets'].values()) or 'none'}",
-            f"Play starts the game through: {'the game executable' if self.game_exe else 'Steam'}",
+            f"Play starts the game through: {self._play_via()}",
             *(["the game's own files:"] + ["  " + l for l in gamelog.snapshot(g, self.user_dir)] if g.kind == "paradox" else [])])
 
     # ---- paths ----
@@ -107,7 +107,7 @@ class GameApp:
         self.workshop_dir = pick(self.cli["workshop_dir"], "workshop_dir",
                                  (detect.workshop_dir_for(self.game_root, g) if self.game_root else None)
                                  or find_first(workshop_dirs(g, self.extra_libraries)))
-        self.game_version = self.cli["game_version"] or game_version(self.game_root, self.game)
+        self.game_version = self.cli["game_version"] or game_version(self.game_root, self.game, self.user_dir)
         self.logo = find_logo(g, self.logo_arg, self.game_root, self.extra_libraries)
         if not self.logo and not self.logo_arg and self.fetch_logos and not self.logo_pending and self.game.app_id != "0":
             self.logo_pending = True
@@ -370,8 +370,8 @@ class GameApp:
         else:
             add(bool(src), "Launcher playsets", f"{src[0]}  ({len(src[1])} playset{'' if len(src[1]) == 1 else 's'})" if src
                 else "Nothing to import (the game's own launcher file was not found; optional).")
-        launcher = "the game executable you set" if self.game_exe else ("Steam (steam://run/%s)" % g.app_id if g.app_id != "0" else "nothing: set a game executable")
-        add(g.app_id != "0" or bool(self.game_exe), "Play starts the game through", launcher)
+        via = self._play_via()
+        add(not via.startswith("nothing"), "Play starts the game through", via)
         return {"game": g.name, "checks": out, "beta": g.custom}
 
     # ---- views ----
@@ -627,6 +627,23 @@ class GameApp:
         if a and b and a != b:
             raise SaveVersionWarning(a, b, source)
 
+    def _play_exe(self):
+        """(executable, its fixed arguments) Play starts for a Paradox game: the one set with --game-exe, else the one
+        the game's launcher starts (launcher-settings.json). Going through Steam would open the Paradox launcher, which
+        writes its own playset over the load file. (None, []) = start through Steam (EU5 has no launcher folder)."""
+        if self.game_exe:
+            return self.game_exe, []
+        exe, args = launcher_exe(self.game_root) if self.game.kind == "paradox" else (None, [])
+        return (str(exe), args) if exe else (None, [])
+
+    def _play_via(self):
+        if self.game.kind == "modules" or self.game_exe:
+            return "the game executable you set" if self.game_exe else "the game executable"
+        exe, args = self._play_exe()
+        if exe:
+            return " ".join([exe, *args]) + " (directly, not through the Paradox launcher)"
+        return "Steam (steam://run/%s)" % self.game.app_id if self.game.app_id != "0" else "nothing: set a game executable"
+
     def _chosen(self, pid, only):
         """Enabled mod ids (optionally a subset of them) and how many errors that subset has (None for no subset)."""
         ids = self.store.export(pid, self.mods)
@@ -689,7 +706,8 @@ class GameApp:
                 saves_note = saves.activate(self.user_dir / saves.SAVES_DIR_NAME, self.cfg / "saves" / pid)
             else:  # shared: all playsets use the game's normal folder, so undo a playset link left by an earlier launch
                 saves_note = saves.deactivate(self.user_dir / saves.SAVES_DIR_NAME, self.cfg / "saves")
-            res = launch.start(self.game, self.game_exe, launch.validate_launch_args(ps["launch_args"]))
+            exe, base_args = self._play_exe()
+            res = launch.start(self.game, exe, [*base_args, *launch.validate_launch_args(ps["launch_args"])])
         except Exception as e:
             gamelog.log(gid, f"PLAY FAILED: {type(e).__name__}: {e}")
             raise
