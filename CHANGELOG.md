@@ -1,7 +1,7 @@
 # Changelog
 
 ## Unreleased
-- If you run a test build of a version that has since been released, the update notice now says so ("The release of 0.9.1 is out (you have 0.9.1 test build abc1234, a test build of it)") instead of "Version 0.9.1 is available (you have 0.9.1)"
+- A copy running a test build follows the test builds first: the update notice and "Check for updates now" offer a newer test build (the banner says "Test build abc1234 is available"), and no longer offer the release of the version it is already on. A release with a higher version number is still offered. Settings > App & updates > Test builds has a new **Go back to the release** button for leaving the test channel
 
 ## 0.9.1 - Fast switching between big playsets
 Clicking between playsets with many mods is now instant after the first time, and the window no longer seems to ignore clicks.

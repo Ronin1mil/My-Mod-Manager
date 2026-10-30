@@ -378,11 +378,11 @@ function banner() {
   if (!u || !u.update_available || GI.settings.dismissed_update === u.latest) { b.hidden = true; b.innerHTML = ''; return; }
   const link = u.url.startsWith(REPO_LINK) ? u.url : REPO_LINK + 'releases';
   b.hidden = false;
-  const mine = GI.version + (GI.build ? ' test build ' + GI.build : ''), sameVersion = GI.build && u.latest === GI.version;
-  b.innerHTML = `<span class="grow"><b>${sameVersion ? 'The release of ' + esc(u.latest) + ' is out' : 'Version ' + esc(u.latest) + ' is available'}</b> <span class="mut">(you have ${esc(mine)}${sameVersion ? ', a test build of it' : ''})</span></span>
+  b.innerHTML = `<span class="grow">${u.build ? `<b>Test build ${esc(u.build)} is available</b> <span class="mut">(you have ${GI.build ? 'test build ' + esc(GI.build) : esc(GI.version)})</span>`
+      : `<b>Version ${esc(u.latest)} is available</b> <span class="mut">(you have ${esc(GI.version)}${GI.build ? ', test build ' + esc(GI.build) : ''})</span>`}</span>
     ${GI.can_self_update ? '<button class="sm pri" id="bn-now">Update now</button>' : ''}
     <a href="${esc(link)}" target="_blank" rel="noopener noreferrer">View release</a><button class="sm" id="bn-dismiss">Dismiss</button>`;
-  if ($('bn-now')) $('bn-now').onclick = guard(() => selfUpdate());
+  if ($('bn-now')) $('bn-now').onclick = guard(() => selfUpdate(undefined, true, u.build ? 'nightly' : 'stable'));
   $('bn-dismiss').onclick = guard(async () => { GI.settings = await app('settings', {dismissed_update: u.latest}); banner(); });
 }
 $('dlg').addEventListener('close', () => { $('dlg').className = ''; });
@@ -488,9 +488,9 @@ async function openPaths(first) {
       </div>
       <div class="card">
         <h3>Test builds (nightly) <span class="b warn">experimental</span></h3>
-        <p class="desc">Builds made automatically from the version being worked on, before it becomes a release. They may contain bugs; your playsets and settings are kept. A release only contains what was tried here first. You have: <b>v${esc(GI.version)}${GI.build ? ' · test build ' + esc(GI.build) : ' (a normal release)'}</b>. To go back to the newest release, press "Check for updates now" above.</p>
+        <p class="desc">Builds made automatically from the version being worked on, before it becomes a release. They may contain bugs; your playsets and settings are kept. A release only contains what was tried here first. You have: <b>v${esc(GI.version)}${GI.build ? ' · test build ' + esc(GI.build) : ' (a normal release)'}</b>. ${GI.build ? 'A copy running a test build is offered newer test builds first, before any release. To go back to the newest release anyway, press "Go back to the release".' : ''}</p>
         <p class="mut" id="nt-status"></p>
-        <div class="acts"><button id="nt-check">Check for a test build</button><button id="nt-go" class="danger" disabled>Install the test build</button></div>
+        <div class="acts"><button id="nt-check">Check for a test build</button><button id="nt-go" class="danger" disabled>Install the test build</button>${GI.build && GI.can_self_update ? '<button id="nt-back">Go back to the release</button>' : ''}</div>
       </div>
       <div class="card">
         <h3>Erase all data <span class="b warn">experimental</span></h3>
@@ -545,6 +545,11 @@ async function openPaths(first) {
     $('nt-status').textContent = r.message + (r.published ? ` (built ${when(r)})` : '') + (r.update_available && !GI.can_self_update ? ' This copy runs from source files, so it cannot replace itself.' : '');
     $('nt-go').disabled = !(r.update_available && GI.can_self_update);
   });
+  if ($('nt-back')) $('nt-back').onclick = guard(async () => {
+    if (!confirm('Replace this test build with the newest release and restart Ronin Mod Manager? Your playsets and settings are kept.')) return;
+    $('nt-back').disabled = true;
+    try { await selfUpdate(m => { $('nt-status').textContent = m; }, false, 'release'); } finally { $('nt-back').disabled = false; }
+  });
   $('nt-go').onclick = guard(async () => {
     $('nt-go').disabled = true;
     try { await selfUpdate(m => { $('nt-status').textContent = m; }, true, 'nightly'); } finally { $('nt-go').disabled = false; }
@@ -577,7 +582,7 @@ async function openPaths(first) {
       (u.status === 'update' ? `<div class="acts">${GI.can_self_update ? '<button class="pri" id="s-now">Download and restart</button> ' : ''}<a href="${esc(link)}" target="_blank" rel="noopener noreferrer">Release page</a></div><div id="s-prog" class="mut"></div>` : '');
     if ($('s-now')) $('s-now').onclick = guard(async () => {
       $('s-now').disabled = true; $('s-check').disabled = true;
-      try { await selfUpdate(m => { $('s-prog').textContent = m; }, false); }
+      try { await selfUpdate(m => { $('s-prog').textContent = m; }, false, u.build ? 'nightly' : 'stable'); }
       catch (e) { $('s-now').disabled = false; $('s-check').disabled = false; throw e; }
     });
   });

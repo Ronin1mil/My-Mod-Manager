@@ -228,6 +228,7 @@ class Updater:
     def __init__(self, check=None, dl=download, exe=None, argv=None, restarter=restart, exiter=None, check_nightly_=None, verify=None):
         self.check = check or (lambda: check_for_update(stable_current()))
         self.check_nightly = check_nightly_ or check_nightly
+        self.check_release = lambda: check_for_update("0.0.0")   # "go back": the newest release counts as newer than anything
         self.channel = "stable"
         self.dl, self.restarter = dl, restarter
         self.verify = verify or (can_run if frozen() or pyz_path() else None)   # a source checkout / a test has nothing to test-start
@@ -249,7 +250,7 @@ class Updater:
                              "(git pull) or download the ZIP again. The downloadable app updates itself.")
         if not self.lock.acquire(blocking=False):
             return self.status()
-        self.channel = "nightly" if channel == "nightly" else "stable"
+        self.channel = channel if channel in ("nightly", "release") else "stable"
         self._set("working", "Checking for the newest test build…" if self.channel == "nightly" else "Checking for the newest version…")
         if run_async:
             threading.Thread(target=self._run, daemon=True, name="self-update").start()
@@ -263,7 +264,7 @@ class Updater:
         new = exe.with_name(exe.name + ".new")
         try:
             perflog.log(f"update ({self.channel}): checking")
-            info = (self.check_nightly if self.channel == "nightly" else self.check)()
+            info = {"nightly": self.check_nightly, "release": self.check_release}.get(self.channel, self.check)()
             if not info.get("update_available"):
                 return self._set("current", info.get("message") or "You are up to date.")
             by = {a["name"]: a for a in info.get("assets", []) if SAFE_NAME.match(a.get("name", ""))}

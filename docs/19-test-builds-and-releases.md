@@ -18,7 +18,7 @@ Two channels, so that **a release only contains what was tried first**:
 ## How the app handles it
 - A test build has a build id in `modmanager/_build.py`, written by CI only for the test branch (the file is not in git). Releases from `main` have none.
 - The test build uses the same safety as a release update: the files come only from this repository's GitHub release `nightly`, and the SHA-256 listed in its `SHA256SUMS.txt` must match before the running app is replaced.
-- A test build counts as *older than the release of its own version*, so once that release exists the normal update banner offers it. To leave the test channel earlier, press "Check for updates now".
+- A copy running a test build follows the test builds, which come before any release (they have the newest features): the update banner and "Check for updates now" offer a newer test build, never the release of the version it is already on (releases are made from test builds). Only a release with a *higher* version number is offered to it. To leave the test channel, press **Go back to the release** in Settings -> App & updates -> Test builds (the update then installs the newest release even though it is not newer).
 - Your playsets and settings are not touched by switching channels.
 
 ## Activity log (for finding what is slow)

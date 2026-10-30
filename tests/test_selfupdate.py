@@ -184,6 +184,15 @@ class Flow(unittest.TestCase):
         u.start(run_async=False)
         self.assertEqual(calls, ["nightly", "stable"])
 
+    def test_the_release_channel_installs_the_newest_release_even_when_the_running_version_is_not_older(self):
+        calls = []
+        u = su.Updater(check=lambda: calls.append("stable") or self.info(), check_nightly_=lambda: calls.append("nightly") or self.info(),
+                       dl=self.dl_factory(), exe=str(self.exe), argv=[],
+                       restarter=lambda e, a: self.restarted.append(1), exiter=lambda: self.exited.append(1))
+        u.check_release = lambda: calls.append("release") or self.info(latest="0.9.1")
+        st = u.start(run_async=False, channel="release")
+        self.assertEqual((calls, st["status"]), (["release"], "restarting"))
+
     def test_checksum_mismatch_changes_nothing(self):
         u = self.updater(dl=self.dl_factory(payload=b"TAMPERED"))
         st = u.start(run_async=False)
@@ -235,8 +244,16 @@ class NightlyCheck(unittest.TestCase):
             raise OSError("offline")
         self.assertEqual(update.check_nightly("", fetch=down)["status"], "unreachable")
 
-    def test_a_test_build_still_sees_the_release_of_its_own_version(self):
+    def test_a_test_build_is_not_pushed_back_to_the_release_of_its_own_version(self):
         from unittest import mock
         from modmanager import update
         with mock.patch.object(update, "BUILD", "abc1234"):
-            self.assertTrue(update.is_newer(update.__version__, update.stable_current()))
+            self.assertFalse(update.is_newer(update.__version__, update.stable_current()))
+            self.assertTrue(update.is_newer("99.0.0", update.stable_current()))   # a higher release number still counts
+
+    def test_going_back_to_the_release_works_from_any_version(self):
+        from modmanager import update
+        rel = {"tag_name": "v0.9.1", "html_url": "https://github.com/Ronin1mil/My-Mod-Manager/releases/tag/v0.9.1", "body": "",
+               "published_at": "2026-10-30T00:00:00Z", "assets": []}
+        r = update.check_for_update("0.0.0", lambda u: (200, rel))
+        self.assertTrue(r["update_available"])

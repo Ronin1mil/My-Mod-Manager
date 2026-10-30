@@ -303,7 +303,40 @@ def fake_github(tag="v9.0.0", counter=None, delay=0.0):
     return fetch
 
 
+def fake_both(release_tag="v0.9.1", build="def5678", counter=None):
+    base = "https://github.com/Ronin1mil/My-Mod-Manager/releases/"
+    rel = fake_github(release_tag, counter)
+
+    def fetch(url):
+        if url.endswith("/releases/tags/test-build"):
+            if counter is not None:
+                counter.append(url)
+            return 200, {"body": f"Test build.\n\nbuild: {build}\n", "published_at": "2026-10-30T01:00:00Z", "prerelease": True,
+                         "assets": [{"id": 1, "name": "Mod-Manager-python.pyzw", "size": 3, "browser_download_url": base + "download/test-build/Mod-Manager-python.pyzw"}]}
+        return rel(url)
+    return fetch
+
+
 class Updates(Base):
+    def test_a_test_build_is_offered_newer_test_builds_before_any_release(self):
+        from unittest import mock
+        from modmanager import __version__
+        self.hub.update_fetch = fake_both(release_tag="v" + __version__)   # the release of its own version is out
+        with mock.patch("modmanager.server.BUILD", "abc1234"):
+            r = self.hub.check_update(True)
+        self.assertEqual((r["build"], r["update_available"]), ("def5678", True))
+        with mock.patch("modmanager.server.BUILD", "def5678"):   # on the newest build: nothing to offer, not the release either
+            r = self.hub.check_update(True)
+        self.assertEqual((r["status"], r["update_available"]), ("current", False))
+
+    def test_a_normal_copy_only_follows_releases(self):
+        from unittest import mock
+        self.hub.update_fetch = fake_both(release_tag="v9.0.0")
+        with mock.patch("modmanager.server.BUILD", ""), mock.patch("modmanager.update.BUILD", ""):
+            r = self.hub.check_update(True)
+        self.assertEqual((r["latest"], r.get("build")), ("9.0.0", None))
+
+
     def test_auto_check_is_off_by_default_and_makes_no_request(self):
         calls = []
         self.hub.update_fetch = fake_github(counter=calls)

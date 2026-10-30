@@ -62,13 +62,6 @@ class Check(unittest.TestCase):
         self.assertEqual(r["published"], "2026-10-01")
         self.assertEqual(r["published_at"], "2026-10-01T00:00:00Z")   # the page shows this in the viewer's own time zone
 
-    def test_a_test_build_of_the_released_version_is_told_to_install_the_release(self):
-        f = fake({"/releases/latest": (200, release("v0.9.1"))})
-        r = check_for_update("0.9.1-nightly", f)
-        self.assertTrue(r["update_available"])
-        self.assertIn("test build", r["message"])
-        self.assertEqual(check_for_update("0.9.0", f)["message"], "Version 0.9.1 is available.")
-
     def test_up_to_date_and_running_ahead(self):
         f = fake({"/releases/latest": (200, release("v0.1.0"))})
         self.assertEqual(check_for_update("0.1.0", f)["status"], "current")

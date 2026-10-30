@@ -770,6 +770,10 @@ class Hub:
                 return self._update_cache[1]
         with perflog.timed("check GitHub for a new version"):
             res = update.check_for_update(update.stable_current(), self.update_fetch)
+            if BUILD:   # a test build follows the test builds: they carry the newest features, so they come before any release
+                nightly = update.check_nightly(BUILD, self.update_fetch)
+                if nightly["status"] in ("update", "current"):
+                    res = nightly
         if res["status"] in ("update", "current", "no_releases"):
             with self._cache_lock:
                 self._update_cache = (time.time(), res)
@@ -1015,7 +1019,7 @@ def make_handler(hub):
                 if app is None:  # app-wide routes
                     if parts == ["api", "self-update"]:
                         ch = self._body().get("channel", "stable")
-                        if ch not in ("stable", "nightly"):
+                        if ch not in ("stable", "nightly", "release"):
                             raise ValueError("Unknown update channel.")
                         return self._send(200, hub.updater.start(channel=ch))
                     if parts == ["api", "client-error"]:
