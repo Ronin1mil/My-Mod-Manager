@@ -56,6 +56,63 @@ def validate_steamcmd(path, user):
     return p
 
 
+def steamcmd_candidates():
+    """Where people usually unzip steamcmd (Valve's guide suggests C:\\steamcmd), in the order they are tried."""
+    import os
+    import shutil
+    import sys
+    home = Path.home()
+    found = shutil.which("steamcmd")
+    out = [Path(found)] if found else []
+    if sys.platform == "win32":
+        from .paths import _fixed_drives
+        dirs = [Path(f"{d}:/") / n for d in _fixed_drives() for n in ("steamcmd", "SteamCMD", "Games/steamcmd", "Tools/steamcmd")]
+        for env in ("ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA", "APPDATA"):
+            if os.environ.get(env):
+                dirs.append(Path(os.environ[env]) / "steamcmd")
+        for d in ("", "Downloads", "Desktop", "Documents"):
+            dirs += [home / d / "steamcmd", home / d / "steamcmd_win32"]
+            out.append(home / d / "steamcmd.exe")
+        out += [d / "steamcmd.exe" for d in dirs]
+    else:
+        out += [home / "steamcmd/steamcmd.sh", home / ".steam/steamcmd/steamcmd.sh", home / "Steam/steamcmd.sh",
+                Path("/usr/games/steamcmd"), Path("/usr/bin/steamcmd"), Path("/usr/local/bin/steamcmd")]
+    return list(dict.fromkeys(out))
+
+
+def find_steamcmd():
+    """The first steamcmd executable in the usual places, or None. Only looks; never runs it."""
+    for p in steamcmd_candidates():
+        try:
+            if p.is_file():
+                return p
+        except OSError:
+            continue
+    return None
+
+
+def steamcmd_accounts(exe):
+    """Account names steamcmd has a cached login for (from its config/config.vdf "Accounts" block). Names only."""
+    try:
+        text = (Path(exe).parent / "config" / "config.vdf").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return []
+    tokens = re.findall(r'"((?:[^"\\]|\\.)*)"|([{}])', text)
+    names, depth, at = [], 0, None
+    for i, (word, brace) in enumerate(tokens):
+        if brace == "{":
+            depth += 1
+            if at is None and i and tokens[i - 1][0].lower() == "accounts":
+                at = depth
+            elif at is not None and depth == at + 1 and i and tokens[i - 1][0]:
+                names.append(tokens[i - 1][0])
+        elif brace == "}":
+            if depth == at:
+                break
+            depth -= 1
+    return [n for n in names if USER_RE.match(n)]
+
+
 def content_dir(steamcmd, game):
     """Where steamcmd puts downloads: next to its executable."""
     return Path(steamcmd).resolve().parent / "steamapps" / "workshop" / "content" / game.app_id

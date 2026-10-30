@@ -23,3 +23,10 @@ def _no_browser(url, *a, **k):
 
 
 webbrowser.open = webbrowser.open_new = webbrowser.open_new_tab = _no_browser
+
+# A Rescan looks for steamcmd in the usual places on this PC; tests must not pick up (and save) a real one.
+# Tests of the search itself call REAL_FIND_STEAMCMD or steamcmd_candidates with their own folders.
+from modmanager import workshop as _workshop  # noqa: E402
+
+REAL_FIND_STEAMCMD = _workshop.find_steamcmd
+_workshop.find_steamcmd = lambda: None

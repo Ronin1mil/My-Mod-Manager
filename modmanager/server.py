@@ -269,6 +269,24 @@ class GameApp:
     def rescan(self, light=False):
         return self.apply_mods(self.read_mods(), light)
 
+    def look_for_steamcmd(self, find=None, accounts=None):
+        """Part of a Rescan: when Settings has no steamcmd (or one that is gone), look in the usual places and fill it in,
+        plus the account name when steamcmd has exactly one cached login and none is set. Never runs steamcmd.
+        -> {"steamcmd": path, "steam_user": name or ""} when something was filled in, else None."""
+        s = self.store.settings()
+        if s["steamcmd"] and Path(s["steamcmd"]).is_file():
+            return None
+        exe = (find or workshop.find_steamcmd)()
+        if not exe:
+            return None
+        new = {"steamcmd": str(exe)}
+        if not s["steam_user"]:
+            names = (accounts or workshop.steamcmd_accounts)(exe)
+            if len(names) == 1:
+                new["steam_user"] = names[0]
+        self.store.update_settings(**new)
+        return {"steamcmd": new["steamcmd"], "steam_user": new.get("steam_user", "")}
+
     # ---- conflicts: kept per load order, worked out ahead of the click ----
     def parse_cache_file(self):
         return config_dir() / "parse-cache.json.gz"
@@ -1172,7 +1190,8 @@ def make_handler(hub):
                 mods = app.read_mods()
                 with hub.lock:
                     app.apply_mods(mods, light)
-                    return self._send(200, app.state())
+                    found = None if light else app.look_for_steamcmd()   # only a Rescan the user pressed, not window focus
+                    return self._send(200, {**app.state(), "steamcmd_found": found})
             except TooLarge as e:
                 self.close_connection = True
                 self._send(413, {"error": str(e)})

@@ -94,7 +94,9 @@ async function load(rescanMsg) {
   if (!cur()) { S.active = S.playsets.length ? S.playsets[0].id : S.no_mods.id; await api(`playsets/${S.active}/activate`, {}); }
   if (rescanMsg) {
     const d = S.diff, bits = [d.added && `${d.added} new`, d.updated && `${d.updated} updated`, d.removed && `${d.removed} removed`].filter(Boolean);
-    toast(bits.length ? `Scan: ${bits.join(', ')} (${d.total} mods)` : `Scan: no changes (${d.total} mods)`);
+    const sc = rescanMsg.steamcmd_found;   // a Rescan also looks for steamcmd when Settings has none
+    toast((bits.length ? `Scan: ${bits.join(', ')} (${d.total} mods)` : `Scan: no changes (${d.total} mods)`) +
+      (sc ? `. Found steamcmd: ${sc.steamcmd}${sc.steam_user ? ` (account ${sc.steam_user})` : ''}; it is now set in Settings` : ''));
   }
   setLogo(G); showImportButton(); applyUI();
   document.title = GNAME() + ' · Ronin Mod Manager';
@@ -481,7 +483,7 @@ async function openPaths(first) {
       <div class="card">
         <h3>Downloading Workshop mods</h3>
         <p class="desc">Optional. <b>Open in Steam</b> needs nothing. To download straight from here, give the path to <code>steamcmd</code> and the Steam account name it is already logged in with. No password is ever asked for, stored or sent by this app.
-          Get steamcmd from Valve: <a href="${STEAMCMD_URL}" target="_blank" rel="noopener noreferrer">SteamCMD download and setup</a> (unzip it, run <code>steamcmd +login &lt;your account&gt;</code> once yourself, then put the path to <code>steamcmd.exe</code> here).</p>
+          Get steamcmd from Valve: <a href="${STEAMCMD_URL}" target="_blank" rel="noopener noreferrer">SteamCMD download and setup</a> (unzip it, run <code>steamcmd +login &lt;your account&gt;</code> once yourself, then put the path to <code>steamcmd.exe</code> here). Left empty, <b>Rescan</b> looks for it in the usual places, such as <code>C:\steamcmd</code> or Downloads, and fills it in.</p>
         <label class="fld" for="p-cmd">steamcmd executable</label><input type="text" id="p-cmd" value="${esc(S.steamcmd)}">
         <label class="fld" for="p-su">Steam account name</label><input type="text" id="p-su" value="${esc(S.steam_user)}">
       </div>
@@ -685,7 +687,7 @@ document.addEventListener('click', guard(async e => {
     $('d-files').innerHTML = '<div class="mut">' + r.total + ' files' + (r.truncated ? ' (first ' + r.files.length + ')' : '') + '</div><div id="d-ft"></div>';
     mountTree($('d-ft'), r.files.map(f => ({path: f.path, tag: f.overridden_by ? `<span class="b warn">overridden by ${esc(nameOf(f.overridden_by))}</span>` : f.overrides.length ? `<span class="b ok">wins over ${f.overrides.length}</span>` : ''})));
   }
-  if (ds.dl === 'rescan') { await api('rescan', {}); await load(true); lastMissing = lastMissing.filter(m => !S.mods.some(x => String(x.remote_id) === m.workshop_id)); render(); }
+  if (ds.dl === 'rescan') { await load(await api('rescan', {})); lastMissing = lastMissing.filter(m => !S.mods.some(x => String(x.remote_id) === m.workshop_id)); render(); }
   if (ds.dl === 'steam' || ds.dl === 'steamcmd') {
     const r = await api('downloads', {ids: lastMissing.map(m => m.workshop_id), method: ds.dl});
     if (ds.dl === 'steam') toast('Opened in Steam. Press Subscribe on each, then Rescan once Steam has finished.');
@@ -713,7 +715,7 @@ view.addEventListener('dragend', () => { drag = null; render(); });
 
 $('auto').onchange = guard(() => patch({auto_sort: $('auto').checked}));
 $('sortnow').onclick = guard(async () => { Object.assign(cur(), await api(`playsets/${S.active}/autosort`, {})); render(); analyse(); });
-$('rescan').onclick = guard(() => api('rescan', {}).then(() => load(true)));
+$('rescan').onclick = guard(() => api('rescan', {}).then(r => load(r)));
 $('new').onclick = guard(async () => {
   const n = prompt('Playset name'); if (!n) return;
   const r = await api('playsets', {name: n}); await api(`playsets/${r.id}/activate`, {}); load();

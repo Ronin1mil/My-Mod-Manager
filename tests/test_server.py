@@ -173,6 +173,20 @@ class LoadOrder(Base):
         self.assertEqual(self.req("GET", f"/api/analyse/{pid}")[1]["conflicts"], [])
 
 
+class RescanFindsSteamcmd(Base):
+    def test_a_pressed_rescan_looks_for_steamcmd_but_window_focus_does_not(self):
+        exe = self.r / "sc" / "steamcmd.exe"
+        exe.parent.mkdir()
+        exe.write_text("")
+        with mock.patch("modmanager.workshop.find_steamcmd", return_value=exe) as find:
+            st = self.post("/api/rescan", {"light": True})[1]
+            self.assertIsNone(st["steamcmd_found"])
+            find.assert_not_called()
+            st = self.post("/api/rescan")[1]
+        self.assertEqual(st["steamcmd_found"]["steamcmd"], str(exe))
+        self.assertEqual(st["steamcmd"], str(exe))
+
+
 class Hardening(Base):
     def test_bad_host_and_origin_are_refused(self):
         self.assertEqual(self.req("GET", "/api/state", headers={"Host": "evil.example"})[0], 403)
