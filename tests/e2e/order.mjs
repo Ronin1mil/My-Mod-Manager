@@ -117,6 +117,7 @@ try {
   await page.waitForSelector('text=A needs Lib');
   await page.click('[data-fix=enable]');
   await page.click('[data-tab=order]');
+  await page.waitForFunction(() => document.querySelectorAll('#view .row.off').length === 0, null, {timeout: 5000});   // the fix is applied by the app, then the list redraws
   assert.equal(await page.locator('#view .row.off').count(), 0);
   assert.match(await page.textContent('#status'), /5 mods active/);
 
