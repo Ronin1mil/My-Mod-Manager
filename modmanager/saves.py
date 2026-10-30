@@ -94,16 +94,17 @@ def activate(game_saves, profile_saves):
         return "linked"
     if not game_saves.is_dir():
         raise ValueError(f"{game_saves} exists and is not a folder.")
+    try:
+        game_saves.rmdir()  # an empty folder holds nothing to keep: it is simply replaced
+        _create_link(profile_saves, game_saves)
+        return "linked"
+    except OSError:
+        pass
     shared = shared_dir(game_saves)
     if not os.path.lexists(str(shared)):
         aside, note = shared, "linked_after_moving"
     else:
-        try:
-            game_saves.rmdir()  # an empty folder next to a kept shared one can simply be replaced
-            _create_link(profile_saves, game_saves)
-            return "linked"
-        except OSError:
-            aside, note = _backup_name(game_saves), "linked_after_backup"
+        aside, note = _backup_name(game_saves), "linked_after_backup"
     game_saves.rename(aside)
     try:
         _create_link(profile_saves, game_saves)
