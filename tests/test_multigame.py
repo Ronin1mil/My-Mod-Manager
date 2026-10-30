@@ -214,6 +214,26 @@ class Logo(GameCase):
         s, body, r = self.req("GET", "/api/logo")
         self.assertEqual((s, body, r.getheader("Content-Type")), (200, b"\x89PNGcustom", "image/png"))
 
+    def test_the_logo_comes_without_creating_the_game_and_is_revalidated_not_refetched(self):
+        from modmanager.paths import config_dir
+        (config_dir(games.CK3)).mkdir(parents=True, exist_ok=True)
+        (config_dir(games.CK3) / "logo.png").write_bytes(b"\x89PNGlogo")
+        self.assertNotIn("ck3", self.hub.apps)
+        s, body, r = self.req("GET", "/api/ck3/logo")
+        self.assertEqual((s, body), (200, b"\x89PNGlogo"))
+        self.assertNotIn("ck3", self.hub.apps, "reading every mod folder must not hold up the logo")
+        tag = r.getheader("ETag")
+        self.assertTrue(tag)
+        self.assertEqual(r.getheader("Cache-Control"), "no-cache")
+        s, body, r = self.req("GET", "/api/ck3/logo", headers={"If-None-Match": tag})
+        self.assertEqual((s, body), (304, b""))
+
+    def test_a_game_with_no_logo_gets_a_plain_404_and_the_page_draws_nothing(self):
+        self.assertEqual(self.req("GET", "/api/ck3/logo")[0], 404)
+        js = (Path(__file__).parent.parent / "modmanager/static/app.js").read_text()
+        self.assertNotIn("CREST", js, "no stand-in shield behind or instead of the logo")
+        self.assertIn("class=\"logo-box\" hidden", js)
+
 
 if __name__ == "__main__":
     unittest.main()

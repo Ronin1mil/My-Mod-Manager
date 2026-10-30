@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- The game logo shows at once: it is served straight from the file on your PC (it no longer waits for the game's mods to be read first) and the browser keeps it. No shield is drawn behind it any more, and a game with no logo shows nothing there. The Steam logo download is skipped for games with no Steam app id
 - A copy running a test build follows the test builds first: the update notice and "Check for updates now" offer a newer test build (the banner says "Test build abc1234 is available"), and no longer offer the release of the version it is already on. A release with a higher version number is still offered. Settings > App & updates > Test builds has a new **Go back to the release** button for leaving the test channel
 
 ## 0.9.1 - Fast switching between big playsets

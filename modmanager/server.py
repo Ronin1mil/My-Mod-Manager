@@ -90,7 +90,7 @@ class GameApp:
                                  or find_first(workshop_dirs(g, self.extra_libraries)))
         self.game_version = self.cli["game_version"] or game_version(self.game_root, self.game)
         self.logo = find_logo(g, self.logo_arg, self.game_root, self.extra_libraries)
-        if not self.logo and not self.logo_arg and self.fetch_logos and not self.logo_pending:
+        if not self.logo and not self.logo_arg and self.fetch_logos and not self.logo_pending and self.game.app_id != "0":
             self.logo_pending = True
             threading.Thread(target=self._fetch_logo, daemon=True, name="logo").start()
         self.rescan()
@@ -825,7 +825,8 @@ def make_handler(hub):
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("X-Frame-Options", "DENY")
             self.send_header("Referrer-Policy", "no-referrer")
-            self.send_header("Cache-Control", "no-store")
+            if not any(k.lower() == "cache-control" for k, _ in headers):
+                self.send_header("Cache-Control", "no-store")
             for k, v in headers:
                 self.send_header(k, v)
             self.end_headers()
@@ -891,8 +892,41 @@ def make_handler(hub):
             p = self.path.split("?")[0].strip("/").split("/")
             if len(p) >= 4 and p[0] == "api" and p[2] in ("conflicts", "tree") and p[1] in hub.games:
                 return self._heavy_get(p)
+            if len(p) == 3 and p[0] == "api" and p[1] in hub.games and p[2] == "logo":
+                return self._logo(p[1])
             with hub.lock:
                 self._get()
+
+        def _logo(self, game_id):
+            """The game's logo. Answered without creating the game (that reads every mod folder), from the PC's own files;
+            only when none is there is the game created and, if it is fetching the logo from Steam, waited for. The browser
+            keeps it (revalidated by ETag, so a new logo.png shows at once and an unchanged one costs nothing)."""
+            if not self._host_ok():
+                return self._send(403, {"error": "bad host"})
+            try:
+                app = hub.apps.get(game_id)
+                logo = app.logo if app else None
+                if not logo:
+                    logo = find_logo(hub.games[game_id], hub.overrides.get(game_id, {}).get("logo"))
+                if not logo:
+                    app = hub.app(game_id)
+                    deadline = time.time() + 8
+                    while not app.logo and app.logo_pending and time.time() < deadline:
+                        time.sleep(0.1)
+                    logo = app.logo
+                if not logo:
+                    return self._send(404, {"error": "no logo"})
+                st = logo.stat()
+                tag = f'"{st.st_mtime_ns:x}-{st.st_size:x}"'
+                head = [("ETag", tag), ("Cache-Control", "no-cache")]
+                if self.headers.get("If-None-Match") == tag:
+                    return self._send(304, b"", LOGO_TYPES[logo.suffix.lower()], head)
+                return self._send(200, logo.read_bytes(), LOGO_TYPES[logo.suffix.lower()], head)
+            except OSError:
+                return self._send(404, {"error": "no logo"})
+            except Exception as e:
+                errorlog.write_exception("server", e, self.path.split("?")[0])
+                return self._send(500, {"error": f"{type(e).__name__}: {e}", "log_file": str(errorlog.log_path())})
 
         def _heavy_get(self, p):
             """Slow read-only views: snapshot under the lock, compute outside it."""

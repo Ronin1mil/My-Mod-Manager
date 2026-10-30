@@ -910,16 +910,15 @@ function applyUI() {
   else if (G && GI) applyTheme(GI.games.find(g => g.id === G) || {});
   root.setProperty('--zoom', String((TEXT_SIZES[S && S.ui_text] || TEXT_SIZES.normal)[1]));
 }
-// The header always shows the game's logo, never its name as text. While the logo is still being fetched
-// (or if it cannot be had) a neutral crest in the game's colours stands in, so nothing flips or jumps.
-const CREST = '<svg class="crest" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 4 56 12v20c0 14-10 24-24 28C18 56 8 46 8 32V12z" fill="none" stroke="currentColor" stroke-width="3"/><path d="M32 16v32M20 26h24" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>';
+// The header shows the game's own logo (its picture with the name in it) and nothing else: no stand-in while it loads, and
+// nothing at all when there is none. The app keeps the file and the browser revalidates it, so it is there as the page is.
 let logoTry = 0;
 function setLogo(id) {
   const box = $('logo');
   if (box.dataset.k === id) return;
   box.dataset.k = id; logoTry = 0;
-  box.innerHTML = `<div class="logo-box">${CREST}<img alt="" src="/api/${id}/logo"></div><span class="sub">Ronin Mod Manager</span>`;
-  const img = box.querySelector('img');
+  box.innerHTML = `<div class="logo-box" hidden><img alt="" src="/api/${encodeURIComponent(id)}/logo"></div><span class="sub">Ronin Mod Manager</span>`;
+  const img = box.querySelector('img'), wrap = box.querySelector('.logo-box');
   img.onload = () => {   // a dark logo (e.g. black lettering) would vanish on the dark theme: lighten it
     try {
       const c = document.createElement('canvas'); c.width = c.height = 48;
@@ -928,9 +927,9 @@ function setLogo(id) {
       for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 128) { sum += (d[i] + d[i + 1] + d[i + 2]) / 3; n++; }
       if (n > 20 && sum / n < 70) img.style.filter = 'invert(1) brightness(.92) drop-shadow(0 2px 6px rgba(0,0,0,.6))';
     } catch (e) { /* cross-origin or blocked canvas: leave as is */ }
-    img.classList.add('ok');
+    wrap.hidden = false; img.classList.add('ok');
   };
-  img.onerror = () => { if (logoTry++ < 8 && box.dataset.k === id) setTimeout(() => { if (box.dataset.k === id) img.src = `/api/${id}/logo?r=${logoTry}`; }, 1500); };
+  img.onerror = () => { if (logoTry++ < 2 && box.dataset.k === id) setTimeout(() => { if (box.dataset.k === id) img.src = `/api/${encodeURIComponent(id)}/logo?r=${logoTry}`; }, 1500); };
 }
 async function useGame(id, first) {
   gen++; G = id; S = A = C = P = null; sel = null; tab = 'order'; cmpWith = null; lastMissing = []; setupShown = false;
@@ -1014,6 +1013,10 @@ $('game').onchange = guard(async () => {
 });
 window.addEventListener('hashchange', () => { const w = location.hash.slice(1); if (GI && w !== G && GI.games.some(g => g.id === w)) useGame(w, true).catch(e => fail(e, 'hash')); });
 (async () => {
+  try {   // ask for the logo of the game most likely to open while the game list is still on its way
+    const early = location.hash.slice(1) || localStorage.getItem('mm-game') || '';
+    if (/^[A-Za-z0-9_.-]{1,64}$/.test(early)) setLogo(early);
+  } catch (e) { /* storage may be blocked */ }
   GI = await app('games');
   $('ver').innerHTML = 'v' + esc(GI.version) + (GI.build ? `<br><b class="testbuild" title="A test build of the next version. Settings > App &amp; updates shows how to go back to a release.">TEST BUILD ${esc(GI.build)}</b>` : '');
   fillGames();
