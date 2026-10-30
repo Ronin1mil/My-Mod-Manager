@@ -173,6 +173,22 @@ class Store:
             self.data["active"] = next(iter(self.data["playsets"]), None)
         self.save()
 
+    def replace_mod(self, old, new):
+        """Every playset that lists `old` lists `new` in its place (same position, same on/off), or only keeps `new` where
+        it already had both. -> how many playsets changed."""
+        n = 0
+        for ps in self.data["playsets"].values():
+            if old not in ps["mods"]:
+                continue
+            had = new in ps["mods"]
+            ps["mods"] = [m for m in ps["mods"] if m != old] if had else [new if m == old else m for m in ps["mods"]]
+            off = old in ps["disabled"]
+            ps["disabled"] = [m for m in ps["disabled"] if m != old] + ([new] if off and not had and new not in ps["disabled"] else [])
+            n += 1
+        if n:
+            self.save()
+        return n
+
     def merge(self, a, b, name):
         """A NEW playset with everything of `a` in its order, then what only `b` has (in b's order). A mod is enabled
         if it is enabled in either. Neither playset is changed."""

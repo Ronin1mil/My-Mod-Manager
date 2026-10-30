@@ -62,6 +62,7 @@ class GameApp:
         self.opener = opener  # tests inject a fake "open this URL" (Steam)
         self.downloads = workshop.Downloads(game)
         self.lock = threading.RLock()
+        self.state_lock = None       # set by a Hub: the lock its requests hold (background work that changes state takes it)
         self.mods, self.files, self.diff = {}, {}, {}
         self.scan_gen = 0            # grows whenever the mods on disk changed: everything computed from them is then stale
         self._results = {}           # conflict results by (load order, base game, scan_gen): switching playsets is a lookup
@@ -639,9 +640,21 @@ class GameApp:
             return {"method": "steam", "opened": workshop.open_pages(ids, self.opener, delay=0.3)}
         if method == "steamcmd":
             s = self.store.settings()
-            job = self.downloads.start(s["steamcmd"], s["steam_user"], ids)
+            after = self._install_download if self.game.kind == "modules" else None
+            job = self.downloads.start(s["steamcmd"], s["steam_user"], ids, after=after)
             return {"method": "steamcmd", "job": job}
         raise ValueError("Unknown download method.")
+
+    def _install_download(self, wid, folder):
+        """A steamcmd download for a Bannerlord-style game (runs on the download thread): the game only loads modules
+        from its Modules folder or Steam's own subscriptions, so the item is copied into Modules, and playsets listing
+        the Workshop item now list that copy. Steam never updates it; while it is there the game loads it, not a
+        subscribed copy (a way to keep a version that works)."""
+        rep = install.install_module_folder(folder, self.game_root, wid, self.cfg)
+        with self.state_lock or self.lock:
+            self.rescan()
+            self.store.replace_mod(f"ws:{wid}", rep["id"])
+        return rep
 
     # ---- install / launch ----
     def install_zip(self, path, name):
@@ -850,6 +863,7 @@ class Hub:
                 self.apps[game_id] = self.factory(self.games[game_id], fetch_logos=self.settings.get()["fetch_logos"] and os.environ.get("MODMANAGER_FETCH_LOGOS") != "0",
                                                   auto_import_launcher=self.settings.get()["auto_import_launcher"] and os.environ.get("MODMANAGER_AUTO_IMPORT") != "0",
                                                   **self.overrides.get(game_id, {}))
+                self.apps[game_id].state_lock = self.lock
                 if self.prewarm:
                     self.apps[game_id].prewarm_lock = self.lock
                     self.apps[game_id].start_prewarm()

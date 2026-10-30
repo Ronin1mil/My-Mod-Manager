@@ -196,6 +196,15 @@ def _module_info(mid_key, sub, root, source, remote_id):
     return info
 
 
+def _workshop_mark(d):
+    """The Workshop id of a Modules copy the app installed from a steamcmd download (install.WORKSHOP_MARK), else None."""
+    try:
+        wid = _read(d / ".ronin-workshop-id").strip()
+    except OSError:
+        return None
+    return wid if re.fullmatch(r"\d{1,20}", wid) else None
+
+
 def scan_modules(game_root, workshop_dir=None):
     """Modules of a Bannerlord-style game: <install>/Modules/<x>/SubModule.xml first, then the Workshop folder (each item
     folder is itself a module). A module id found twice keeps its first copy, like the game does."""
@@ -209,7 +218,7 @@ def scan_modules(game_root, workshop_dir=None):
                 sub = parse_submodule(_read(sm))
                 if sub and sub["id"] not in seen:
                     seen.add(sub["id"])
-                    mods[f"local:{sub['id']}"] = _module_info(f"local:{sub['id']}", sub, d, "local", None)
+                    mods[f"local:{sub['id']}"] = _module_info(f"local:{sub['id']}", sub, d, "local", _workshop_mark(d))
             except OSError:
                 continue
     if workshop_dir and _isdir(workshop_dir):

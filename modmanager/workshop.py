@@ -151,7 +151,9 @@ class Downloads:
         self.lock = threading.Lock()
         self._n = 0
 
-    def start(self, steamcmd, user, ids):
+    def start(self, steamcmd, user, ids, after=None):
+        """`after(id, folder)`, when given, runs for each item that downloaded (e.g. to install it); an error there
+        fails that item with its message."""
         exe = validate_steamcmd(steamcmd, user)
         ids = clean_ids(ids)
         with self.lock:
@@ -162,12 +164,12 @@ class Downloads:
             job = {"id": jid, "state": "queued", "items": {i: {"state": "queued", "message": ""} for i in ids},
                    "dir": str(content_dir(exe, self.game))}
             self.jobs[jid] = job
-        t = threading.Thread(target=self._run, args=(job, exe, user, ids), daemon=True)
+        t = threading.Thread(target=self._run, args=(job, exe, user, ids, after), daemon=True)
         t.start()
         job["thread"] = t
         return self.public(job)
 
-    def _run(self, job, exe, user, ids):
+    def _run(self, job, exe, user, ids, after=None):
         job["state"] = "running"
         for wid in ids:
             it = job["items"][wid]
@@ -179,6 +181,11 @@ class Downloads:
                 ok = r.returncode == 0 and "Success" in out and (Path(job["dir"]) / wid).is_dir()
                 it["state"] = "done" if ok else "failed"
                 it["message"] = "" if ok else failure_line(out)
+                if ok and after:
+                    try:
+                        it["installed"] = after(wid, Path(job["dir"]) / wid)["folder"]
+                    except Exception as e:   # downloaded, but not usable yet: say why
+                        it["state"], it["message"] = "failed", f"Downloaded, but not installed: {e}"[:200]
                 if not ok and _needs_login(out):   # every other item would fail the same way: stop and say what to do
                     msg = login_help(exe, user)
                     for rest in job["items"].values():

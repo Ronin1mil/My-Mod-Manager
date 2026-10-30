@@ -144,3 +144,4 @@ button.star{background:none;border:0;padding:0 4px;font-size:16px;line-height:1;
 .ctx button:hover,.ctx button:focus{background:var(--bg);outline:none}.ctx button.danger{color:var(--err)}
 .ctx hr{border:0;border-top:1px solid var(--line);margin:4px 0}
 .steam-step{margin-top:8px;line-height:2}.steam-step button{margin-left:4px}
+.dl-ways{font-size:12px;margin-top:8px}

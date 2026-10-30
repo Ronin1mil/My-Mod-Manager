@@ -320,6 +320,37 @@ def install_modules_archive(archive, game_root, archive_name="mod.zip", cfg=None
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+WORKSHOP_MARK = ".ronin-workshop-id"   # in a Modules/<id> folder: the Workshop item this copy was downloaded from
+
+
+def install_module_folder(src, game_root, workshop_id, cfg=None):
+    """Copy a module that steamcmd downloaded into <game_root>/Modules/<ModuleId> and mark which Workshop item it is,
+    so playsets that list the item find this copy. An existing copy is moved to the backup folder first; steamcmd's
+    own copy stays (it is its cache: the next download of the item only fetches what changed). -> {folder, name, upgraded, id}"""
+    from .scan import parse_submodule
+    src = Path(src)
+    if not game_root or not (Path(game_root) / "Modules").is_dir():
+        raise ValueError("The game's Modules folder was not found. Set the game folder in Settings.")
+    roots = find_module_roots(src)
+    if not roots:
+        raise ValueError("The download does not contain a module (no SubModule.xml found).")
+    sub = parse_submodule((roots[0] / "SubModule.xml").read_text(encoding="utf-8-sig", errors="replace"))
+    if not sub:
+        raise ValueError("Its SubModule.xml could not be read.")
+    if sub["official"] and sub["id"] in ("Native", "SandBoxCore", "Sandbox", "StoryMode", "CustomBattle"):
+        raise ValueError(f"{sub['id']} is an official module and is never replaced.")
+    dest = Path(game_root) / "Modules" / sub["id"]
+    tmp = dest.with_name(dest.name + ".ronin-copy")
+    shutil.rmtree(tmp, ignore_errors=True)
+    shutil.copytree(str(roots[0]), str(tmp))   # copied next to it first: a failed copy never leaves half a module
+    (tmp / WORKSHOP_MARK).write_text(str(workshop_id), encoding="utf-8")
+    upgraded = dest.exists()
+    if upgraded:
+        _move_to_backup(dest, sub["id"], cfg)
+    tmp.rename(dest)
+    return {"folder": sub["id"], "name": sub["name"], "upgraded": upgraded, "id": f"local:{sub['id']}"}
+
+
 def uninstall_module(game_root, mod, cfg=None):
     """Move an installed module's folder to the backup folder. Official modules are refused."""
     if mod["source"] != "local" or not mod["root"] or mod.get("official"):

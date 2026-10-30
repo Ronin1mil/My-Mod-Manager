@@ -35,6 +35,8 @@ The enabled modules of the playset (or the part chosen under **Launch part…**)
 ## Installing
 **Install mod…** takes a `.zip` / `.tar*` that contains a module (with or without a `Modules/` wrapper) and puts it in `<install>/Modules/<ModuleId>`; an existing copy is moved to the backup folder first. Official modules are never replaced or uninstalled. Workshop modules are installed and updated by Steam.
 
+**Download with steamcmd** (Presets tab) copies each downloaded item into `<install>/Modules/<ModuleId>` (an existing copy goes to the backup folder first) and writes the item's Workshop id to `.ronin-workshop-id` inside it; the scan reads that back as the module's `remote_id`, and playsets that listed `ws:<id>` are switched to `local:<ModuleId>` in place. steamcmd's own copy stays as its cache. Steam never updates these copies, and as the `Modules` copy of a module id wins, the game loads it rather than a subscribed copy: a way to keep a version that works. Uninstall it here to go back to Steam's copy. **Open in Steam** (one page at a time, you press Subscribe) leaves installing and updating to Steam.
+
 ## Import
 The launcher's last module selection (`Documents/Mount and Blade II Bannerlord/Configs/LauncherData.xml`, `<UserModData><Id/><IsSelected/>`) can be imported. On the real PC checked this file did not exist (the Documents folder held only `Game Saves`), so there was nothing to import; where it exists it can be imported from the Import menu as one playset ("Launcher selection"); unselected modules stay in it, switched off; modules that are not installed are reported.
 
