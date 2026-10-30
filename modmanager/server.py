@@ -6,7 +6,9 @@ URLs:  /api/games, /api/settings, /api/update-check          app-wide
 import contextlib
 import json
 import os
+import pickle
 import shutil
+import subprocess
 import tempfile
 import threading
 import time
@@ -15,7 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from . import APP_NAME, BUILD, __version__, collections, compare, detect, games as gamesmod, install, launch, order, presets, saves, scan, update, updates
-from . import customgames, errorlog, gamelog, launcherdb, perflog, selfupdate, workshop
+from . import bootworker, customgames, errorlog, gamelog, launcherdb, perflog, selfupdate, workshop
 from .library import Library
 from .paths import LOGO_TYPES, config_dir, fetch_best_logo, find_first, find_logo, game_version, launcher_exe, user_dirs, workshop_dirs
 from .store import GlobalSettings, Store, write_load_file
@@ -286,8 +288,7 @@ class GameApp:
         say = say or (lambda _t: None)
         scan.load_cache(self.parse_cache_file())
         data = self.store.data
-        ids = [p for p in [data["active"], *data["playsets"]] if p in data["playsets"]]
-        ids = list(dict.fromkeys(ids))
+        ids = self.warm_order()
         for n, pid in enumerate(ids, 1):
             name = data["playsets"][pid]["name"]
             head = f"playset {n} of {len(ids)} \"{name}\""
@@ -408,15 +409,8 @@ class GameApp:
         that can run without holding it, so switching games or editing a playset never waits for a scan.
         An answer worked out before is returned as it was. A request from the user stops any older scan (so clicks
         cannot pile up); the background pre-scan (`background=True`) is the one that gives way to the user."""
-        if ordr is None:
-            ps = self.store.get(pid)
-            enabled = [m for m in ps["mods"] if m not in ps["disabled"]]
-            ordr = order.compute_order(self.mods, enabled, ps["auto_sort"], self.game_version)["order"]
+        ordr, van, key = self._scan_inputs(pid, ordr)
         mods, files, defs, gen, trusted = dict(self.mods), self.files, self.game.def_dirs, self.scan_gen, self._trusted
-        van = None
-        if self.game_dir and self.game_dir.is_dir() and self.store.settings()["include_vanilla"]:
-            van = (self.game_dir, self.game.vanilla_only)
-        key = (tuple(ordr), str(van[0]) if van else "", gen)
         hit = self._results.get(key)
         if hit is not None:
             return lambda: hit
@@ -439,18 +433,62 @@ class GameApp:
                     t.note(cancelled=True)
                     return {"conflicts": [], "counts": {}, "truncated": False, "pending": True, "cancelled": True}
                 t.note(found=len(conflicts))
-            counts = {}
-            for c in conflicts:
-                k = "vanilla" if c.get("vanilla") else c["kind"]
-                counts[k] = counts.get(k, 0) + 1
-            cap = scan.MAX_PER_KIND * 4
-            res = {"conflicts": conflicts[:cap], "counts": counts, "truncated": len(conflicts) > cap, "pending": False}
+            res = scan.summarize(conflicts)
             if gen == self.scan_gen:   # the mods changed meanwhile: this answer is already out of date
-                if len(self._results) >= RESULT_CACHE:
-                    self._results.pop(next(iter(self._results)), None)
-                self._results[key] = res
+                self._keep_result(key, res)
             return res
         return run
+
+    def _scan_inputs(self, pid, ordr=None):
+        """(load order, base game or None, result key) of a playset's conflict scan."""
+        if ordr is None:
+            ps = self.store.get(pid)
+            enabled = [m for m in ps["mods"] if m not in ps["disabled"]]
+            ordr = order.compute_order(self.mods, enabled, ps["auto_sort"], self.game_version)["order"]
+        van = None
+        if self.game_dir and self.game_dir.is_dir() and self.store.settings()["include_vanilla"]:
+            van = (self.game_dir, self.game.vanilla_only)
+        return ordr, van, (tuple(ordr), str(van[0]) if van else "", self.scan_gen)
+
+    def _keep_result(self, key, res):
+        if len(self._results) >= RESULT_CACHE:
+            self._results.pop(next(iter(self._results)), None)
+        self._results[key] = res
+
+    def warm_order(self):
+        """The playsets the start-up pass works out, the active one first."""
+        data = self.store.data
+        return list(dict.fromkeys(p for p in [data["active"], *data["playsets"]] if p in data["playsets"]))
+
+    def warm_job(self):
+        """What a start-up worker process needs to work out every playset's conflicts on its own (see bootworker), or
+        None when there is nothing to compare. Only plain data: the worker reads files, it never writes."""
+        if not self.game.has_conflicts or not self.mods:
+            return None
+        names = self.store.data["playsets"]
+        todo = []
+        for pid in self.warm_order():
+            ordr, van, key = self._scan_inputs(pid)
+            if key not in self._results:
+                todo.append({"key": key, "name": names[pid]["name"], "order": ordr, "vanilla": van})
+        if not todo:
+            return None
+        return {"mods": dict(self.mods), "defs": self.game.def_dirs, "cache": str(self.parse_cache_file()), "playsets": todo}
+
+    def adopt_warm(self, job, answer):
+        """Take a worker's answers (made for `job`) as if this process had worked them out. Answers for mods that changed
+        since the job was made are dropped. Returns how many playsets were taken."""
+        if job["mods"] != self.mods:
+            return 0
+        scan.add_entries(answer["entries"])
+        self.files.update(answer["files"])
+        self._trusted.update(answer["trusted"])
+        n = 0
+        for ps, res in zip(job["playsets"], answer["results"]):
+            if ps["key"][2] == self.scan_gen:
+                self._keep_result(ps["key"], res)
+                n += 1
+        return n
 
     def compare(self, a, b):
         res = compare.compare_playsets(self.mods, self.store.get(a), self.store.get(b))
@@ -1286,26 +1324,105 @@ def make_handler(hub):
 def boot(hub, say=print, first=None):
     """Everything slow, done once before the window opens: read the mod folders of every game that has been used, load what
     was read last time, and work out the conflicts of every playset. Only the file reads are saved between starts; the
-    comparing is done again every time, so a start takes about as long as the last one (~33 s for 12 CK3 and 3 Victoria 3
-    playsets on the dev PC, most of it comparing). Progress goes to `say` (the terminal, when there is one)."""
+    comparing is done again every time. The playsets are shared out over a few worker processes (bootworker) so they
+    are compared side by side on separate cores; a game whose workers cannot start or fail is checked here instead, one
+    playset after another as before. Progress goes to `say` (the terminal, when there is one)."""
     t0 = time.time()
     last = hub.settings.get().get("last_game")
     used = [g for g in hub.games if g == first or g == last or (config_dir() / g).is_dir()]
     if not used:
         return
     say("Getting ready: reading mods and checking every playset for conflicts.")
+    apps = {}
     for gid in used:
         name = hub.games[gid].name
         t = time.time()
         say(f"{name}: reading mods ...")
         app = hub.app(gid)
         say(f"{name}: {len(app.mods)} mods ({time.time() - t:.1f} s)")
-        if not app.mods:
-            continue
+        if app.mods:
+            apps[gid] = app
+    workers = _start_workers(hub, apps, say) if apps and bootworker.usable() else {}
+    if workers:
+        scan.load_cache(next(iter(apps.values())).parse_cache_file())   # meanwhile: this process needs it for later clicks
+    for gid, app in apps.items():
+        name = hub.games[gid].name
+        if gid in workers:
+            t = time.time()
+            ok = [_finish_worker(hub, app, name, *w) for w in workers[gid]]
+            if all(ok):
+                say(f"{name}: ready ({time.time() - workers[gid][0][4]:.1f} s, in {len(ok)} worker process{'' if len(ok) == 1 else 'es'})")
+                continue
+            say(f"{name}: a worker process did not finish; checking the rest here instead.")
         t = time.time()
         app.warm(lambda m, name=name: say(f"{name}: {m}"), hub.lock)
         say(f"{name}: ready ({time.time() - t:.1f} s)")
+    if scan.cache_dirty():
+        with perflog.timed("save parse cache", quiet=True):
+            scan.save_cache(next(iter(apps.values())).parse_cache_file())
     say(f"Ready ({time.time() - t0:.1f} s).")
+
+
+def _start_workers(hub, apps, say):
+    """Share the playsets of these games out over a few bootworker processes and start them.
+    -> {game id: [(job, process, reader threads, say, start time), ...]}"""
+    gids, jobs = [], []
+    for gid, app in apps.items():
+        with hub.lock:
+            job = app.warm_job()
+        if job is not None:
+            gids.append(gid)
+            jobs.append(job)
+    if not jobs:
+        return {}
+    out, failed = {}, set()
+    for n, job in bootworker.split(jobs, bootworker.worker_count()):
+        gid = gids[n]
+        name = hub.games[gid].name
+        try:
+            p = bootworker.start(job)
+        except Exception as e:   # no worker: this game's playsets are checked in this process instead
+            errorlog.write_exception("boot worker", e, gid)
+            failed.add(gid)
+            continue
+        got = []
+        lines = threading.Thread(target=lambda p=p, name=name: [say(f"{name}: {ln.decode('utf-8', 'replace').rstrip()}") for ln in p.stderr],
+                                 daemon=True, name=f"boot-{gid}-progress")
+        answer = threading.Thread(target=lambda p=p: got.append(p.stdout.read()), daemon=True, name=f"boot-{gid}-answer")
+        lines.start()
+        answer.start()
+        out.setdefault(gid, []).append((job, p, (lines, answer, got), say, time.time()))
+    for gid in failed:   # a game with a worker that did not start is checked here; its other workers are not needed
+        for w in out.pop(gid, []):
+            w[1].kill()
+            w[1].wait(5)
+    if out:
+        say(f"Checking the playsets side by side in {sum(map(len, out.values()))} worker processes ...")
+    return out
+
+
+def _finish_worker(hub, app, name, job, p, readers, say, t, timeout=900):
+    """Wait for one worker and take its answers. False when it failed (the caller then checks the game itself)."""
+    lines, answer, got = readers
+    answer.join(timeout)
+    try:
+        p.wait(1 if answer.is_alive() else timeout)
+    except subprocess.TimeoutExpired:
+        p.kill()
+        p.wait(5)
+    lines.join(5)
+    for f in (p.stdout, p.stderr):
+        f.close()
+    try:
+        if p.returncode != 0 or not got:
+            raise RuntimeError(f"worker ended with code {p.returncode}")
+        res = pickle.loads(got[0])   # our own child process, started with our own code: trusted data
+        with hub.lock:
+            app.adopt_warm(job, res)
+    except Exception as e:
+        errorlog.write_exception("boot worker", e, app.game.id)
+        return False
+    return True
 
 
 def adopts_open_window(mode, environ, app_window):

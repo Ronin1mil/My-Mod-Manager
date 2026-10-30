@@ -370,6 +370,7 @@ class ScanCancelled(Exception):
 _parse_cache = {}   # (path, parser name) -> (mtime_ns, size, frozenset of keys)
 _loaded = set()     # cache files already read into _parse_cache
 _new_entries = 0    # parses done since the cache was last loaded or saved
+_fresh = set()      # keys parsed (new or changed) in this process: what a start-up worker hands back to the app
 CACHE_FORMAT = 1
 MAX_CACHE = 300_000
 
@@ -389,6 +390,7 @@ def _cached(path, fn, trusted=None):
             _parse_cache.clear()
         hit = _parse_cache[key] = (st.st_mtime_ns, st.st_size, frozenset(fn(_read(path))))
         _new_entries += 1
+        _fresh.add(key)
     if trusted is not None:
         trusted.add(key)
     return hit[2]
@@ -396,6 +398,20 @@ def _cached(path, fn, trusted=None):
 
 def cache_dirty():
     return _new_entries > 0
+
+
+def fresh_entries():
+    """The parses this process made (files new or changed since the cache was saved), as {key: entry}."""
+    return {k: _parse_cache[k] for k in _fresh if k in _parse_cache}
+
+
+def add_entries(entries):
+    """Take parses made by another process (a start-up worker); they are saved with the next save_cache."""
+    global _new_entries
+    if len(_parse_cache) + len(entries) > MAX_CACHE:
+        _parse_cache.clear()
+    _parse_cache.update(entries)
+    _new_entries += len(entries)
 
 
 def save_cache(path):
@@ -473,6 +489,7 @@ def prefetch(todo, trusted=None, progress=None, should_stop=None):
                     _parse_cache.clear()
                 _parse_cache[key] = (r[0], r[1], frozenset(fn(r[2])))
                 _new_entries += 1
+                _fresh.add(key)
                 if trusted is not None:
                     trusted.add(key)
         done += len(batch)
@@ -492,6 +509,16 @@ def def_category(rel, def_dirs):
         if p in def_dirs:
             return "/".join(parts[:i + 2]) if i + 2 < len(parts) else "/".join(parts[:i + 1])
     return None
+
+
+def summarize(conflicts):
+    """What the page is sent for one playset: the conflicts (capped), how many of each kind, and whether it was cut."""
+    counts = {}
+    for c in conflicts:
+        k = "vanilla" if c.get("vanilla") else c["kind"]
+        counts[k] = counts.get(k, 0) + 1
+    cap = MAX_PER_KIND * 4
+    return {"conflicts": conflicts[:cap], "counts": counts, "truncated": len(conflicts) > cap, "pending": False}
 
 
 def find_conflicts(mods, order, files_cache=None, def_dirs=DEFAULT_DEF_DIRS, vanilla=None, trusted=None, should_stop=None,

@@ -151,13 +151,84 @@ class Boot(_Base):
         boot(hub, said.append)
         text = "\n".join(said)
         self.assertIn("Victoria 3: 3 mods", text)
-        self.assertIn('playset 1 of 2', text)
-        self.assertIn('playset 2 of 2 "two"', text)
+        self.assertIn("worker process", text)
+        self.assertIn('playset "one" checked', text)
+        self.assertIn('playset "two" checked', text)
         self.assertTrue(said[-1].startswith("Ready"))
         with mock.patch("modmanager.scan.find_conflicts", side_effect=AssertionError("scanned again")):
             app.conflicts_job(a)()
             app.conflicts_job(b)()
         self.assertTrue(app.parse_cache_file().is_file(), "what was read is saved for the next start")
+
+    def _two_playsets(self, hub):
+        hub.settings.update(last_game="vic3")
+        app = hub.app("vic3")
+        for ps in list(app.store.data["playsets"]):
+            app.store.delete(ps)
+        return app, app.store.create("one", self.ids), app.store.create("two", self.ids[:2])
+
+    def test_worker_answers_are_the_same_as_working_it_out_here(self):
+        from modmanager.server import boot
+        hub = self._hub()
+        app, a, b = self._two_playsets(hub)
+        boot(hub, lambda _t: None)
+        from_workers = [app.conflicts_job(p)() for p in (a, b)]
+        app._results.clear()
+        here = [app.conflicts_job(p)() for p in (a, b)]
+        self.assertEqual(from_workers, here)
+        self.assertTrue(any(c["kind"] == "definition" for c in here[0]["conflicts"]))
+
+    def test_without_workers_every_playset_is_checked_here_in_order(self):
+        from modmanager.server import boot
+        hub = self._hub()
+        app, a, b = self._two_playsets(hub)
+        said = []
+        with mock.patch.dict(os.environ, {"MODMANAGER_BOOT_PROCS": "0"}):
+            boot(hub, said.append)
+        text = "\n".join(said)
+        self.assertNotIn("worker process", text)
+        self.assertIn('playset 2 of 2 "two"', text)
+        self.assertEqual(len(app._results), 2)
+
+    def test_a_worker_that_cannot_start_or_fails_is_done_here_instead(self):
+        from modmanager import bootworker
+        from modmanager.server import boot
+        for broken in (mock.patch.object(bootworker, "start", side_effect=OSError("no python")),
+                       mock.patch.object(bootworker, "RUN", "import sys; sys.exit(3)")):
+            hub = self._hub()
+            app, a, b = self._two_playsets(hub)
+            said = []
+            with broken:
+                boot(hub, said.append)
+            self.assertTrue(said[-1].startswith("Ready"))
+            self.assertEqual(len(app._results), 2, said)
+            with mock.patch("modmanager.scan.find_conflicts", side_effect=AssertionError("scanned again")):
+                app.conflicts_job(a)()
+
+    def test_answers_for_mods_that_changed_meanwhile_are_not_taken(self):
+        from modmanager import bootworker
+        hub = self._hub()
+        app, a, b = self._two_playsets(hub)
+        job = app.warm_job()
+        answer = bootworker.run(job)
+        mkmod(self.user, "D", files={"common/traits/d.txt": "shared = { }"})
+        app.rescan()
+        self.assertEqual(app.adopt_warm(job, answer), 0)
+        self.assertEqual(app._results, {})
+
+    def test_playsets_are_shared_out_by_size_and_none_is_lost(self):
+        from modmanager import bootworker
+        ps = lambda name, n: {"name": name, "order": [f"m{i}" for i in range(n)], "key": name}
+        big = {"mods": {}, "playsets": [ps(f"b{i}", 50) for i in range(6)]}
+        small = {"mods": {}, "playsets": [ps("s1", 1), ps("s2", 2)]}
+        parts = bootworker.split([big, small], 6)
+        self.assertEqual(sorted(p["name"] for _, j in parts for p in j["playsets"]),
+                         sorted(p["name"] for p in big["playsets"] + small["playsets"]))
+        per_game = [sum(1 for n, _ in parts if n == g) for g in (0, 1)]
+        self.assertGreater(per_game[0], per_game[1], "the game with more work gets more workers")
+        self.assertEqual(per_game[1], 1)
+        self.assertTrue(all(j["playsets"] for _, j in parts), "no empty worker")
+        self.assertTrue(2 <= bootworker.worker_count() <= 6)
 
     def test_boot_does_nothing_for_a_game_never_used(self):
         from modmanager.server import boot
