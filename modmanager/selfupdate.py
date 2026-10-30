@@ -29,6 +29,7 @@ from .update import ALLOWED_HOST, check_for_update, check_nightly, stable_curren
 
 MAX_EXE = 300 * 1024 * 1024
 SUMS_NAME = "SHA256SUMS.txt"
+PYZ_ASSET = "Mod-Manager-python.pyzw"   # the Python edition: one zip app run by py/pythonw, no exe of ours
 SAFE_NAME = re.compile(r"^[A-Za-z0-9._\-]{1,100}$")
 
 
@@ -36,8 +37,17 @@ def frozen():
     return bool(getattr(sys, "frozen", False))
 
 
+def pyz_path():
+    """The Python edition's file (Mod-Manager-python.pyzw) when this copy was started from it, else None.
+    Its bootstrap (tools/build_pyz.py) sets MODMANAGER_PYZ."""
+    p = os.environ.get("MODMANAGER_PYZ")
+    return Path(p) if p and Path(p).is_file() else None
+
+
 def platform_asset():
-    """File name of this platform's build in a release."""
+    """File name of this copy's build in a release."""
+    if pyz_path():
+        return PYZ_ASSET
     if sys.platform == "win32":
         return "Mod-Manager-windows.exe"
     if sys.platform == "darwin":
@@ -45,8 +55,13 @@ def platform_asset():
     return "Mod-Manager-linux"
 
 
+def app_file():
+    """The file an update replaces: the Python edition's zip app, or the packaged exe."""
+    return pyz_path() or Path(sys.executable)
+
+
 def can_self_update():
-    return frozen() and Path(sys.executable).is_file()
+    return bool(pyz_path()) or (frozen() and Path(sys.executable).is_file())
 
 
 def _host_ok(url):
@@ -156,8 +171,9 @@ def can_run(path):
     replaces anything: Smart App Control ("An Application Control policy has blocked this file", error 4551) and
     antivirus refuse an unsigned program when it is started, not when it is downloaded."""
     flags = 0x08000000 if sys.platform == "win32" else 0  # CREATE_NO_WINDOW
+    cmd = [sys.executable, str(path)] if pyz_path() else [str(path)]   # the Python edition is started by the interpreter
     try:
-        r = subprocess.run([str(path), "--version"], env=child_environment(), capture_output=True, timeout=90,
+        r = subprocess.run([*cmd, "--version"], env=child_environment(), capture_output=True, timeout=90,
                            stdin=subprocess.DEVNULL, creationflags=flags, cwd=str(Path(path).parent))
     except subprocess.TimeoutExpired:
         return True, ""   # it started (a slow first unpack); a blocked file fails at once
@@ -168,9 +184,10 @@ def can_run(path):
 
 def cleanup_old():
     """Remove the previous version left by an update. Called at start-up; never raises."""
-    if frozen():
+    if frozen() or pyz_path():
         try:
-            Path(sys.executable).with_name(Path(sys.executable).name + ".old").unlink()
+            f = app_file()
+            f.with_name(f.name + ".old").unlink()
         except OSError:
             pass
 
@@ -190,7 +207,7 @@ def restart(exe, argv):
     flags = 0
     if sys.platform == "win32":
         flags = 0x00000008 | 0x00000200  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
-    args = [str(exe)] + [a for a in argv if a != "--no-browser"]
+    args = ([sys.executable] if pyz_path() else []) + [str(exe)] + [a for a in argv if a != "--no-browser"]
     if os.environ.get("MODMANAGER_MODE") != "window":  # a window closes with the old copy, so the new one opens its own
         args.append("--no-browser")                       # a browser tab is still open and reloads itself
     return subprocess.Popen(args, env=env, close_fds=True, creationflags=flags, cwd=str(Path(exe).parent))
@@ -204,8 +221,8 @@ class Updater:
         self.check_nightly = check_nightly_ or check_nightly
         self.channel = "stable"
         self.dl, self.restarter = dl, restarter
-        self.verify = verify or (can_run if frozen() else None)   # a source checkout / a test has nothing to test-start
-        self.exe = exe or sys.executable
+        self.verify = verify or (can_run if frozen() or pyz_path() else None)   # a source checkout / a test has nothing to test-start
+        self.exe = exe or str(app_file())
         self.argv = list(argv if argv is not None else sys.argv[1:])
         self.exiter = exiter or (lambda: os._exit(0))
         self.lock = threading.Lock()
@@ -218,7 +235,7 @@ class Updater:
         self.state = {"status": status, "message": message}
 
     def start(self, run_async=True, channel="stable"):
-        if not can_self_update() and self.exe == sys.executable:
+        if not can_self_update() and self.exe == str(app_file()):
             raise ValueError("This copy runs from source, so it cannot replace itself. Update with Git "
                              "(git pull) or download the ZIP again. The downloadable app updates itself.")
         if not self.lock.acquire(blocking=False):

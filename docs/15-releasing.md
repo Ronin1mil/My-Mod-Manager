@@ -9,6 +9,8 @@
 
 The release title and the notes shown on the Releases page are taken from that CHANGELOG section by `.github/scripts/release-notes.sh`. **The release job fails if the version has no section**, so a release cannot go out without notes.
 
+**Python edition.** Every release and test build also carries `Mod-Manager-python.pyzw` (built by the `pyz` job with `tools/build_pyz.py`, tested on Windows with Python 3.8). To publish a release with only that file (no exe, no installer, because Smart App Control blocks unsigned programs), tick **python_only** as well as **publish**. The updater of a Python edition copy looks for that file name; copies of the exe look for `Mod-Manager-windows.exe`, so a python-only release shows them the "no exe in this release" message with a link to the release page.
+
 To fix wording of releases that already exist, edit `CHANGELOG.md`, push, and run the workflow with **refresh_notes** ticked: it rewrites the title and notes of every release that has a changelog section.
 
 ## macOS and Linux builds (saved for later)

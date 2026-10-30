@@ -73,7 +73,7 @@ dialog h3.sec{font:600 13px var(--serif);color:var(--acc);margin:18px 0 0;border
 .logo-box img.ok{opacity:1}
 
 /* Settings: wide dialog, side navigation, one card per topic */
-dialog.wide{width:min(1020px,95vw);height:min(760px,calc(92vh / var(--zoom,1)));max-height:calc(92vh / var(--zoom,1));overflow:hidden;font-size:17px;line-height:1.55;padding:0}
+dialog.wide{width:max(min(1020px,95vw),calc((100vw - 440px * var(--zoom,1)) / var(--zoom,1)));height:calc(96vh / var(--zoom,1));max-height:calc(96vh / var(--zoom,1));overflow:hidden;font-size:17px;line-height:1.55;padding:0}
 dialog.wide[open]{display:flex;flex-direction:column}
 .st-head{padding:24px 32px 18px;border-bottom:1px solid var(--line)}
 dialog.wide h2{font-size:26px;margin:0 0 4px}
@@ -133,7 +133,6 @@ button.star{background:none;border:0;padding:0 4px;font-size:16px;line-height:1;
 .dg{padding:6px 0;border-bottom:1px solid var(--line)}.dg:last-child{border:0}.dg b{font-weight:600}.dg .mut{font-size:13.5px;word-break:break-word}
 .st-form{flex:1;min-height:0;overflow:auto;padding:26px 32px 12px}.st-form select{max-width:100%;font-size:17px;padding:11px 12px}.st-form input[type=color]{width:80px;height:44px;padding:2px;background:var(--bg);border:1px solid var(--line);border-radius:9px}
 .st-foot>span:last-child{white-space:nowrap;flex:none}
-dialog.wide.gform{width:min(1500px,97vw);height:min(860px,calc(94vh / var(--zoom,1)));max-height:calc(94vh / var(--zoom,1))}
 .gform .st-form .card{max-width:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:40px}
 .gform .st-form .card>*{min-width:0}.gform .st-form .card>p,.gform .st-form .card>[data-wide]{grid-column:1/-1}
 @media (max-width:900px){.gform .st-form .card{grid-template-columns:1fr}}

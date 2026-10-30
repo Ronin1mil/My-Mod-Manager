@@ -1030,7 +1030,7 @@ def serve(port=8765, open_browser=True, overrides=None, initial_game=None, windo
     import webbrowser
     from . import window as windowmod
     perflog.log(f"=== {APP_NAME} {__version__}{' test build ' + BUILD if BUILD else ''} starting (pid {os.getpid()}, "
-                f"{'packaged' if selfupdate.frozen() else 'from source'}, port {port})")
+                f"{'packaged' if selfupdate.frozen() else 'python edition' if selfupdate.pyz_path() else 'from source'}, port {port})")
     hub = Hub(overrides=overrides)
     hub.check_on_launch()  # no-op unless the user enabled "check for updates on launch"
     srv = None

@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.9.0 - Python edition (no exe), add your own games (beta)
+**How to install (this release is the Python edition only)**
+
+What you need:
+- **Windows 10 or 11**
+- **Python 3.8 or newer** from python.org. Keep "py launcher" ticked in its installer (it is by default). To check what you have, open PowerShell and run `py --version`: if it prints `Python 3.8` or higher you are done; if it says "not recognized", install Python first
+- **Edge or Chrome** (for the app window; both are normally already there). Nothing else: no pip packages, no exe
+
+Steps:
+1. Download **`Mod-Manager-python.pyzw`** from this release and put it anywhere you like (for example a folder in Documents)
+2. Double-click it. If nothing happens or Windows asks what to open it with, run it from PowerShell instead: `py Mod-Manager-python.pyzw`
+3. Updates: a banner offers **Update now**; the app downloads the new file, checks it against `SHA256SUMS.txt`, tests that Windows lets it start, and only then replaces itself. Your playsets and settings (`%APPDATA%\Ronin Mod Manager`) carry over from any earlier version
+
+Why this edition exists: Windows Smart App Control blocks every program that is not signed, including this app's exe and installer, and the files cannot be signed yet. This edition has no exe of ours: Windows' own signed Python runs it. There is no installer and no exe in this release; copies of the exe cannot update themselves to it, so download the file by hand once. The first start unpacks about 1 MB into `%LOCALAPPDATA%\Ronin Mod Manager\pyz`. The app window opens through Edge/Chrome (the native window library of the exe is not part of this edition); if neither is found it opens in your browser.
+
+What is new
+- **Python edition.** One file, `Mod-Manager-python.pyzw`, started by the Python launcher. It updates itself like the exe does
+- **Add a game (beta).** The game list ends with "＋ Add a game (beta)…". A form (with Stellaris and Imperator: Rome as unverified starting points, or a blank Paradox-style or Bannerlord-style game) defines a game from data: its Steam id, its folders in Documents and Steam, the file that lists mods, the folders to check for conflicts, an accent colour. The game then works like a built-in one (playsets, load order, conflicts, launcher import, Play). Edit or remove it under Settings -> Game. Every name is checked so a field can never point outside its folder, and the game's own files are never changed by the form
+- **Check this game (beta)** in Settings -> Game, for every game: lists what the app found (install, base content, version, user folder, load file, Workshop folder, mods, launcher playsets, how Play starts the game) and what it was looking for where something is missing, with a button to copy the report
+- **Bigger Settings window** (and the Add a game form): as wide as the page minus the playset list's width on each side, so the playset list stays visible on the left with the same space mirrored on the right
+- **Safer self-update.** The downloaded file is started once (`--version`) before it replaces anything. If Windows refuses it (Smart App Control "Application Control policy has blocked this file", error 4551, or antivirus), nothing is changed and the page says why, instead of hanging at "Restarting..." with the blocked file already in place. If the new copy cannot start or ends at once after the swap, the previous version is put back
+- A test build now says so plainly: an orange "TEST BUILD <id>" under the version, "(test build)" in the window title and in Settings
+
 ## 0.8.5 - checkboxes that always click, faster scan, activity log
 - **Fix: the enable/disable checkbox sometimes ignored a click** (seen on 1440p screens). The box was tiny and sat inside a draggable row, so a slightly moving mouse started a drag instead of a click, and a list redraw (a late warning check, or the window regaining focus) between mouse-down and mouse-up removed the box under the pointer. Now the whole 30 px square around the box is clickable, a row is dragged only by its ⠿ handle, and a redraw waits until the mouse button is released
 - **Faster conflict scan** (about 3x on a large mod list, same results): the file parser now tokenizes in C, per-file cache lookups use plain `os.stat`, and shared keys are grouped only when there is something to compare
