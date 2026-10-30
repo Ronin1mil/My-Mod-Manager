@@ -75,7 +75,7 @@ This is an unofficial fan tool. It is not affiliated with or endorsed by Paradox
 - The official launcher keeps its own playsets in `launcher-v2.sqlite`; this tool does not edit it. Start the game through this tool so its load order is used.
 - Mods install from `.zip` and `.tar` archives (`.tar.gz`, `.tar.bz2`, `.tar.xz`); `.7z` and `.rar` are not supported.
 - Definition scanning covers top-level keys in the game's script folders; it does not understand per-database merge rules.
-- Per-playset saves are opt-in until verified on a real install.
+- Saves per playset: a new playset gets its own save folder; one playset per game (chosen in Playset settings) keeps the game's existing saves. Not yet confirmed in a game.
 - Presets ship with **unverified** Workshop ids; read [docs/11](docs/11-presets-and-downloads.md) before relying on one.
 
 ## Development

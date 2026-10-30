@@ -14,7 +14,7 @@ Legend: **[known]** documented or confirmed by the working standalone managers' 
 - Definitions: top-level `key = {` in the game's script folders is a definition. Two mods defining the same key **in the same script folder** (`common/traits`) but different files both load; the later wins (*definition* conflict). The same key in *different* folders is not a clash. `REPLACE:`/`TRY_REPLACE:`/`REPLACE_OR_CREATE:` are intentional overrides (info); `INJECT:`/`TRY_INJECT:`/`INJECT_OR_CREATE:` merge into the target and are listed as *patches*. **[known]** for the prefixes; per-folder merge rules beyond this are not modelled.
 - `replace_path` drops everything under that folder from *earlier* mods (and the base game). **[known]**
 - Localization: same `(language, key)` in different files of different mods is reported (info); `localization/replace/` is skipped; never reported against the base game.
-- Saves: `<user dir>/save games`; per-playset saves replace it with a link. **[verify]** that the game follows the link and that Paradox cloud sync does not fight it.
+- Saves: `<user dir>/save games`; per-playset saves replace it with a link (an NTFS junction on Windows) while the game's own folder waits next to it as `save games (shared)`. **[verify]** that the game follows the link. Steam Cloud does not sync the save folders of CK3, VIC3 or EU5 (no `remotecache.vdf` on the PC checked).
 
 ## Crusader Kings III (`ck3`)
 | | |
@@ -54,5 +54,7 @@ If the game ignores the file, use this tool for analysis, presets and sharing, a
 Everything above is data (`games.py`) or one function (`store.mod_entry`). When a real-install check disagrees, fix the data, update the pinned values in `tests/test_games.py` / `tests/test_store_games.py`, set `verified=True` for that game, and update this page.
 
 ## Saves and versions (unverified)
-- Default: all playsets of a game share the game's own `save games` folder. A playset may opt into its own folder (a link, see `saves.py`).
+- A new playset gets its own save folder (`<config>/<game>/saves/<playset id>`); playsets made before 0.9.2 keep what they had. One playset (or several) can play with the game's own `save games` folder: **Playset settings → Keep the game's saves with this playset only** makes that playset the one, and gives every other playset its own folder. *No mods* always uses the game's own folder.
+- Switching: Play for a playset with its own saves renames the game's real folder to `save games (shared)` and links `save games` to the playset's folder; Play for a playset without its own saves removes the link and renames `save games (shared)` back. Nothing is copied or deleted; an interrupted switch is repaired on the next shared start.
+- Before 0.9.2 switching back never happened on Windows: the link target came back as `\\?\C:\...` and never matched the app's folder, so once one playset with its own saves had been played, every later playset used that playset's folder.
 - Save-version guard: compares major.minor of the installed game (`launcher/launcher-settings.json`) with the version the saves were made on. Source 1: a `version="x.y.z"` in the newest save's first 16 KB (works only if the header is readable text; **not confirmed for any game**). Source 2: the version recorded when this app last launched with that save folder (dependable). Patch releases are ignored. A wrong header guess only costs one "Launch anyway" click; switch it off in Settings.

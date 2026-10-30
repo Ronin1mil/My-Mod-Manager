@@ -617,7 +617,19 @@ class GameApp:
         if self.store.get(pid)["separate_saves"]:
             d = self.cfg / "saves" / pid
             return d, f"playset:{pid}"
-        return self.user_dir / saves.SAVES_DIR_NAME, "shared"
+        game_saves = self.user_dir / saves.SAVES_DIR_NAME
+        aside = saves.shared_dir(game_saves)   # the game's own saves wait here while another playset's are linked in
+        return (aside if saves.is_link(game_saves) and aside.is_dir() else game_saves), "shared"
+
+    def saves_home(self, pid):
+        """Make `pid` the one playset that plays with the game's own save folder; every other playset of this game
+        gets (or keeps) a save folder of its own. Nothing is moved: the game's saves simply stay with `pid`."""
+        if not self.game.has_saves:
+            raise ValueError(f"{self.game.name} keeps its saves itself; this app does not switch them.")
+        self.store.get(pid)
+        for other in list(self.store.data["playsets"]):
+            self.store.update(other, separate_saves=other != pid)
+        return {"home": pid, "own": [p for p in self.store.data["playsets"] if p != pid]}
 
     def check_save_version(self, pid):
         """Raise SaveVersionWarning when the saves about to be used were made on another minor release."""
@@ -1226,6 +1238,8 @@ def make_handler(hub):
                         return self._send(200, app.enable(pid, str(b.get("id"))))
                     if act in ("enable_all", "disable_all", "prune"):
                         return self._send(200, app.bulk(pid, act))
+                    if act == "saves-home":
+                        return self._send(200, app.saves_home(pid))
                     if act == "save-preset":
                         return self._send(200, app.save_preset(pid, str(b.get("id", "")), str(b.get("name", ""))))
                     if act == "launch":

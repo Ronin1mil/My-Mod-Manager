@@ -793,12 +793,17 @@ $('cfg').onclick = () => {
     <label>Name</label><input type="text" id="c-name" maxlength="60" value="${esc(p.name)}">
     <label>Notes</label><textarea id="c-notes" maxlength="2000">${esc(p.notes)}</textarea>
     <label>Extra launch arguments (one per line, e.g. -debug_mode)</label><textarea id="c-args">${esc(p.launch_args.join('\n'))}</textarea>
-    <label class="chk" style="color:var(--ink);${S.game.has_saves ? '' : 'display:none'}"><input type="checkbox" id="c-saves" ${p.separate_saves ? 'checked' : ''}> Own save folder for this playset (off = every playset shares the game's normal saves)
-    </label><div class="mut" style="font-size:12px;${S.game.has_saves ? '' : 'display:none'}">Your existing "save games" folder is never deleted; it is moved aside to a backup the first time.</div>
+    <label class="chk" style="color:var(--ink);${S.game.has_saves ? '' : 'display:none'}"><input type="checkbox" id="c-saves" ${p.separate_saves ? 'checked' : ''}> Own save folder for this playset (off = it plays with the game's normal saves)
+    </label><div class="mut" style="font-size:12px;${S.game.has_saves ? '' : 'display:none'}">The game only sees this playset's saves. Your existing "save games" folder is never deleted: while another playset plays, it waits next to it as "save games (shared)".
+      <br><button id="c-home" style="margin-top:6px" title="This playset keeps the game's existing saves; every other playset of this game gets a save folder of its own">Keep the game's saves with this playset only</button></div>
     <div class="dlg-btns"><span><button id="c-dup">Duplicate</button> <button id="c-exp">Export</button> <button id="c-pre" title="Keep this Workshop mod list as a reusable preset">Save as preset</button> <button id="c-del" class="danger">Delete</button></span>
     <span><button id="c-cancel">Cancel</button> <button id="c-save" class="pri">Save</button></span></div>`;
   d.showModal();
   $('c-cancel').onclick = () => d.close();
+  $('c-home').onclick = guard(async () => {
+    if (!confirm(`"${p.name}" will play with the game's existing saves. Every other playset gets a save folder of its own (empty until you save there). Nothing is moved or deleted.`)) return;
+    await api(`playsets/${p.id}/saves-home`, {}); d.close(); load();
+  });
   $('c-save').onclick = guard(async () => {
     await patch({name: $('c-name').value, notes: $('c-notes').value, separate_saves: $('c-saves').checked,
       launch_args: $('c-args').value.split('\n').map(s => s.trim()).filter(Boolean)});
@@ -897,7 +902,9 @@ $('launch').onclick = guard(async () => {
   if (errs && !confirm(`This playset has ${errs} error${errs === 1 ? '' : 's'} (see Warnings). Launch anyway?`)) return;
   const r = await launchCall(p, {}); if (!r) return;
   toast((r.file === 'command line' ? `Started ${GNAME()} with ${r.written} module${r.written === 1 ? '' : 's'}.` : `Wrote ${r.written} mods to ${r.file} and started ${GNAME()}${r.via === 'steam' ? ' through Steam' : ''}.`) +
-    (r.saves && r.saves.startsWith('linked_after_backup') ? ' Your old save folder was kept as a backup.' : ''));
+    (!r.saves ? '' : r.saves.startsWith('linked_after_backup') ? ' Your old save folder was kept as a backup.'
+      : r.saves.startsWith('linked') || r.saves === 'already' ? ' This playset uses its own saves.'
+      : r.saves.startsWith('unlinked') || r.saves === 'restored' ? " Back on the game's own saves." : ''));
 });
 function applyTheme(g) {
   const root = document.documentElement.style;

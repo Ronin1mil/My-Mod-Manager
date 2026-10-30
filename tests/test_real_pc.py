@@ -71,7 +71,7 @@ class Play(Base):
             with self.subTest(game=g.id):
                 root = self.install(g, CK3_SETTINGS)
                 a = self.app(g, root)
-                pid = a.store.create("T", ["local:A"])
+                pid = a.store.create("T", ["local:A"], separate_saves=False)
                 a.store.update(pid, launch_args=["-debug_mode"])
                 with mock.patch.object(launch.subprocess, "Popen") as po, mock.patch.object(launch.webbrowser, "open") as op:
                     res = a.launch(pid, ack_version=True)
@@ -87,7 +87,7 @@ class Play(Base):
     def test_a_game_without_launcher_settings_still_goes_through_steam(self):
         root = self.install(games.EU5, {"rawVersion": "1.0.0"}, exe=None)
         a = self.app(games.EU5, root)
-        pid = a.store.create("T", ["local:A"])
+        pid = a.store.create("T", ["local:A"], separate_saves=False)
         with mock.patch.object(launch.webbrowser, "open") as op:
             self.assertEqual(a.launch(pid, ack_version=True)["via"], "steam")
         op.assert_called_once_with("steam://run/3450310")
@@ -98,7 +98,7 @@ class Play(Base):
         mine.write_bytes(b"")
         a = self.app(games.CK3, root)
         a.game_exe = str(mine)
-        pid = a.store.create("T", ["local:A"])
+        pid = a.store.create("T", ["local:A"], separate_saves=False)
         with mock.patch.object(launch.subprocess, "Popen") as po:
             a.launch(pid, ack_version=True)
         self.assertEqual(po.call_args[0][0], [str(mine)])
@@ -107,6 +107,44 @@ class Play(Base):
         g = games.Game(id="x", name="X", app_id="0", user_dir_name="X", install_dir_name="X", install_marker=("a",),
                        load_file="dlc_load.json", load_style="path", def_dirs=())
         self.assertNotIn("SteamAppId", launch.steam_env(g))
+
+
+class SavesPerPlayset(Base):
+    """The main use: Prince of Darkness sees only its own saves; 'default' keeps the game's existing saves."""
+
+    def test_one_playset_keeps_the_games_saves_and_the_others_only_see_their_own(self):
+        root = self.install(games.CK3, {"rawVersion": "1.20.1.2"}, exe=None)
+        user = self.r / "user"
+        mkmod(user, "A")
+        (user / "save games").mkdir(parents=True)
+        (user / "save games/old.ck3").write_text("old")
+        a = GameApp(games.CK3, user_dir=user, workshop_dir=self.r / "ws", game_dir=str(root), autodetect=False,
+                    store=Store(self.r / "p.json"), library=Library(self.r / "l.json"))
+        default = a.store.create("default", ["local:A"], separate_saves=False)
+        pod = a.store.create("prince of darkness", ["local:A"], separate_saves=False)
+        self.assertTrue(a.store.get(a.store.create("new one"))["separate_saves"])   # new playsets get their own
+        res = a.saves_home(default)
+        self.assertEqual(res["home"], default)
+        self.assertEqual({p: a.store.get(p)["separate_saves"] for p in a.store.data["playsets"]},
+                         {p: p != default for p in a.store.data["playsets"]})
+        seen = lambda: sorted(f.name for f in (user / "save games").iterdir())
+        with mock.patch("modmanager.launch.start", return_value={"via": "exe"}):
+            a.launch(pod, ack_version=True)
+            self.assertEqual(seen(), [])
+            (user / "save games/pod.ck3").write_text("pod")
+            a.launch(default, ack_version=True)
+            self.assertEqual(seen(), ["old.ck3"])
+            a.launch(pod, ack_version=True)
+            self.assertEqual(seen(), ["pod.ck3"])
+            a.launch("nomods", ack_version=True)       # 'No mods' plays with the game's own saves too
+            self.assertEqual(seen(), ["old.ck3"])
+
+    def test_bannerlord_keeps_its_saves_itself(self):
+        a = GameApp(games.BANNERLORD, user_dir=self.r / "u", workshop_dir=self.r / "ws", autodetect=False,
+                    store=Store(self.r / "p.json"), library=Library(self.r / "l.json"))
+        pid = a.store.create("x")
+        with self.assertRaises(ValueError):
+            a.saves_home(pid)
 
 
 class NoRealLinks(unittest.TestCase):

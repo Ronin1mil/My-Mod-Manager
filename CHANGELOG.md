@@ -1,17 +1,19 @@
 # Changelog
 
-## 0.9.2 - Crusader Kings III and EU5 confirmed, Victoria 3 load file fixed, Bannerlord presets
-Play now starts Crusader Kings III and Europa Universalis V with your playset's mods (both confirmed on a real PC), Victoria 3 gets the load file format it actually reads, and Bannerlord has eight ready-made presets.
+## 0.9.2 - Saves per playset, CK3 and EU5 confirmed, Victoria 3 load file fixed, Bannerlord presets
+Each playset now has its own saves, Play starts Crusader Kings III and Europa Universalis V with your playset's mods (both confirmed on a real PC), Victoria 3 gets the load file format it actually reads, and Bannerlord has eight ready-made presets.
 
 **How to install (Python edition only, no exe)**
 - You need Windows 10 or 11, **Python 3.8 or newer** from python.org and Edge or Chrome. Nothing else
 - Download **`Mod-Manager-python.pyzw`** below and double-click it, or run `py Mod-Manager-python.pyzw`. Your playsets and settings are kept
 - Already on 0.9.x? Use **Check for updates** in the app: it updates itself
 
-**Not confirmed yet:** Play for Victoria 3 and Bannerlord has not been tried in the game since these fixes. If one does not start the way you expect, send `Documents\Ronin Mod Manager\RoninModManager-<game>.log`.
+**Not confirmed yet:** saves per playset, and Play for Victoria 3 and Bannerlord, have not been tried in the game since these fixes. If one does not start the way you expect, send `Documents\Ronin Mod Manager\RoninModManager-<game>.log`.
 
 **What changed**
 
+- **Every playset has its own saves.** A playset made from now on gets its own save folder, so the game's save list only shows that playset's saves (Prince of Darkness no longer lists your vanilla campaigns). One playset per game keeps the saves you already have: choose it in Playset settings with **Keep the game's saves with this playset only**, which also gives every other playset its own folder. Nothing is copied or deleted: while another playset plays, your existing `save games` folder waits next to it as `save games (shared)` and comes back when that playset (or *No mods*) starts. Not yet confirmed in a game
+- **Fixed: going back to the game's saves never happened on Windows.** Once one playset with its own save folder had been played, every later playset used that folder too, and the first switch moved your saves to `save games (original backup)` and showed an empty folder afterwards
 - **Victoria 3: Play now writes the load file the game reads.** The app wrote `content_load.json` like CK3's file (`"enabled_mods": ["mod/ugc_<id>.mod"]`), but Victoria 3 reads `"enabledMods": [{"path": "<mod folder>"}]` with full folder paths and uses no `.mod` files, so Play in the app did not change which mods the game loaded. It now writes the game's own format, keeps the other settings in the file and no longer creates `ugc_<id>.mod` files in Victoria 3's `mod` folder. Found by reading the files on a real install ([docs/22](docs/22-checked-on-a-real-pc.md))
 - **CK3 and Victoria 3: Play starts the game itself, not the Paradox launcher.** Going through Steam opened the Paradox launcher, which writes its own playset over the app's load file when you press Play there. Play now starts the exe the launcher would start (`binaries/ck3.exe`, `binaries/victoria3.exe`, read from the game's `launcher/launcher-settings.json`) with the same `-gdpr-compliant` argument plus your playset's launch arguments. Steam must be running. A game executable you set yourself still wins; EU5 (no launcher folder) still starts through Steam. The game is started with `SteamAppId` set, the way Steam starts it: without it Victoria 3 asked Steam to start it again and quit, which opened the Paradox launcher anyway. Confirmed for CK3 (marked as verified); not yet confirmed for Victoria 3
 - **Europa Universalis V is confirmed working** (marked as verified): Play makes your playset the game's active one and the game loads its mods in order. Its version, shown as "unknown" before (EU5 has no launcher folder), is now read from the game's own `logs/debug.log`

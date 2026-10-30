@@ -12,7 +12,7 @@ For each game: a `tree -L 3` / `dir /s /b` of the **install** folder (down to `g
 4. **Order**: does the in-game load order match the playset? (Reorder, Play again, compare.)
 5. **Workshop entries**: for a Workshop mod, does the game accept the entry we write (`mod/ugc_<id>.mod` or the path)? Did the created stub survive?
 6. **Launch arguments**: add `-debug_mode`, Play; does the game receive it (`steam://run/<app>//<args>/`)?
-7. **Saves** (opt-in): enable *Separate save folder*, Play; does the game use the linked folder? Does Steam Cloud complain? Does your original folder come back as `save games (original backup)`?
+7. **Saves**: Play a playset with its own saves: the game's save list shows only that playset's saves. Play the playset that keeps the game's saves: the old saves are back, and `save games (shared)` is gone.
 8. **Conflicts**: pick two mods you know overlap. Does the winner shown match what you see in game?
 9. **Base-game comparison**: turn it on; are the "Base game" overrides sensible, and is the first analysis fast enough?
 

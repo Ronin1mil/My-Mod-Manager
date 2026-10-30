@@ -64,8 +64,11 @@ class T(unittest.TestCase):
                     got = json.loads(rec.read_text())
                     self.assertEqual(got["args"], ["-debug_mode"])
                     self.assertEqual(Path(got["cwd"]).resolve(), exe.parent.resolve())
-                    want = ["mod/B.mod"] if g.load_style == "descriptor" else ["mod/B"]
-                    self.assertEqual(got["content_load"]["enabled_mods"], want)
+                    if g.load_style == "enabled_paths":
+                        self.assertEqual([Path(e["path"]).name for e in got["content_load"]["enabledMods"]], ["B"])
+                    else:
+                        want = ["mod/B.mod"] if g.load_style == "descriptor" else ["mod/B"]
+                        self.assertEqual(got["content_load"]["enabled_mods"], want)
                     self.assertTrue(os.path.islink(r / "user/save games"))
                     self.assertTrue(str(r / "cfg" / g.id / "saves") in os.readlink(r / "user/save games"))  # per game
 

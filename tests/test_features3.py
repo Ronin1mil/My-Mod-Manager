@@ -63,7 +63,7 @@ class Saves(unittest.TestCase):
             r = Path(r)
             mk(r / "user", "A", {"x.txt": ""}, meta={"name": "A"})
             app = mkapp(r, "1.15.1")
-            pid = app.store.create("p", ["local:A"])
+            pid = app.store.create("p", ["local:A"], separate_saves=False)
             saves.record_launch(app.cfg, "shared", "1.14.3")
             with self.assertRaises(SaveVersionWarning) as cm:
                 app.launch(pid)
@@ -84,7 +84,7 @@ class Saves(unittest.TestCase):
             r = Path(r)
             mk(r / "user", "A", {"x.txt": ""}, meta={"name": "A"})
             app = mkapp(r, "1.14.0")
-            pid = app.store.create("p", ["local:A"])
+            pid = app.store.create("p", ["local:A"], separate_saves=False)
             d = r / "user/save games"; d.mkdir(parents=True)
             (d / "s.ck3").write_bytes(b'meta{ version="1.16.0" }')
             saves.record_launch(app.cfg, "shared", "1.14.0")

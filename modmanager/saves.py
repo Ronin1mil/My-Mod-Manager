@@ -2,7 +2,8 @@
 
 Paradox games read saves from `<user dir>/save games`. To give each playset its own saves, that folder
 is pointed at the playset's directory with a link (symlink; an NTFS junction on Windows, which
-needs no admin rights). Nothing is ever deleted: an existing real folder is renamed to a backup first.
+needs no admin rights). The game's own folder is never deleted or emptied: while a playset's folder is in use
+it waits next to it as `save games (shared)` and is renamed back when a playset without its own saves starts.
 """
 import json
 import os
@@ -12,6 +13,12 @@ import sys
 from pathlib import Path
 
 SAVES_DIR_NAME = "save games"
+SHARED_SUFFIX = " (shared)"   # where the game's own saves wait while a playset's own folder is linked in
+
+
+def shared_dir(game_saves):
+    game_saves = Path(game_saves)
+    return game_saves.parent / (game_saves.name + SHARED_SUFFIX)
 
 
 def is_link(p):
@@ -26,10 +33,17 @@ def is_link(p):
 
 
 def link_target(p):
+    """Where a link points, as a normal path. Windows reports junction targets as '\\\\?\\C:\\...', which never
+    compared equal to the app's own folders, so switching back to the game's saves silently did nothing there."""
     try:
-        return os.readlink(str(p))
+        t = os.readlink(str(p))
     except (OSError, ValueError):
         return None
+    if t.startswith("\\\\?\\UNC\\"):
+        return "\\\\" + t[8:]
+    if t.startswith(("\\\\?\\", "\\??\\")):
+        return t[4:]
+    return t
 
 
 def _create_link(target, link):
@@ -62,7 +76,9 @@ def _backup_name(game_saves):
 
 
 def activate(game_saves, profile_saves):
-    """Make `game_saves` resolve to `profile_saves`. Returns 'already' | 'linked' | 'linked_after_backup:<path>'."""
+    """Make `game_saves` resolve to `profile_saves`. The game's own folder (when it is a real one) is renamed to
+    `save games (shared)` first, never emptied. Returns 'already' | 'linked' | 'linked_after_moving:<path>' |
+    'linked_after_backup:<path>' (only when a shared folder is already there, so neither is overwritten)."""
     game_saves, profile_saves = Path(game_saves), Path(profile_saves)
     profile_saves.mkdir(parents=True, exist_ok=True)
     game_saves.parent.mkdir(parents=True, exist_ok=True)
@@ -78,35 +94,47 @@ def activate(game_saves, profile_saves):
         return "linked"
     if not game_saves.is_dir():
         raise ValueError(f"{game_saves} exists and is not a folder.")
+    shared = shared_dir(game_saves)
+    if not os.path.lexists(str(shared)):
+        aside, note = shared, "linked_after_moving"
+    else:
+        try:
+            game_saves.rmdir()  # an empty folder next to a kept shared one can simply be replaced
+            _create_link(profile_saves, game_saves)
+            return "linked"
+        except OSError:
+            aside, note = _backup_name(game_saves), "linked_after_backup"
+    game_saves.rename(aside)
     try:
-        game_saves.rmdir()  # an empty folder can simply be replaced
-        _create_link(profile_saves, game_saves)
-        return "linked"
-    except OSError:
-        pass
-    backup = _backup_name(game_saves)
-    game_saves.rename(backup)
-    try:
         _create_link(profile_saves, game_saves)
     except OSError:
-        backup.rename(game_saves)  # undo: never leave the user without their saves
+        aside.rename(game_saves)  # undo: never leave the user without their saves
         raise
-    return f"linked_after_backup:{backup}"
+    return f"{note}:{aside}"
 
 
 def deactivate(game_saves, managed_root):
-    """Back to the game's normal, shared save folder. Only undoes a link this app made (one pointing
-    into `managed_root`); a real folder or someone else's link is left alone. Returns
-    'unchanged' | 'unlinked:<folder the playset's saves stay in>'."""
+    """Back to the game's normal, shared save folder: the link this app made (one pointing into `managed_root`) is
+    removed and `save games (shared)` is renamed back. A real folder or someone else's link is left alone. Returns
+    'unchanged' | 'restored' | 'unlinked:<folder the playset's saves stay in>'."""
     game_saves = Path(game_saves)
-    if not os.path.lexists(str(game_saves)) or not is_link(game_saves):
+    shared = shared_dir(game_saves)
+    if not os.path.lexists(str(game_saves)):
+        if shared.is_dir() and not is_link(shared):  # interrupted earlier between the two steps below
+            shared.rename(game_saves)
+            return "restored"
+        return "unchanged"
+    if not is_link(game_saves):
         return "unchanged"
     target = link_target(game_saves)
     managed = os.path.normcase(os.path.realpath(str(managed_root)))
     if not target or not os.path.normcase(os.path.realpath(target)).startswith(managed + os.sep):
         return "unchanged"
     _remove_link(game_saves)
-    game_saves.mkdir()
+    if shared.is_dir() and not is_link(shared):
+        shared.rename(game_saves)
+    else:
+        game_saves.mkdir()
     return f"unlinked:{target}"
 
 

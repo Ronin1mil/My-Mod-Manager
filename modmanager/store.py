@@ -97,7 +97,8 @@ class Store:
     def create(self, name, mods=None, disabled=None, **extra):
         pid = uuid.uuid4().hex[:8]
         ps = {"id": pid, "name": validate_name(name), "mods": _id_list(mods or [], "mods"),
-              "disabled": _id_list(disabled or [], "disabled"), "created": int(time.time()), **_defaults()}
+              "disabled": _id_list(disabled or [], "disabled"), "created": int(time.time()), **_defaults(),
+              "separate_saves": True}   # a new playset starts with its own saves; older ones keep what they had
         self.data["playsets"][pid] = ps
         if extra:
             try:
