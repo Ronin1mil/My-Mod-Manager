@@ -90,14 +90,18 @@ def scan_mods(user_dir=None, workshop_dir=None):
     """Return {mod_id: info}. mod_id is 'ws:<id>' or 'local:<name>'. An entry that cannot be read is skipped."""
     mods = {}
     if workshop_dir and _isdir(workshop_dir):
-        for d in _listdir(workshop_dir):
+        def workshop_mod(d):
             try:
                 if _isdir(d) and looks_like_mod(d):
                     df = d / "descriptor.mod"
                     desc = _load_desc(df if _isfile(df) else None, d)
-                    mods[f"ws:{d.name}"] = _info(f"ws:{d.name}", desc, d, "workshop", d.name)
+                    return f"ws:{d.name}", _info(f"ws:{d.name}", desc, d, "workshop", d.name)
             except OSError:
-                continue
+                pass
+            return None
+        for found in _adaptive_map(workshop_mod, _listdir(workshop_dir), 0.002):   # several file checks per mod: slow disks use threads
+            if found:
+                mods[found[0]] = found[1]
     if user_dir and _isdir(Path(user_dir) / "mod"):
         mod_dir = Path(user_dir) / "mod"
         for f in [x for x in _listdir(mod_dir) if x.suffix == ".mod"]:
@@ -281,20 +285,29 @@ def list_files(root, only=()):
 _TOKEN = re.compile(r'#[^\n]*|("[^"]*"|[{}]|[^\s{}="#]+|=)')
 
 
+_STRUCT = re.compile(r'[{}]|"[^"]*"|#[^\n]*')
+
+
 def top_level_keys(text):
     """Names defined at brace depth 0 as (key, mode). mode is None for a plain definition
-    or the patch prefix ('REPLACE', 'INJECT', ...) for `PREFIX:key = {`."""
-    keys, depth = [], 0
-    toks = [t for t in _TOKEN.findall(text) if t]  # findall runs in C; a comment matches with an empty group
-    for j, t in enumerate(toks):
+    or the patch prefix ('REPLACE', 'INJECT', ...) for `PREFIX:key = {`.
+    Only the braces, strings and comments are walked (a few per definition); the words between top-level blocks are
+    tokenised only where a block starts. Same answers as reading every word (tests compare the two)."""
+    keys, depth, start = [], 0, 0
+    for m in _STRUCT.finditer(text):
+        t = m.group()
         if t == "{":
+            if depth == 0:
+                toks = [x for x in _TOKEN.findall(text, start, m.start()) if x]
+                if len(toks) >= 2 and toks[-1] == "=" and toks[-2] not in ("{", "}"):
+                    k = toks[-2].strip('"')
+                    mm = PATCH_PREFIX.match(k)
+                    keys.append((mm.group(2), mm.group(1)) if mm else (k, None))
             depth += 1
-        elif t == "}":
-            depth = max(0, depth - 1)
-        elif depth == 0 and j + 2 < len(toks) and toks[j + 1] == "=" and toks[j + 2] == "{":
-            k = t.strip('"')
-            m = PATCH_PREFIX.match(k)
-            keys.append((m.group(2), m.group(1)) if m else (k, None))
+        elif t == "}" and depth:
+            depth -= 1
+            if depth == 0:
+                start = m.end()
     return keys
 
 
@@ -310,6 +323,44 @@ def loc_keys(text):
         if m and lang:
             out.append((lang, m.group(1)))
     return out
+
+
+WORKERS = 12   # file reads in flight at once: on Windows most of the time is waiting for the disk and the antivirus
+
+
+def _adaptive_map(fn, items, per_item_slow, trial=8):
+    """Like _pmap, but threads only pay off when each call mostly waits (a disk with antivirus, a network drive): the first
+    `trial` calls run in line and are timed; when they average more than `per_item_slow` seconds the rest runs on threads.
+    On a fast local disk threads would only fight over the interpreter lock, so they are not used there."""
+    import time as _t
+    items = list(items)
+    t0 = _t.perf_counter()
+    head = [fn(x) for x in items[:trial]]
+    if len(items) <= trial:
+        return head
+    slow = (_t.perf_counter() - t0) / max(1, len(head)) > per_item_slow
+    return head + (list(_pmap(fn, items[trial:])) if slow else [fn(x) for x in items[trial:]])
+
+
+def _pmap(fn, items, window=256):
+    """fn over items, results in order, with up to `window` calls running on threads at once (the waiting overlaps).
+    Small jobs run inline."""
+    items = list(items)
+    if len(items) < 16:
+        yield from map(fn, items)
+        return
+    from collections import deque
+    from concurrent.futures import ThreadPoolExecutor
+    from itertools import islice
+    with ThreadPoolExecutor(WORKERS) as ex:
+        it = iter(items)
+        pend = deque(ex.submit(fn, x) for x in islice(it, window))
+        for x in it:
+            r = pend.popleft().result()
+            pend.append(ex.submit(fn, x))
+            yield r
+        while pend:
+            yield pend.popleft().result()
 
 
 class ScanCancelled(Exception):
@@ -382,6 +433,55 @@ def load_cache(path):
     return n
 
 
+def _probe_many(items):
+    """For a handful of (path, parser) pairs: True where the saved parse is still right, (mtime_ns, size, text) where the file
+    has to be read (new or changed), None where it cannot be read. Runs on a worker thread: stat and read are where the
+    waiting is. (Bytes are decoded here, not through Path.read_text: the key finders do not care about line endings.)"""
+    out = []
+    for path, fn in items:
+        try:
+            st = os.stat(path)
+            hit = _parse_cache.get((path, fn.__name__))
+            if hit is not None and hit[0] == st.st_mtime_ns and hit[1] == st.st_size:
+                out.append(True)
+                continue
+            with open(path, "rb") as f:
+                out.append((st.st_mtime_ns, st.st_size, f.read().decode("utf-8-sig", errors="replace")))
+        except OSError:
+            out.append(None)
+    return out
+
+
+def prefetch(todo, trusted=None, progress=None, should_stop=None):
+    """Bring the parse cache up to date for these (path, parser) pairs, reading in parallel. Files already checked since
+    the mods were last read from disk (`trusted`) are skipped."""
+    global _new_entries
+    if trusted is not None:
+        todo = [(p, fn) for p, fn in todo if (p, fn.__name__) not in trusted]
+    total, done = len(todo), 0
+    for i in range(0, total, 1000):   # read a batch on the threads while this thread only waits, then parse it (no fighting over the GIL)
+        batch = todo[i:i + 1000]
+        parts = _adaptive_map(_probe_many, [batch[j:j + 20] for j in range(0, len(batch), 20)], 0.003)   # 20 files take over 3 ms: waiting dominates
+        results = [r for part in parts for r in part]
+        for (path, fn), r in zip(batch, results):
+            key = (path, fn.__name__)
+            if r is True:
+                if trusted is not None:
+                    trusted.add(key)
+            elif r:
+                if len(_parse_cache) > MAX_CACHE:
+                    _parse_cache.clear()
+                _parse_cache[key] = (r[0], r[1], frozenset(fn(r[2])))
+                _new_entries += 1
+                if trusted is not None:
+                    trusted.add(key)
+        done += len(batch)
+        if should_stop is not None and should_stop():
+            raise ScanCancelled()
+        if progress:
+            progress(f"reading files {done} of {total}")
+
+
 def def_category(rel, def_dirs):
     """'common/traits/x.txt' -> 'common/traits'; 'in_game/common/goods/a.txt' -> 'in_game/common/goods';
     None when the file is not a script folder. Keys only clash within the same category."""
@@ -394,11 +494,13 @@ def def_category(rel, def_dirs):
     return None
 
 
-def find_conflicts(mods, order, files_cache=None, def_dirs=DEFAULT_DEF_DIRS, vanilla=None, trusted=None, should_stop=None):
+def find_conflicts(mods, order, files_cache=None, def_dirs=DEFAULT_DEF_DIRS, vanilla=None, trusted=None, should_stop=None,
+                   progress=None):
     """order: list of mod ids, first loads first (later wins). `vanilla` = (game folder, only-dirs)
     treats the base game as the first mod; results involving it carry `vanilla: True`.
     `trusted` (a set) remembers which files were already checked for changes; `should_stop()` returning True between
-    two mods abandons the scan with ScanCancelled.
+    two mods abandons the scan with ScanCancelled. `progress(text)` is told how far the listing and reading are. File lists
+    and file reads run in parallel threads before the (sequential) comparison.
 
     Returns list of {kind, severity, path, mods:[ids in load order], winner}; definition conflicts also carry
     `files` {mod id: [file that defines the key]} so the UI can show which file each mod overrides it in.
@@ -427,6 +529,38 @@ def find_conflicts(mods, order, files_cache=None, def_dirs=DEFAULT_DEF_DIRS, van
         if d not in dir_cat:
             dir_cat[d] = def_category(rel, def_dirs)
         return dir_cat[d]
+
+    def parser_for(rel):
+        if rel.endswith(".txt") and category(rel):
+            return top_level_keys
+        if rel.endswith(".yml") and "localization" in rel.split("/")[:2] and "/replace/" not in rel:
+            return loc_keys
+        return None
+
+    # ahead of the comparison, in parallel: every mod's file list, then every file that has to be read
+    roots = []
+    for mid in order:
+        m = mods.get(mid)
+        if m and m["exists"]:
+            k = (m["root"], tuple(m.get("only", ())))
+            if k not in cache and k not in roots:
+                roots.append(k)
+    for i in range(0, len(roots), 200):
+        part = roots[i:i + 200]
+        for k, listing in zip(part, _adaptive_map(lambda k: list_files(k[0], k[1]), part, 0.004)):
+            cache[k] = listing
+        if should_stop is not None and should_stop():
+            raise ScanCancelled()
+        if progress:
+            progress(f"listing files {min(i + 200, len(roots))} of {len(roots)} mods")
+    todo = []
+    for mid in order:
+        m = mods.get(mid)
+        if m and m["exists"] and mid != VANILLA:
+            todo += [(p, fn) for rel, p in cache[(m["root"], tuple(m.get("only", ())))].items() if (fn := parser_for(rel))]
+    prefetch(todo, trusted, progress, should_stop)
+    if progress:
+        progress(f"comparing {len(order)} mods")
 
     for mid in order:
         if should_stop is not None and should_stop():
@@ -475,6 +609,8 @@ def find_conflicts(mods, order, files_cache=None, def_dirs=DEFAULT_DEF_DIRS, van
                     seen_loc[(lang, k)].append((mid, rel))
     if van_files:
         wanted = {c for c, _ in seen_defs}
+        prefetch([(p, top_level_keys) for rel, p in van_files.items() if rel.endswith(".txt") and category(rel) in wanted],
+                 trusted, progress, should_stop)
         for rel, p in van_files.items():
             cat = category(rel) if rel.endswith(".txt") else None
             if cat in wanted:

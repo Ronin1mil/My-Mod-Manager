@@ -152,6 +152,30 @@ try {
   await page.reload();
   await page.waitForSelector('#banner:not([hidden])');  // a newer version shows again
 
+  // ---- an update leaves exactly one window: the old app window waits for the new copy to be ready, then closes itself
+  {
+    const p2 = await browser.newPage({ viewport: { width: 1000, height: 700 } });
+    await p2.goto(`${base}/#vic3`); await p2.waitForSelector('#view .row, #view .empty');
+    await p2.route('**/api/self-update', r => r.request().method() === 'POST' ? r.fulfill({ json: { status: 'restarting', message: 'Restarting…' } }) : r.abort());
+    let asked = 0;
+    await p2.route('**/api/games', r => { asked++; r.fulfill({ json: { ready: asked > 1, mode: 'window' } }); });
+    await p2.evaluate(() => { selfUpdate(() => {}, false).catch(() => {}); }).catch(() => {});
+    await new Promise(res => setTimeout(res, 11000));
+    const gone = p2.isClosed() || /opened in a new window/.test(await p2.textContent('body').catch(() => 'opened in a new window'));
+    assert.ok(gone, 'the old window must not stay on as a second copy');
+    assert.ok(asked >= 2, 'it waited until the new copy said it was ready');
+    // a browser tab is reloaded into the new version instead of closed
+    const p3 = await browser.newPage({ viewport: { width: 1000, height: 700 } });
+    await p3.goto(`${base}/#vic3`); await p3.waitForSelector('#view .row, #view .empty');
+    await p3.route('**/api/self-update', r => r.request().method() === 'POST' ? r.fulfill({ json: { status: 'restarting', message: 'Restarting…' } }) : r.abort());
+    let navs = 0; p3.on('framenavigated', () => { navs++; });
+    await p3.route('**/api/games', r => r.fulfill({ json: { ready: true, mode: 'browser' } }));
+    await p3.evaluate(() => { selfUpdate(() => {}, false).catch(() => {}); }).catch(() => {});
+    await p3.waitForTimeout(3500);
+    assert.ok(navs >= 1, 'a tab reloads itself into the new version');
+    await p3.close().catch(() => {});
+  }
+
   assert.deepEqual(errors, [], 'no page errors');
   console.log('compare/settings e2e ok');
 } finally {

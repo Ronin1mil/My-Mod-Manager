@@ -275,7 +275,7 @@ class GameApp:
             head = f"playset {n} of {len(ids)} \"{name}\""
             say(head + " ...")
             with lock or contextlib.nullcontext():   # only the snapshot needs the app lock; the scan itself runs outside it
-                job = self.conflicts_job(pid, progress=lambda d, t, head=head: say(f"{head}: {d} of {t} mods"))
+                job = self.conflicts_job(pid, progress=lambda text, head=head: say(f"{head}: {text}"))
             job()
         if scan.cache_dirty():
             with perflog.timed(f"{self.game.id}: save parse cache", quiet=True):
@@ -403,13 +403,7 @@ class GameApp:
         if hit is not None:
             return lambda: hit
         if progress:   # the start-up pass: nobody else is asking, so no giving way; report how far it is instead
-            done = [0]
-
-            def stop():
-                done[0] += 1
-                if done[0] % 100 == 0:
-                    progress(done[0], len(ordr))
-                return False
+            stop = lambda: False
         elif background:
             start = self._scan_token
             stop = lambda: time.sleep(0.002) or self._scan_token is not start   # also yields, so the page stays quick
@@ -422,7 +416,7 @@ class GameApp:
                 return {"conflicts": [], "counts": {}, "truncated": False, "pending": False}
             with perflog.timed(f"{self.game.id}: conflict scan", mods=len(ordr), base_game=bool(van)) as t:
                 try:
-                    conflicts = scan.find_conflicts(mods, ordr, files, defs, van, trusted=trusted, should_stop=stop)
+                    conflicts = scan.find_conflicts(mods, ordr, files, defs, van, trusted=trusted, should_stop=stop, progress=progress)
                 except scan.ScanCancelled:
                     t.note(cancelled=True)
                     return {"conflicts": [], "counts": {}, "truncated": False, "pending": True, "cancelled": True}
@@ -708,6 +702,8 @@ class Hub:
         self.update_pending = False
         self.client_errors = 0
         self.updater = selfupdate.Updater()
+        self.ready = True      # False while the start-up pass runs (a copy that was just updated is not yet the one to switch to)
+        self.last_ping = None  # when a page last said it is open (only used for a window this process cannot watch)
         self.updater_forced = False  # tests
         self.update_fetch = None  # tests inject a fake GitHub here
 
@@ -741,7 +737,7 @@ class Hub:
         s = self.settings.get()
         return {"log_file": str(errorlog.log_path()), "can_self_update": selfupdate.can_self_update() or self.updater_forced, "games": [g.public() for g in self.games.values()], "last_game": s["last_game"],
                 "custom_games": self.custom.defs, "game_templates": customgames.TEMPLATES,
-                "version": __version__, "build": BUILD, "settings": s, "update": self._update_cache[1] if self._update_cache else None,
+                "version": __version__, "build": BUILD, "mode": os.environ.get("MODMANAGER_MODE", ""), "ready": self.ready, "settings": s, "update": self._update_cache[1] if self._update_cache else None,
                 "update_pending": self.update_pending}
 
     def save_custom_game(self, b):
@@ -917,6 +913,8 @@ def make_handler(hub):
                     t.note(status=self._status)
 
         def do_GET(self):
+            if hub.last_ping is not None:   # any request from a page shows it is open
+                hub.last_ping = time.monotonic()
             self._timed("GET", self._do_get)
 
         def do_POST(self):
@@ -926,6 +924,11 @@ def make_handler(hub):
             p = self.path.split("?")[0].strip("/").split("/")
             if len(p) >= 4 and p[0] == "api" and p[2] in ("conflicts", "tree") and p[1] in hub.games:
                 return self._heavy_get(p)
+            if p == ["api", "ping"]:   # "this page is still open": no lock, no work
+                if not self._host_ok():
+                    return self._send(403, {"error": "bad host"})
+                hub.last_ping = time.monotonic()
+                return self._send(200, {})
             if len(p) == 3 and p[0] == "api" and p[1] in hub.games and p[2] == "logo":
                 return self._logo(p[1])
             with hub.lock:
@@ -1236,6 +1239,30 @@ def boot(hub, say=print, first=None):
     say(f"Ready ({time.time() - t0:.1f} s).")
 
 
+def adopts_open_window(mode, environ, app_window):
+    """After an update by a version that does not close its own old window (no MODMANAGER_HANDOVER), in a browser's app
+    window: that window reloads itself into the new copy, so the new copy must not open a second one."""
+    return bool(mode == "window" and app_window and environ.get("MODMANAGER_RESTARTED") == "1" and not environ.get("MODMANAGER_HANDOVER"))
+
+
+def watch_window(hub, quiet=150.0, grace=240.0):
+    """For a window this process cannot watch (it belongs to a browser that was already running, which is what happens
+    after an update): the app ends when no page has said it is open for `quiet` seconds. The page says so every few seconds
+    and with every request; a laptop that slept is forgiven (the clocks stopped, the pages did not get to speak)."""
+    started = tick = time.monotonic()
+    while True:
+        time.sleep(5)
+        now = time.monotonic()
+        if now - tick > 20:   # this loop was frozen: the computer was asleep
+            started = now
+            if hub.last_ping is not None:
+                hub.last_ping = now
+        tick = now
+        seen = hub.last_ping
+        if (seen is None and now - started > grace) or (seen is not None and now - seen > quiet):
+            return
+
+
 def serve(port=8765, open_browser=True, overrides=None, initial_game=None, window=False, **kw):
     """Run the app. `open_browser` shows the page; with `window` it gets its own window and closing it ends the app,
     otherwise it opens in the default browser and runs until Ctrl+C. The slow work (see boot) is done before the page opens."""
@@ -1260,6 +1287,7 @@ def serve(port=8765, open_browser=True, overrides=None, initial_game=None, windo
     os.environ["MODMANAGER_MODE"] = mode  # an updated copy restarts the same way
     print(f"{APP_NAME} {__version__} running at {url}  (Ctrl+C to quit)", flush=True)
     print("  games: " + ", ".join(f"{g.id} ({g.name})" for g in hub.games.values()), flush=True)
+    hub.ready = False
     threading.Thread(target=srv.serve_forever, daemon=True, name="server").start()
 
     def say(text):
@@ -1274,8 +1302,17 @@ def serve(port=8765, open_browser=True, overrides=None, initial_game=None, windo
             boot(hub, say, first=initial_game)
         if os.environ.get("MODMANAGER_PREWARM") != "0":
             hub.enable_prewarm()
+        hub.ready = True
         if mode != "none":
             say("Opening the interface ...")
+        # A copy that an OLD version (which does not know the new hand-over) just started inside a browser's app window: that
+        # window reloads itself into this copy, so opening a second one would show two. Adopt it; its pings keep us alive.
+        if adopts_open_window(mode, os.environ, windowmod.uses_app_window()):
+            say("Continuing in the window that is already open.")
+            watch_window(hub)
+            srv.shutdown()
+            srv.server_close()
+            return
         if mode == "window":
             with perflog.timed("open the app window"):
                 result = windowmod.show(url)
@@ -1285,6 +1322,11 @@ def serve(port=8765, open_browser=True, overrides=None, initial_game=None, windo
                 return
             if result is None:
                 webbrowser.open(url)  # no window backend here: the browser it is
+            elif result == "detached":
+                watch_window(hub)   # the window is a browser's, so closing it cannot end us: the pages' pings do
+                srv.shutdown()
+                srv.server_close()
+                return
         elif mode == "browser":
             webbrowser.open(url)
         while True:  # keep serving until Ctrl+C (or, for the app window, until it is closed)

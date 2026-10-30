@@ -98,6 +98,12 @@ def _run_app_window(exe, url, title):
     return "closed" if time.time() - started > 3 else "detached"
 
 
+def uses_app_window():
+    """True when show() would open a browser's app window (not a native one): a window that stays open after this process
+    exits, so an update can find it still there."""
+    return pywebview_module() is None and chromium_path() is not None
+
+
 def show(url, title=TITLE, pywebview=None, chromium=None):
     wv = pywebview if pywebview is not None else pywebview_module()
     if wv:

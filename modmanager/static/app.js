@@ -367,9 +367,19 @@ async function selfUpdate(say, ask = true, channel = 'stable') {
   if (st.status === 'error') throw new Error(st.message);
   if (st.status === 'current') return say(st.message);
   say('Restarting…');
-  for (let i = 0; i < 60; i++) {   // wait for the new copy, then load it (an app window is replaced by the new copy's own)
+  for (let i = 0; i < 600; i++) {   // wait for the new copy (it first does its start-up work), then hand over
     await new Promise(r => setTimeout(r, 1000));
-    try { const r = await fetch('/api/games'); if (r.ok) return location.reload(); } catch (e) { /* not up yet */ }
+    try {
+      const r = await fetch('/api/games'); if (!r.ok) continue;
+      const g = await r.json(); if (g.ready === false) { say('The new version is getting ready…'); continue; }
+      if (g.mode === 'window') {   // the new copy opened its own window: this old one goes away (it must not become a second one)
+        await new Promise(r2 => setTimeout(r2, 4000)); window.close();
+        await new Promise(r2 => setTimeout(r2, 1500));
+        document.body.innerHTML = '<p style="font:16px sans-serif;padding:32px">Ronin Mod Manager was updated and has opened in a new window. You can close this one.</p>';
+        return;
+      }
+      return location.reload();    // a browser tab: the same tab shows the new version
+    } catch (e) { /* not up yet */ }
   }
   throw new Error('Ronin Mod Manager did not come back. Start it again from its icon; the update itself was installed.');
 }
@@ -1012,6 +1022,7 @@ $('game').onchange = guard(async () => {
   await useGame($('game').value, true);
 });
 window.addEventListener('hashchange', () => { const w = location.hash.slice(1); if (GI && w !== G && GI.games.some(g => g.id === w)) useGame(w, true).catch(e => fail(e, 'hash')); });
+setInterval(() => { fetch('/api/ping').catch(() => {}); }, 5000);   // "this page is open": lets the app end after its window was closed (see watch_window)
 (async () => {
   try {   // ask for the logo of the game most likely to open while the game list is still on its way
     const early = location.hash.slice(1) || localStorage.getItem('mm-game') || '';

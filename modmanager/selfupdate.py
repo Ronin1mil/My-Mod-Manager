@@ -206,7 +206,7 @@ def child_environment():
     reuse THIS copy's unpacked files; the new version must unpack its own (the old copy's folder lacks libraries the
     new one needs, e.g. _sqlite3 after 0.5.0)."""
     env = {k: v for k, v in os.environ.items() if k != "_MEIPASS2" and not k.startswith("_PYI_")}
-    env.update(MODMANAGER_RESTARTED="1", PYINSTALLER_RESET_ENVIRONMENT="1")
+    env.update(MODMANAGER_RESTARTED="1", MODMANAGER_HANDOVER="1", PYINSTALLER_RESET_ENVIRONMENT="1")
     return env
 
 

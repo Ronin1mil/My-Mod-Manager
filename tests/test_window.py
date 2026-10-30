@@ -7,7 +7,7 @@ import urllib.request
 from pathlib import Path
 from unittest import mock
 
-from modmanager import selfupdate, server, window
+from modmanager import games, selfupdate, server, window
 
 
 class Backends(unittest.TestCase):
@@ -91,3 +91,57 @@ class Restart(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Handover(unittest.TestCase):
+    """An update must leave exactly one window."""
+
+    def test_the_new_copy_opens_its_own_window_unless_an_old_version_left_its_window_open(self):
+        env = {"MODMANAGER_RESTARTED": "1"}                       # started by a version that does not know the hand-over
+        self.assertTrue(server.adopts_open_window("window", env, True))
+        self.assertFalse(server.adopts_open_window("window", {**env, "MODMANAGER_HANDOVER": "1"}, True))   # new: old page closes itself
+        self.assertFalse(server.adopts_open_window("window", env, False))      # a native window died with the old process
+        self.assertFalse(server.adopts_open_window("window", {}, True))        # a normal start
+        self.assertFalse(server.adopts_open_window("browser", env, True))
+
+    def test_a_restart_says_it_is_a_hand_over(self):
+        self.assertEqual(selfupdate.child_environment()["MODMANAGER_HANDOVER"], "1")
+
+    def test_the_game_list_tells_a_waiting_page_when_the_new_copy_is_ready_and_how_it_shows_itself(self):
+        hub = server.Hub(gamelist=[games.VIC3])
+        with mock.patch.dict(os.environ, {"MODMANAGER_MODE": "window"}):
+            idx = hub.index()
+        self.assertEqual((idx["mode"], idx["ready"]), ("window", True))
+        hub.ready = False
+        self.assertFalse(hub.index()["ready"])
+
+
+class Watch(unittest.TestCase):
+    """A window we cannot watch: the app ends when the pages stop saying they are open."""
+
+    def run_watch(self, pings, quiet=150.0, grace=240.0, freeze_at=None):
+        """pings: seconds (on the fake clock) at which a page pings. Returns the fake time at which watch_window returned."""
+        hub = server.Hub(gamelist=[games.VIC3])
+        clock = [0.0]
+
+        def sleep(n):
+            clock[0] += n
+            if freeze_at is not None and abs(clock[0] - freeze_at) < 1:
+                clock[0] += 3600       # the computer slept
+            while pings and pings[0] <= clock[0]:
+                hub.last_ping = pings.pop(0)
+
+        with mock.patch("modmanager.server.time.sleep", sleep), mock.patch("modmanager.server.time.monotonic", lambda: clock[0]):
+            server.watch_window(hub, quiet, grace)
+        return clock[0]
+
+    def test_no_page_at_all_ends_after_the_grace_time(self):
+        self.assertAlmostEqual(self.run_watch([]), 245, delta=6)
+
+    def test_it_ends_a_while_after_the_last_ping(self):
+        end = self.run_watch([5, 10, 15, 100])
+        self.assertAlmostEqual(end, 100 + 150, delta=10)
+
+    def test_a_computer_that_slept_is_forgiven(self):
+        end = self.run_watch([5, 10], freeze_at=60)
+        self.assertGreater(end, 3600 + 100, "the hour of sleep must not count as an hour without a page")
