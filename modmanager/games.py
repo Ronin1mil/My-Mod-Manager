@@ -65,7 +65,7 @@ _COMMON = {"--ink": "#efe6d4", "--mut": "#a1928f"}
 CK3 = Game(
     id="ck3", name="Crusader Kings III", app_id="1158310", user_dir_name="Crusader Kings III",
     install_dir_name="Crusader Kings III", install_marker=("game", "common"),
-    load_file="dlc_load.json", load_style="descriptor", def_dirs=("common", "events"),
+    load_file="dlc_load.json", load_style="descriptor", def_dirs=("common", "events"), verified=True,
     theme={**_COMMON, "--bg": "#120b0b", "--side": "#170e0e", "--panel": "#1d1313", "--line": "#3b2423",
            "--acc": "#e0766a", "--accink": "#fff4ee", "--p1": "#8f2a24", "--p2": "#b53a32", "--p3": "#6b1e1a",
            "--mut": "#a08c85"})

@@ -5,7 +5,7 @@ What the four built-in games actually look like on a Windows 11 PC with all of t
 ## Summary
 | Game | Version | Play | What changed |
 |---|---|---|---|
-| Crusader Kings III | 1.20.1.2 | **not yet confirmed** | Play starts `binaries/ck3.exe` directly instead of going through Steam |
+| Crusader Kings III | 1.20.1.2 | **confirmed** (`verified=True`) | Play starts `binaries/ck3.exe` directly instead of going through Steam |
 | Europa Universalis V | 1.4.5 | **confirmed** (`verified=True`) | Version read from the game's `debug.log` |
 | Victoria 3 | 1.14.5 | **not yet confirmed** | Load file format fixed; Play starts `binaries/victoria3.exe` directly |
 | Bannerlord | 1.5.6 | **not yet confirmed** | New playsets also start with `BirthAndDeath` and `NavalDLC` |
@@ -37,7 +37,7 @@ Play used to open `steam://run/<app id>`. For these two games Steam opens the Pa
 
 Fix: when the install has `launcher/launcher-settings.json` with an `exePath` (resolved inside the install only), Play starts that exe directly with its `exeArgs` (`-gdpr-compliant`) followed by the playset's launch arguments, the way the launcher itself starts the game. A `--game-exe` set by you still wins; a game without that file still goes through Steam. Settings > Problems and the game log say which way Play goes.
 
-**To confirm:** press Play on a CK3 and a Victoria 3 playset in the app. The game should start without the Paradox launcher window, and its main menu's mod list (or `logs/debug.log`) should show the playset's mods. Steam must be running.
+**CK3 confirmed:** Play on a 20-mod playset started `ck3.exe -gdpr-compliant` directly; the game mounted exactly those 20 mods, and `launcher-v2.sqlite` was not touched. **Victoria 3, to confirm:** press Play on a playset in the app. The game should start without the Paradox launcher window, and its main menu's mod list (or `logs/debug.log`) should show the playset's mods. Steam must be running.
 
 ## Europa Universalis V: confirmed
 At 23:16:10 the app made "Initial playset" the active one in `playsets.json`. At 23:16:15 the game's `logs/debug.log` said `Switching to playset index 1, Name: Initial playset` and listed the same 17 mods, in order. Loading mods was also confirmed by playing.

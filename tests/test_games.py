@@ -35,8 +35,8 @@ class Registry(unittest.TestCase):
         self.assertEqual(p["install_marker"], "game/common")
 
     def test_only_games_checked_on_a_real_install_are_marked_verified(self):
-        # EU5: Play confirmed loading the playset's mods (docs/22-checked-on-a-real-pc.md)
-        self.assertEqual([g.id for g in games.GAMES.values() if g.verified], ["eu5"])
+        # Play confirmed loading the playset's mods (docs/22-checked-on-a-real-pc.md)
+        self.assertEqual([g.id for g in games.GAMES.values() if g.verified], ["ck3", "eu5"])
 
     def test_bannerlord_new_playsets_start_with_the_official_modules_in_dependency_order(self):
         # dependencies read from the SubModule.xml files of a real 1.5.6 install
