@@ -30,6 +30,7 @@ class Game:
     launch_prefix: tuple = ()    # arguments before the module list
     content_dir: object = None   # folder under the install root that holds the base content ("" = the root itself); None = the kind's default
     custom: bool = False         # made by the user in the app (beta), not built in
+    playsets_file: str = ""      # the game's own playset list in the user dir; its active playset is what the game starts with
 
     @property
     def vanilla_dir_name(self):
@@ -72,7 +73,7 @@ EU5 = Game(
     id="eu5", name="Europa Universalis V", app_id="3450310", user_dir_name="Europa Universalis V",
     install_dir_name="Europa Universalis V", install_marker=("game", "in_game"),
     load_file="dlc_load.json", load_style="path", def_dirs=("common",),
-    vanilla_only=("in_game", "main_menu", "loading_screen"),
+    vanilla_only=("in_game", "main_menu", "loading_screen"), playsets_file="playsets.json",
     theme={**_COMMON, "--bg": "#0e1621", "--side": "#0b121b", "--panel": "#15202d", "--line": "#2a3a4d",
            "--acc": "#d4a73a", "--accink": "#1a1407", "--p1": "#2b4a6e", "--p2": "#3a6291", "--p3": "#223a56",
            "--mut": "#8f9bab"})

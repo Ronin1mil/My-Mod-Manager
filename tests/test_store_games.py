@@ -55,6 +55,37 @@ class LoadFiles(Base):
         self.assertEqual(json.loads(f.read_text())["enabled_mods"], ["mod/A", str(self.r / "ws/123")])
         self.assertFalse((self.user / "mod/ugc_123.mod").exists())
 
+    def test_eu5_starts_with_the_active_playset_of_its_own_list_so_ours_is_put_there_and_made_active(self):
+        f = self.user / "playsets.json"
+        f.write_text(json.dumps({"x": 1, "playsets": [
+            {"name": "Mine", "isActive": True, "DLC": ["d1"], "orderedListMods": [{"path": "C:\\a\\b\\3450310\\9\\", "isEnabled": True}]},
+            {"name": "Other", "isActive": False, "orderedListMods": []}]}))
+        write_load_file(games.EU5, self.user, self.mods, ["local:A", "ws:123"])
+        got = json.loads(f.read_text())
+        self.assertEqual(got["x"], 1)
+        self.assertEqual([(p["name"], p["isActive"]) for p in got["playsets"]], [("Mine", False), ("Other", False), ("Ronin Mod Manager", True)])
+        ours = got["playsets"][2]
+        self.assertEqual(ours["DLC"], ["d1"])
+        self.assertEqual([m["isEnabled"] for m in ours["orderedListMods"]], [True, True])
+        self.assertEqual([m["path"] for m in ours["orderedListMods"]],
+                         [str(self.user / "mod" / "A").replace("/", "\\") + "\\", str(self.r / "ws" / "123").replace("/", "\\") + "\\"])
+        self.assertEqual(json.loads((self.user / "playsets.json.bak").read_text())["playsets"][0]["isActive"], True)
+        write_load_file(games.EU5, self.user, self.mods, ["ws:123"])   # the next launch updates ours, no second copy
+        again = json.loads(f.read_text())["playsets"]
+        self.assertEqual([p["name"] for p in again], ["Mine", "Other", "Ronin Mod Manager"])
+        self.assertEqual(len(again[2]["orderedListMods"]), 1)
+
+    def test_eu5_without_a_list_yet_gets_one_and_the_other_games_get_none(self):
+        write_load_file(games.EU5, self.user, self.mods, ["local:A"])
+        got = json.loads((self.user / "playsets.json").read_text())["playsets"]
+        self.assertEqual([(p["name"], p["isActive"]) for p in got], [("Ronin Mod Manager", True)])
+        self.assertTrue(got[0]["orderedListMods"][0]["path"].endswith("A"))
+        for g in (games.CK3, games.VIC3):
+            u = self.r / ("u" + g.id)
+            u.mkdir()
+            write_load_file(g, u, self.mods, ["local:A"])
+            self.assertFalse((u / "playsets.json").exists())
+
     def test_existing_settings_survive_and_old_file_is_backed_up(self):
         (self.user / "dlc_load.json").write_text(json.dumps({"disabled_dlcs": ["dlc001"], "x": 1, "enabled_mods": ["old"]}))
         f = write_load_file(games.CK3, self.user, self.mods, ["local:A"])

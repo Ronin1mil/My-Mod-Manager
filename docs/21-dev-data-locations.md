@@ -33,7 +33,7 @@ Folder: `%APPDATA%\Ronin Mod Manager\` (that is `C:\Users\<you>\AppData\Roaming\
 |---|---|---|---|
 | Crusader Kings III | `Documents\Paradox Interactive\Crusader Kings III\` | `dlc_load.json` | `launcher-v2.sqlite` |
 | Victoria 3 | `Documents\Paradox Interactive\Victoria 3\` | `content_load.json` | `launcher-v2.sqlite` |
-| Europa Universalis V | `Documents\Paradox Interactive\Europa Universalis V\` | `dlc_load.json` | `playsets.json` |
+| Europa Universalis V | `Documents\Paradox Interactive\Europa Universalis V\` | `dlc_load.json` (and the active playset in `playsets.json`, which is what EU5 really uses) | `playsets.json` |
 | Mount & Blade II: Bannerlord | `Documents\Mount and Blade II Bannerlord\` | none (modules go on the command line) | `Configs\LauncherData.xml` |
 
 Local mods: `<Documents folder>\mod\<mod>\` with a `mod\<mod>.mod` stub (Paradox games); Bannerlord modules: `<install>\Modules\<ModuleId>\`.

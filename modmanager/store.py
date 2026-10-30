@@ -329,4 +329,53 @@ def write_load_file(game, user_dir, mods, ids):
     cur["enabled_mods"] = [mod_entry(game, mods[mid]) for mid in ids]
     cur.setdefault("disabled_dlcs", [])
     _atomic_write(f, json.dumps(cur, indent=2))
+    if game.playsets_file:
+        write_launcher_playset(game, user_dir, mods, ids)
     return f
+
+
+LAUNCH_PLAYSET = "Ronin Mod Manager"
+
+
+def write_launcher_playset(game, user_dir, mods, ids):
+    """Games that start with the active playset of their own list (EU5: <user dir>/playsets.json) ignore the load file.
+    Put the chosen mods into a playset of ours in that list and make it the active one. Everything else in the file
+    (other playsets, keys we do not know) is kept; the old file is saved as playsets.json.bak."""
+    f = Path(user_dir) / game.playsets_file
+    data = {}
+    if f.is_file():
+        try:
+            data = json.loads(f.read_text(encoding="utf-8-sig"))
+        except ValueError:
+            data = {}
+        if not isinstance(data, dict):
+            data = {}
+        shutil.copy2(f, f.with_suffix(".json.bak"))
+    sets = data.get("playsets")
+    if not isinstance(sets, list):
+        sets = []
+    sets = [p for p in sets if isinstance(p, dict)]
+    mine = next((p for p in sets if p.get("name") == LAUNCH_PLAYSET), None)
+    paths = [m.get("path") for p in sets for m in (p.get("orderedListMods") or []) if isinstance(m, dict) and isinstance(m.get("path"), str)]
+    sep = "\\" if any("\\" in p for p in paths) else "/"
+    trailing = bool(paths) and all(p.endswith(("/", "\\")) for p in paths)
+    if mine is None:   # start from the playset in use so settings we do not know (DLC choice) carry over
+        base = next((p for p in sets if p.get("isActive") is True and not p.get("isRemoved")), None) or {}
+        mine = {k: v for k, v in base.items() if k not in ("name", "isActive", "orderedListMods", "id", "isRemoved")}
+        sets.append(mine)
+    for p in sets:
+        p["isActive"] = p is mine
+    mine["name"] = LAUNCH_PLAYSET
+    mine["isRemoved"] = False
+    mine["orderedListMods"] = [{"path": _launcher_path(game, user_dir, mods[mid], sep, trailing), "isEnabled": True} for mid in ids]
+    data["playsets"] = sets
+    _atomic_write(f, json.dumps(data, indent=2))
+    return f
+
+
+def _launcher_path(game, user_dir, m, sep, trailing):
+    """A mod's folder as the game's playset list writes it: the Workshop folder, or <user dir>/mod/<folder>."""
+    p = m["root"] if m["source"] != "local" else str(Path(user_dir) / "mod" / Path(m["root"]).name)
+    p = p.replace("\\", "/").rstrip("/")
+    p = p.replace("/", sep)
+    return p + sep if trailing else p
