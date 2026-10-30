@@ -109,6 +109,15 @@ def _result(current, status, message, **kw):
             "message": message, "url": f"{LINK_PREFIX}releases", "notes": "", "published": "", "published_at": "", "assets": [], **kw}
 
 
+def _message(tag, current, newer):
+    if not newer:
+        return "You are up to date."
+    v = tag.lstrip("v")
+    if current == f"{v}-nightly":   # a test build of this very version: the release replaces it
+        return f"Version {v} is released. You have a test build of it (it may lack the final fixes); installing the release replaces it."
+    return f"Version {v} is available."
+
+
 def check_for_update(current=__version__, fetch=None, repo=REPO):
     """Compare the running version with the newest GitHub release (falling back to tags).
     Never raises: failures come back as a result with status 'unreachable' or 'error'."""
@@ -124,8 +133,7 @@ def check_for_update(current=__version__, fetch=None, repo=REPO):
                       if isinstance(a, dict) and isinstance(a.get("name"), str)
                       and str(a.get("browser_download_url", "")).startswith(LINK_PREFIX)]
             newer = is_newer(tag, current)
-            return _result(current, "update" if newer else "current",
-                           f"Version {tag.lstrip('v')} is available." if newer else "You are up to date.",
+            return _result(current, "update" if newer else "current", _message(tag, current, newer),
                            latest=tag.lstrip("v"), update_available=newer,
                            url=_clean_url(rel.get("html_url"), f"{LINK_PREFIX}releases"),
                            notes=str(rel.get("body") or "")[:4000], published=str(rel.get("published_at") or "")[:10], published_at=str(rel.get("published_at") or ""),

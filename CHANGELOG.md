@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- If you run a test build of a version that has since been released, the update notice now says so ("The release of 0.9.1 is out (you have 0.9.1 test build abc1234, a test build of it)") instead of "Version 0.9.1 is available (you have 0.9.1)"
+
 ## 0.9.1 - Fast switching between big playsets
 Clicking between playsets with many mods is now instant after the first time, and the window no longer seems to ignore clicks.
 

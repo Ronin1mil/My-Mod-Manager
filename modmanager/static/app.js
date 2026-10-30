@@ -378,7 +378,8 @@ function banner() {
   if (!u || !u.update_available || GI.settings.dismissed_update === u.latest) { b.hidden = true; b.innerHTML = ''; return; }
   const link = u.url.startsWith(REPO_LINK) ? u.url : REPO_LINK + 'releases';
   b.hidden = false;
-  b.innerHTML = `<span class="grow"><b>Version ${esc(u.latest)} is available</b> <span class="mut">(you have ${esc(GI.version)})</span></span>
+  const mine = GI.version + (GI.build ? ' test build ' + GI.build : ''), sameVersion = GI.build && u.latest === GI.version;
+  b.innerHTML = `<span class="grow"><b>${sameVersion ? 'The release of ' + esc(u.latest) + ' is out' : 'Version ' + esc(u.latest) + ' is available'}</b> <span class="mut">(you have ${esc(mine)}${sameVersion ? ', a test build of it' : ''})</span></span>
     ${GI.can_self_update ? '<button class="sm pri" id="bn-now">Update now</button>' : ''}
     <a href="${esc(link)}" target="_blank" rel="noopener noreferrer">View release</a><button class="sm" id="bn-dismiss">Dismiss</button>`;
   if ($('bn-now')) $('bn-now').onclick = guard(() => selfUpdate());
