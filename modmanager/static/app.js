@@ -957,18 +957,18 @@ const GAME_FORM = [   // [key, label, hint, only for kind]
 ];
 function openGameDialog(editId) {
   const d = $('dlg'), def = editId ? GI.custom_games[editId] : null, T = GI.game_templates;
-  d.className = 'wide';
+  d.className = 'wide gform';
   d.innerHTML = `<div class="st-head"><h2>${def ? 'Edit ' + esc(def.name) : 'Add a game'} <span class="b warn">beta</span></h2>
       <span class="mut">For games that work like Paradox\'s or like Bannerlord. Nothing here is checked against a real install.</span></div>
     <div class="st-form">
       <div class="card">
-        ${def ? '' : `<label class="fld" for="gf-tpl">Start from<span class="hint">Fills in the fields below. Check them against your game.</span></label>
-          <select id="gf-tpl">${T.map((t, i) => `<option value="${i}">${esc(t.label)}</option>`).join('')}</select>`}
-        <label class="fld" for="gf-kind">Type of game<span class="hint">"paradox": mods are listed in a file in the game\'s Documents folder. "modules": Bannerlord style, mods are module folders and the game is started with the list.</span></label>
-        <select id="gf-kind"><option value="paradox">Paradox style (mod list file)</option><option value="modules">Bannerlord style (modules)</option></select>
+        ${def ? '' : `<div><label class="fld" for="gf-tpl">Start from<span class="hint">Fills in the fields below. Check them against your game.</span></label>
+          <select id="gf-tpl">${T.map((t, i) => `<option value="${i}">${esc(t.label)}</option>`).join('')}</select></div>`}
+        <div><label class="fld" for="gf-kind">Type of game<span class="hint">"paradox": mods are listed in a file in the game\'s Documents folder. "modules": Bannerlord style, mods are module folders and the game is started with the list.</span></label>
+        <select id="gf-kind"><option value="paradox">Paradox style (mod list file)</option><option value="modules">Bannerlord style (modules)</option></select></div>
         ${GAME_FORM.map(([k, l, h, only]) => `<div data-only="${only || ''}"><label class="fld" for="gf-${k}">${esc(l)}<span class="hint">${esc(h)}</span></label><input type="text" id="gf-${k}"></div>`).join('')}
-        <label class="fld" for="gf-accent">Colour<span class="hint">The accent colour of the app for this game.</span></label>
-        <input type="color" id="gf-accent" value="#8fa8d0">
+        <div><label class="fld" for="gf-accent">Colour<span class="hint">The accent colour of the app for this game.</span></label>
+        <input type="color" id="gf-accent" value="#8fa8d0"></div>
         <p class="warn" id="gf-msg"></p>
       </div></div>
     <div class="st-foot"><span class="mut">The game\'s folders are chosen afterwards under Settings &gt; Game and Storage. The game\'s own files are never changed by this form.</span><span><button id="gf-cancel">Cancel</button> <button id="gf-save" class="pri">${def ? 'Save' : 'Add game'}</button></span></div>`;
