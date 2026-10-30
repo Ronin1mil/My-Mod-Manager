@@ -56,6 +56,7 @@ try {
   await page.fill('#gf-user_dir_name', 'Stellaris');
   await page.click('#gf-save');
   await page.waitForFunction(() => /Stellaris/.test(document.querySelector('#game').selectedOptions[0].textContent));
+  await page.waitForFunction(() => S && S.game && S.game.custom);   // loaded: Settings reads this state
   assert.match(await page.locator('#game').evaluate(s => s.selectedOptions[0].textContent), /Stellaris \(beta\)/);
   const gid = await page.locator('#game').inputValue();
   assert.match(gid, /^cg-stellaris/);
@@ -85,6 +86,7 @@ try {
   await page.fill('#gf-name', 'Stellaris Two');
   await page.click('#gf-save');
   await page.waitForFunction(() => /Stellaris Two/.test(document.querySelector('#game').selectedOptions[0].textContent));
+  await page.waitForFunction(() => S && S.game && S.game.name === 'Stellaris Two');   // the game finished loading (Settings needs its state)
 
   // remove: back to the built-in games
   await page.click('#appcfg');

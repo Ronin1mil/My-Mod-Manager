@@ -230,7 +230,7 @@ class Logo(GameCase):
 
     def test_a_game_with_no_logo_gets_a_plain_404_and_the_page_draws_nothing(self):
         self.assertEqual(self.req("GET", "/api/ck3/logo")[0], 404)
-        js = (Path(__file__).parent.parent / "modmanager/static/app.js").read_text()
+        js = (Path(__file__).parent.parent / "modmanager/static/app.js").read_text(encoding="utf-8")
         self.assertNotIn("CREST", js, "no stand-in shield behind or instead of the logo")
         self.assertIn("class=\"logo-box\" hidden", js)
 
