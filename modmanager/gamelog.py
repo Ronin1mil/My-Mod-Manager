@@ -100,7 +100,40 @@ def _snapshot(game, user_dir):
         else:
             mods = data.get("enabled_mods")
             out.append(f"{name}: written {when}, {len(mods) if isinstance(mods, list) else '?'} mods enabled")
+    out += recent_files(d)
     return out
+
+
+SKIP_DIRS = {"mod", "save games", "saves", "logs", "crashes", "cache", "screenshots", "pops", "dumps"}
+
+
+def recent_files(d, minutes=15, limit=25):
+    """Files the game (or anything else) changed in its user folder lately, top level and one folder down (mods, saves
+    and logs are skipped): this is how a file that decides which playset starts shows up."""
+    cutoff = time.time() - minutes * 60
+    found = []
+    try:
+        for e in os.scandir(d):
+            if e.is_file():
+                found.append((e.stat().st_mtime, e.name, e.stat().st_size))
+            elif e.is_dir() and e.name.lower() not in SKIP_DIRS:
+                for f in os.scandir(e.path):
+                    if f.is_file():
+                        found.append((f.stat().st_mtime, f"{e.name}/{f.name}", f.stat().st_size))
+    except OSError as err:
+        return [f"(could not list the folder: {err})"]
+    new = sorted((t, n, z) for t, n, z in found if t >= cutoff)[-limit:]
+    return [f"changed in the last {minutes} min in the user folder:"] + (
+        [f"  {time.strftime('%H:%M:%S', time.localtime(t))}  {z:>8} bytes  {n}" for t, n, z in new] or ["  (nothing)"])
+
+
+def raw_text(game, user_dir, limit=60000):
+    """The game's playset list exactly as it is on disk, for the follow-up entries."""
+    try:
+        text = (Path(user_dir) / game.playsets_file).read_text(encoding="utf-8-sig", errors="replace")
+    except OSError as e:
+        return [f"(could not read {game.playsets_file}: {e})"]
+    return [f"{game.playsets_file} as it is on disk ({len(text)} characters):"] + [("  " + l)[:300] for l in text[:limit].splitlines()]
 
 
 def follow_up(game, user_dir, delays=FOLLOW_UP):
@@ -109,7 +142,8 @@ def follow_up(game, user_dir, delays=FOLLOW_UP):
         return
 
     def look(secs):
-        log(game.id, f"{secs} s after Play: the game's files now say", snapshot(game, user_dir))
+        log(game.id, f"{secs} s after Play: the game's files now say",
+            snapshot(game, user_dir) + (raw_text(game, user_dir) if game.playsets_file else []))
 
     for secs in delays:
         t = threading.Timer(secs, look, args=(secs,))

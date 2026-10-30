@@ -74,7 +74,23 @@ class GameLog(unittest.TestCase):
         time.sleep(0.4)
         t = self.text()
         self.assertIn("0.05 s after Play: the game's files now say", t)
-        self.assertIn("active playset 'Old'", t.split("0.05 s after Play")[1])
+        after = t.split("0.05 s after Play")[1]
+        self.assertIn("active playset 'Old'", after)
+        self.assertIn("playsets.json as it is on disk", after)   # the file itself, to see what the game wrote
+        self.assertIn('"name": "Old"', after)
+        self.assertIn("changed in the last 15 min in the user folder:", after)
+        self.assertIn("playsets.json", after.split("changed in the last 15 min")[1])
+
+    def test_recent_files_look_one_folder_down_and_skip_mods(self):
+        (self.user / "settings").mkdir()
+        (self.user / "settings" / "last.json").write_text("{}")
+        old = self.user / "old.txt"
+        old.write_text("x")
+        os.utime(old, (time.time() - 7200, time.time() - 7200))
+        lines = "\n".join(gamelog.recent_files(self.user))
+        self.assertIn("settings/last.json", lines)
+        self.assertNotIn("old.txt", lines)
+        self.assertNotIn("mod/", lines)
 
     def test_the_windows_user_name_is_not_written(self):
         with mock.patch.dict(os.environ, {"USERNAME": "Somebody"}):
