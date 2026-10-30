@@ -79,6 +79,10 @@ class Play(Base):
                 self.assertEqual(res["via"], "exe")
                 self.assertEqual(po.call_args[0][0], [str((root / "binaries/ck3.exe").resolve()), "-gdpr-compliant", "-debug_mode"])
                 self.assertIn("not through the Paradox launcher", a._play_via())
+                # without this Victoria 3 hands itself back to Steam, which opens the launcher (no steam_appid.txt)
+                env = po.call_args[1]["env"]
+                self.assertEqual((env["SteamAppId"], env["SteamGameId"]), (g.app_id, g.app_id))
+                self.assertEqual(env.get("PATH"), os.environ.get("PATH"))
 
     def test_a_game_without_launcher_settings_still_goes_through_steam(self):
         root = self.install(games.EU5, {"rawVersion": "1.0.0"}, exe=None)
@@ -98,6 +102,11 @@ class Play(Base):
         with mock.patch.object(launch.subprocess, "Popen") as po:
             a.launch(pid, ack_version=True)
         self.assertEqual(po.call_args[0][0], [str(mine)])
+
+    def test_no_steam_app_id_for_a_game_without_one(self):
+        g = games.Game(id="x", name="X", app_id="0", user_dir_name="X", install_dir_name="X", install_marker=("a",),
+                       load_file="dlc_load.json", load_style="path", def_dirs=())
+        self.assertNotIn("SteamAppId", launch.steam_env(g))
 
 
 class Eu5Version(Base):

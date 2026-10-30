@@ -39,6 +39,9 @@ Fix: when the install has `launcher/launcher-settings.json` with an `exePath` (r
 
 **CK3 confirmed:** Play on a 20-mod playset started `ck3.exe -gdpr-compliant` directly; the game mounted exactly those 20 mods, and `launcher-v2.sqlite` was not touched. **Victoria 3, to confirm:** press Play on a playset in the app. The game should start without the Paradox launcher window, and its main menu's mod list (or `logs/debug.log`) should show the playset's mods. Steam must be running.
 
+### Victoria 3 handed itself back to the launcher
+The first direct start of `victoria3.exe` loaded for about 8 seconds, then Steam's `console_log.txt` shows `ExecCommandLine: "steam.exe" -- steam://run/529340`, Steam ran `launcher\dowser.exe`, and the Paradox launcher opened and wrote its own 50-mod playset into `content_load.json`. The app had started the game only once, directly. The difference from CK3: CK3's `binaries` folder has a `steam_appid.txt` (`1158310`), Victoria 3's has none, so the Steam library in the game decided it had not been started by Steam and asked Steam to start it again. Steam's way of starting a game sets the `SteamAppId` environment variable, which the Steam library accepts in place of that file, so Play now sets `SteamAppId` and `SteamGameId` to the game's app id when it starts an exe. Nothing is written into the game folder.
+
 ## Europa Universalis V: confirmed
 At 23:16:10 the app made "Initial playset" the active one in `playsets.json`. At 23:16:15 the game's `logs/debug.log` said `Switching to playset index 1, Name: Initial playset` and listed the same 17 mods, in order. Loading mods was also confirmed by playing.
 

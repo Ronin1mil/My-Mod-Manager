@@ -1,5 +1,6 @@
 """Starting the game. Never builds a shell string: the game is spawned from an argument list, or
 started through a steam:// URL whose arguments are percent-encoded."""
+import os
 import re
 import subprocess
 import urllib.parse
@@ -33,13 +34,23 @@ def steam_url(game, args):
     return f"{base}//{urllib.parse.quote(' '.join(args), safe='-_.=:/')}/"
 
 
+def steam_env(game):
+    """The environment Steam gives a game it starts. A Steam game started any other way (Victoria 3 has no
+    steam_appid.txt next to its exe) asks Steam to start it again and quits, and Steam then opens the Paradox launcher.
+    With SteamAppId set the game knows it belongs to Steam and keeps running."""
+    env = dict(os.environ)
+    if game.app_id.isdigit() and game.app_id != "0":
+        env["SteamAppId"] = env["SteamGameId"] = game.app_id
+    return env
+
+
 def start(game, game_exe, args):
     """Spawn the game directly when an executable is configured, otherwise go through Steam."""
     if game_exe:
         exe = Path(game_exe)
         if not exe.is_file():
             raise ValueError(f"Game executable not found: {exe}")
-        subprocess.Popen([str(exe), *args], cwd=str(exe.parent), close_fds=True)
+        subprocess.Popen([str(exe), *args], cwd=str(exe.parent), close_fds=True, env=steam_env(game))
         return {"via": "exe"}
     webbrowser.open(steam_url(game, args))
     return {"via": "steam"}
