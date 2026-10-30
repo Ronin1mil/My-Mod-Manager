@@ -1,0 +1,167 @@
+{
+  "format": "modmanager-preset",
+  "id": "bannerlord-mods-of-bannerlord-war-sails",
+  "game": "bannerlord",
+  "name": "Mods Of Bannerlord (War Sails)",
+  "status": "unverified",
+  "description": "From the Steam Workshop collection 3716690126 (checked on Steam 2026-10-29: all 39 items public; collection updated 2026-05-16). A big War Sails-era pack: Calradia At War, Custom Spawns API, Improved Garrisons, Xorberax's Legacy, Dismemberment Plus, Diplomacy, Detailed Character Creation, Leave on Click, Enable Achievement. The official modules are added when you create the playset, and Auto-sort puts Harmony, ButterLib, UIExtenderEx and Mod Configuration Menu first. Most of these mods were made for 1.3/1.4: check each mod's page for your game version. Not tested in a game.",
+  "source": "https://steamcommunity.com/sharedfiles/filedetails/?id=3716690126",
+  "mods": [
+    {
+      "workshop_id": "2859188632",
+      "name": "Harmony"
+    },
+    {
+      "workshop_id": "2859222409",
+      "name": "UIExtenderEx"
+    },
+    {
+      "workshop_id": "2859232415",
+      "name": "ButterLib"
+    },
+    {
+      "workshop_id": "2859238197",
+      "name": "Mod Configuration Menu v5"
+    },
+    {
+      "workshop_id": "2859265386",
+      "name": "Improved Garrisons"
+    },
+    {
+      "workshop_id": "2875093027",
+      "name": "Dismemberment (Plus) for v1.4.8"
+    },
+    {
+      "workshop_id": "2875138158",
+      "name": "Xorberax's Legacy for v1.4.8"
+    },
+    {
+      "workshop_id": "2875194175",
+      "name": "Leave on Click"
+    },
+    {
+      "workshop_id": "2875960358",
+      "name": "Better Time"
+    },
+    {
+      "workshop_id": "2878685456",
+      "name": "Custom Spawns API"
+    },
+    {
+      "workshop_id": "2878689343",
+      "name": "Calradia At War"
+    },
+    {
+      "workshop_id": "2880190747",
+      "name": "Enable Achievement"
+    },
+    {
+      "workshop_id": "2881380744",
+      "name": "Diplomacy"
+    },
+    {
+      "workshop_id": "2886299887",
+      "name": "Detailed Character Creation"
+    },
+    {
+      "workshop_id": "3000052862",
+      "name": "Traders` Infinite Wealth"
+    },
+    {
+      "workshop_id": "3251872472",
+      "name": "Extra Banners"
+    },
+    {
+      "workshop_id": "3596692403",
+      "name": "RTS Camera for v1.3.x (War Sails DLC Compatible)"
+    },
+    {
+      "workshop_id": "3596693285",
+      "name": "RTS Command for v1.3.x (War Sails DLC Compatible)"
+    },
+    {
+      "workshop_id": "3625253563",
+      "name": "CJ's - Overhaul - Starting Gear - Warsails"
+    },
+    {
+      "workshop_id": "3674878917",
+      "name": "Item Quality Indicator"
+    },
+    {
+      "workshop_id": "3642337847",
+      "name": "Simple Naval Mod"
+    },
+    {
+      "workshop_id": "2875642325",
+      "name": "BannerColorPersistence with BannerPaste"
+    },
+    {
+      "workshop_id": "3676690880",
+      "name": "Horde Kingdom"
+    },
+    {
+      "workshop_id": "3695433176",
+      "name": "Balanced Fief Voting"
+    },
+    {
+      "workshop_id": "3678049835",
+      "name": "Auto-Armor Upgrade"
+    },
+    {
+      "workshop_id": "3583201039",
+      "name": "UFO's Cheat Mods Bundle [1.4.8]"
+    },
+    {
+      "workshop_id": "3542272439",
+      "name": "Fire Arrows - Arrow Volley - AI Volley - Expeditions - Deployment Buildings - Skyrim Poisons"
+    },
+    {
+      "workshop_id": "2877445271",
+      "name": "CC's Banners"
+    },
+    {
+      "workshop_id": "2875905594",
+      "name": "Special Troops Plus"
+    },
+    {
+      "workshop_id": "3034083929",
+      "name": "Fast Dialogue (UPDATED)"
+    },
+    {
+      "workshop_id": "3482852301",
+      "name": "Helmet Hair Cover Tweaks Expanded"
+    },
+    {
+      "workshop_id": "3701187027",
+      "name": "SiegeFix"
+    },
+    {
+      "workshop_id": "3720376888",
+      "name": "Player Settlement"
+    },
+    {
+      "workshop_id": "3720013905",
+      "name": "Better Caravans"
+    },
+    {
+      "workshop_id": "3670027574",
+      "name": "Commander"
+    },
+    {
+      "workshop_id": "3624152079",
+      "name": "GameMaster [BLGM]"
+    },
+    {
+      "workshop_id": "3665042349",
+      "name": "Adjustable Leveling"
+    },
+    {
+      "workshop_id": "3669537268",
+      "name": "Donate Food To Settlement"
+    },
+    {
+      "workshop_id": "3718577337",
+      "name": "Upgradeable Workshops 1.4.5"
+    }
+  ]
+}

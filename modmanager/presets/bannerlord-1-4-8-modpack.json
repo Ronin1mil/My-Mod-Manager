@@ -1,0 +1,199 @@
+{
+  "format": "modmanager-preset",
+  "id": "bannerlord-1-4-8-modpack",
+  "game": "bannerlord",
+  "name": "Bannerlord v1.4.8 Modpack",
+  "status": "unverified",
+  "description": "From the Steam Workshop collection 2941055735 (checked on Steam 2026-10-29: all 47 items public; collection updated 2026-10-01). Kingdoms and politics: Kingdom Politics Expanded, Balanced Fief Voting, Machination, Peasant Revenge, Clan Armies, Horde Kingdom, Recruit Exiled Clans, Camp Menu. The author warns that adding other large mods can cause crashes. The official modules are added when you create the playset, and Auto-sort puts Harmony, ButterLib, UIExtenderEx and Mod Configuration Menu first. Most of these mods were made for 1.3/1.4: check each mod's page for your game version. Not tested in a game.",
+  "source": "https://steamcommunity.com/sharedfiles/filedetails/?id=2941055735",
+  "mods": [
+    {
+      "workshop_id": "2859188632",
+      "name": "Harmony"
+    },
+    {
+      "workshop_id": "2859232415",
+      "name": "ButterLib"
+    },
+    {
+      "workshop_id": "2859222409",
+      "name": "UIExtenderEx"
+    },
+    {
+      "workshop_id": "2859238197",
+      "name": "Mod Configuration Menu v5"
+    },
+    {
+      "workshop_id": "2875138158",
+      "name": "Xorberax's Legacy for v1.4.8"
+    },
+    {
+      "workshop_id": "3622146187",
+      "name": "More Battle Shouts"
+    },
+    {
+      "workshop_id": "3627110143",
+      "name": "Camp Menu"
+    },
+    {
+      "workshop_id": "3636823673",
+      "name": "Kingdom Politics Expanded 1.3.X"
+    },
+    {
+      "workshop_id": "3695433176",
+      "name": "Balanced Fief Voting"
+    },
+    {
+      "workshop_id": "3644127631",
+      "name": "Machination"
+    },
+    {
+      "workshop_id": "2949132830",
+      "name": "PeasantRevenge"
+    },
+    {
+      "workshop_id": "3618752412",
+      "name": "Clan Armies (1.3.x)"
+    },
+    {
+      "workshop_id": "3676690880",
+      "name": "Horde Kingdom"
+    },
+    {
+      "workshop_id": "3618730894",
+      "name": "Recruit Exiled Clans(v1.3.X-v1.4.6,Compatible with WarSail DLC)"
+    },
+    {
+      "workshop_id": "3320802782",
+      "name": "Troops Prefer Spears"
+    },
+    {
+      "workshop_id": "3080363208",
+      "name": "Breakable Polearms"
+    },
+    {
+      "workshop_id": "3614435151",
+      "name": "Unblockable Thrust"
+    },
+    {
+      "workshop_id": "2875960358",
+      "name": "Better Time"
+    },
+    {
+      "workshop_id": "3665042349",
+      "name": "Adjustable Leveling"
+    },
+    {
+      "workshop_id": "3691572079",
+      "name": "Proven Steel"
+    },
+    {
+      "workshop_id": "3627930600",
+      "name": "Stop Clan Party Garrison Donations"
+    },
+    {
+      "workshop_id": "3620861063",
+      "name": "Keep Your Clan Members After Marriage"
+    },
+    {
+      "workshop_id": "3678050062",
+      "name": "Healthy Relationships"
+    },
+    {
+      "workshop_id": "3618489007",
+      "name": "Faster Child Growth"
+    },
+    {
+      "workshop_id": "2959469806",
+      "name": "Family Tree"
+    },
+    {
+      "workshop_id": "3674878917",
+      "name": "Item Quality Indicator"
+    },
+    {
+      "workshop_id": "2916000111",
+      "name": "Encyclopedia Filters Extended"
+    },
+    {
+      "workshop_id": "2880190747",
+      "name": "Enable Achievement"
+    },
+    {
+      "workshop_id": "3635060909",
+      "name": "Heal on Kill Updated [ON HIATUS]"
+    },
+    {
+      "workshop_id": "3251872472",
+      "name": "Extra Banners"
+    },
+    {
+      "workshop_id": "3668388368",
+      "name": "Marching"
+    },
+    {
+      "workshop_id": "3645772953",
+      "name": "LordOfDuels"
+    },
+    {
+      "workshop_id": "2875090166",
+      "name": "swadian armoury"
+    },
+    {
+      "workshop_id": "2925617885",
+      "name": "Vlandian Steel Items"
+    },
+    {
+      "workshop_id": "2913601276",
+      "name": "Zweihander and Claymore"
+    },
+    {
+      "workshop_id": "2956986632",
+      "name": "Remove Fog of War"
+    },
+    {
+      "workshop_id": "2862531759",
+      "name": "Realistic Weather"
+    },
+    {
+      "workshop_id": "2910268800",
+      "name": "Quick Nearby Tournaments"
+    },
+    {
+      "workshop_id": "3773280133",
+      "name": "Unlimited Siege Ammo"
+    },
+    {
+      "workshop_id": "3760490973",
+      "name": "Clan Limits Expanded"
+    },
+    {
+      "workshop_id": "3782705489",
+      "name": "Marry Anyone Updated - Community Fix"
+    },
+    {
+      "workshop_id": "2875093027",
+      "name": "Dismemberment (Plus) for v1.4.8"
+    },
+    {
+      "workshop_id": "3669537268",
+      "name": "Donate Food To Settlement"
+    },
+    {
+      "workshop_id": "3775588404",
+      "name": "Crafting Tier Indicator"
+    },
+    {
+      "workshop_id": "3775673318",
+      "name": "Crafting Order Indicator"
+    },
+    {
+      "workshop_id": "3747725551",
+      "name": "RTS Camera for v1.4.x (War Sails DLC Compatible)"
+    },
+    {
+      "workshop_id": "3747771970",
+      "name": "RTS Command for v1.4.x (War Sails DLC Compatible)"
+    }
+  ]
+}

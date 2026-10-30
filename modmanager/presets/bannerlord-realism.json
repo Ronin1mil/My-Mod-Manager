@@ -1,0 +1,171 @@
+{
+  "format": "modmanager-preset",
+  "id": "bannerlord-realism",
+  "game": "bannerlord",
+  "name": "Realism Collection",
+  "status": "unverified",
+  "description": "From the Steam Workshop collection 3125462668 (checked on Steam 2026-10-29: all 40 items public; collection updated 2026-10-18). As realistic and hardcore as possible: Realistic Battle Mod and De Re Militari, Culture Equipment Seeder, Breakable Polearms, Death for All, Cultural Kingdoms, Better Caravans. Built around War Sails. The official modules are added when you create the playset, and Auto-sort puts Harmony, ButterLib, UIExtenderEx and Mod Configuration Menu first. Most of these mods were made for 1.3/1.4: check each mod's page for your game version. Not tested in a game.",
+  "source": "https://steamcommunity.com/sharedfiles/filedetails/?id=3125462668",
+  "mods": [
+    {
+      "workshop_id": "3635788184",
+      "name": "(RBM WS) Realistic Battle Mod War Sails Submod"
+    },
+    {
+      "workshop_id": "2859251492",
+      "name": "(RBM) Realistic Battle Mod Bannerlord"
+    },
+    {
+      "workshop_id": "2875978806",
+      "name": "Balanced Tournament Armor"
+    },
+    {
+      "workshop_id": "3720013905",
+      "name": "Better Caravans"
+    },
+    {
+      "workshop_id": "2875960358",
+      "name": "Better Time"
+    },
+    {
+      "workshop_id": "2875478172",
+      "name": "BetterExceptionWindow"
+    },
+    {
+      "workshop_id": "3080363208",
+      "name": "Breakable Polearms"
+    },
+    {
+      "workshop_id": "2859232415",
+      "name": "ButterLib"
+    },
+    {
+      "workshop_id": "3623922895",
+      "name": "Civilian Mounts"
+    },
+    {
+      "workshop_id": "3647153514",
+      "name": "Cultural Kingdoms - War Sails"
+    },
+    {
+      "workshop_id": "3677955157",
+      "name": "Culture Equipment Seeder (CES)"
+    },
+    {
+      "workshop_id": "2920524845",
+      "name": "Death for All"
+    },
+    {
+      "workshop_id": "2875168687",
+      "name": "DeReMilitari"
+    },
+    {
+      "workshop_id": "2881380744",
+      "name": "Diplomacy"
+    },
+    {
+      "workshop_id": "2875093027",
+      "name": "Dismemberment (Plus) for v1.4.8"
+    },
+    {
+      "workshop_id": "2880997722",
+      "name": "DynaCulture"
+    },
+    {
+      "workshop_id": "2880190747",
+      "name": "Enable Achievement"
+    },
+    {
+      "workshop_id": "2959469806",
+      "name": "Family Tree"
+    },
+    {
+      "workshop_id": "3623885977",
+      "name": "Governors Handle Issues (v1.4.7)"
+    },
+    {
+      "workshop_id": "2859188632",
+      "name": "Harmony"
+    },
+    {
+      "workshop_id": "3676690880",
+      "name": "Horde Kingdom"
+    },
+    {
+      "workshop_id": "2875076661",
+      "name": "I Don't Care - Campaign Log Filter"
+    },
+    {
+      "workshop_id": "3626222686",
+      "name": "Immersive Storms"
+    },
+    {
+      "workshop_id": "2859265386",
+      "name": "Improved Garrisons"
+    },
+    {
+      "workshop_id": "3636823673",
+      "name": "Kingdom Politics Expanded 1.3.X"
+    },
+    {
+      "workshop_id": "2875194175",
+      "name": "Leave on Click"
+    },
+    {
+      "workshop_id": "3620695688",
+      "name": "Marriage Offers For Player"
+    },
+    {
+      "workshop_id": "2859238197",
+      "name": "Mod Configuration Menu v5"
+    },
+    {
+      "workshop_id": "3622146187",
+      "name": "More Battle Shouts"
+    },
+    {
+      "workshop_id": "2896564069",
+      "name": "No Sword Sisters"
+    },
+    {
+      "workshop_id": "3719370392",
+      "name": "Performance Optimizer"
+    },
+    {
+      "workshop_id": "3599557394",
+      "name": "Retinues - Custom Clan and Kingdom Troops (for v1.4 & v1.5) (DLC compatible)"
+    },
+    {
+      "workshop_id": "3167409012",
+      "name": "SimpleSiegeAmmo [1.3.6+]"
+    },
+    {
+      "workshop_id": "3320802782",
+      "name": "Troops Prefer Spears"
+    },
+    {
+      "workshop_id": "2859222409",
+      "name": "UIExtenderEx"
+    },
+    {
+      "workshop_id": "3614435151",
+      "name": "Unblockable Thrust"
+    },
+    {
+      "workshop_id": "2885762785",
+      "name": "UnlimitedCAP"
+    },
+    {
+      "workshop_id": "3798647413",
+      "name": "Heroes Evolve"
+    },
+    {
+      "workshop_id": "3782352093",
+      "name": "Factoria Workshop"
+    },
+    {
+      "workshop_id": "2875508967",
+      "name": "Adonnay's Troop Changer"
+    }
+  ]
+}

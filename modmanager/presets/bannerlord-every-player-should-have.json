@@ -1,0 +1,99 @@
+{
+  "format": "modmanager-preset",
+  "id": "bannerlord-every-player-should-have",
+  "game": "bannerlord",
+  "name": "Mods That Every Bannerlord Player Should Have",
+  "status": "unverified",
+  "description": "From the Steam Workshop collection 3047704678 (checked on Steam 2026-10-29: all 22 items public; collection updated 2026-07-19). A broader vanilla-plus set: Realistic Battle Mod (with its War Sails submod), Diplomacy, AutoTrader, Xorberax's Legacy, Dismemberment Plus, Item Quality Indicator, Bannerloot, Remove Fog of War, Crash Doctor, Enable Achievement. The official modules are added when you create the playset, and Auto-sort puts Harmony, ButterLib, UIExtenderEx and Mod Configuration Menu first. Most of these mods were made for 1.3/1.4: check each mod's page for your game version. Not tested in a game.",
+  "source": "https://steamcommunity.com/sharedfiles/filedetails/?id=3047704678",
+  "mods": [
+    {
+      "workshop_id": "2875138158",
+      "name": "Xorberax's Legacy for v1.4.8"
+    },
+    {
+      "workshop_id": "2859222409",
+      "name": "UIExtenderEx"
+    },
+    {
+      "workshop_id": "2907309923",
+      "name": "Sell all but stop at zero"
+    },
+    {
+      "workshop_id": "2859238197",
+      "name": "Mod Configuration Menu v5"
+    },
+    {
+      "workshop_id": "2859188632",
+      "name": "Harmony"
+    },
+    {
+      "workshop_id": "2881380744",
+      "name": "Diplomacy"
+    },
+    {
+      "workshop_id": "2859232415",
+      "name": "ButterLib"
+    },
+    {
+      "workshop_id": "2875960358",
+      "name": "Better Time"
+    },
+    {
+      "workshop_id": "2875660601",
+      "name": "AutoTrader"
+    },
+    {
+      "workshop_id": "2859265386",
+      "name": "Improved Garrisons"
+    },
+    {
+      "workshop_id": "2875093027",
+      "name": "Dismemberment (Plus) for v1.4.8"
+    },
+    {
+      "workshop_id": "2859251492",
+      "name": "(RBM) Realistic Battle Mod Bannerlord"
+    },
+    {
+      "workshop_id": "2880190747",
+      "name": "Enable Achievement"
+    },
+    {
+      "workshop_id": "2882064139",
+      "name": "Relentless Smith"
+    },
+    {
+      "workshop_id": "2877445271",
+      "name": "CC's Banners"
+    },
+    {
+      "workshop_id": "2875710877",
+      "name": "Fourberie"
+    },
+    {
+      "workshop_id": "2956986632",
+      "name": "Remove Fog of War"
+    },
+    {
+      "workshop_id": "3674878917",
+      "name": "Item Quality Indicator"
+    },
+    {
+      "workshop_id": "3635788184",
+      "name": "(RBM WS) Realistic Battle Mod War Sails Submod"
+    },
+    {
+      "workshop_id": "3717685432",
+      "name": "Crash Doctor"
+    },
+    {
+      "workshop_id": "3615438656",
+      "name": "Bannerloot"
+    },
+    {
+      "workshop_id": "3615340073",
+      "name": "Both Perks"
+    }
+  ]
+}

@@ -505,6 +505,8 @@ class GameApp:
         if not p:
             raise KeyError(preset_id)
         ids, off, missing = presets.to_playset_args(p, self.mods)
+        official = [i for i in self.starting_mods([]) if i not in ids]   # Workshop presets never list Native & co.
+        ids = official + ids
         pid = self.store.create(p["name"], ids, off, notes=(p["description"] or "")[:2000])
         self.update(pid, {"auto_sort": self.store.get(pid)["auto_sort"]})
         return {"id": pid, "missing": missing, "status": p["status"]}

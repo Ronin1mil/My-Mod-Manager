@@ -25,6 +25,8 @@ Not used: version ranges (`DependentVersion`, `version=`), `RequiredGameVersion`
 ## Playsets
 A new playset starts with the official modules that are installed (`Native`, `SandBoxCore`, `BirthAndDeath`, `CustomBattle`, `Sandbox`, `StoryMode`, `NavalDLC`), in that order, which follows their own dependencies. **Auto-sort** keeps dependencies first and official modules ahead of the rest; your own order is kept wherever no rule applies. The Conflicts tab, base-game comparison and the save-version/own-save-folder features are not offered: modules do not share script folders, and their saves are handled by the game.
 
+**Presets:** eight built-in presets made from Steam Workshop collections ([11-presets-and-downloads.md](11-presets-and-downloads.md)); a playset made from one starts with the installed official modules.
+
 ## Play
 No file is written. The game is started directly, with the same arguments other launchers use:
 `<install>/bin/Win64_Shipping_Client/Bannerlord.exe /singleplayer _MODULES_*Native*SandBoxCore*…*_MODULES_ <your extra arguments>`

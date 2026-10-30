@@ -1,0 +1,99 @@
+{
+  "format": "modmanager-preset",
+  "id": "bannerlord-2026",
+  "game": "bannerlord",
+  "name": "Bannerlord 2026",
+  "status": "unverified",
+  "description": "From the Steam Workshop collection 3814276546 (checked on Steam 2026-10-29: all 22 items public; collection updated 2026-10-06). A recent general pack: Better Bandits Plus, Realistic Battle Mod, Distinguished Service, Family Tree, EOE Armoury, Heal on Kill, Item Quality Indicator, Both Perks. The official modules are added when you create the playset, and Auto-sort puts Harmony, ButterLib, UIExtenderEx and Mod Configuration Menu first. Most of these mods were made for 1.3/1.4: check each mod's page for your game version. Not tested in a game.",
+  "source": "https://steamcommunity.com/sharedfiles/filedetails/?id=3814276546",
+  "mods": [
+    {
+      "workshop_id": "3736768674",
+      "name": "Better Bandits Plus"
+    },
+    {
+      "workshop_id": "2859251492",
+      "name": "(RBM) Realistic Battle Mod Bannerlord"
+    },
+    {
+      "workshop_id": "2875960358",
+      "name": "Better Time"
+    },
+    {
+      "workshop_id": "3615340073",
+      "name": "Both Perks"
+    },
+    {
+      "workshop_id": "2859232415",
+      "name": "ButterLib"
+    },
+    {
+      "workshop_id": "2877445271",
+      "name": "CC's Banners"
+    },
+    {
+      "workshop_id": "2880190747",
+      "name": "Enable Achievement"
+    },
+    {
+      "workshop_id": "3621845412",
+      "name": "Distinguished Service 1.3+ No Warsails"
+    },
+    {
+      "workshop_id": "3372040868",
+      "name": "EOE_Armoury"
+    },
+    {
+      "workshop_id": "2959469806",
+      "name": "Family Tree"
+    },
+    {
+      "workshop_id": "2859188632",
+      "name": "Harmony"
+    },
+    {
+      "workshop_id": "2875223027",
+      "name": "Heal on Kill"
+    },
+    {
+      "workshop_id": "3674878917",
+      "name": "Item Quality Indicator"
+    },
+    {
+      "workshop_id": "2859238197",
+      "name": "Mod Configuration Menu v5"
+    },
+    {
+      "workshop_id": "3798647413",
+      "name": "Heroes Evolve"
+    },
+    {
+      "workshop_id": "2956986632",
+      "name": "Remove Fog of War"
+    },
+    {
+      "workshop_id": "3777470096",
+      "name": "Settlement Culture Drift"
+    },
+    {
+      "workshop_id": "3790642149",
+      "name": "Smart Fief Management"
+    },
+    {
+      "workshop_id": "3780290052",
+      "name": "Slavery"
+    },
+    {
+      "workshop_id": "2859222409",
+      "name": "UIExtenderEx"
+    },
+    {
+      "workshop_id": "2875138158",
+      "name": "Xorberax's Legacy for v1.4.8"
+    },
+    {
+      "workshop_id": "3814877341",
+      "name": "Companion Autonomy"
+    }
+  ]
+}

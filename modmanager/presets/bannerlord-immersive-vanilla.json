@@ -1,0 +1,67 @@
+{
+  "format": "modmanager-preset",
+  "id": "bannerlord-immersive-vanilla",
+  "game": "bannerlord",
+  "name": "Immersive Vanilla Bannerlord",
+  "status": "unverified",
+  "description": "From the Steam Workshop collection 3493018660 (checked on Steam 2026-10-29: all 14 items public; collection updated 2026-03-31). Close to the base game, more atmosphere: Total War Music, Realistic Weather, historical and AI banner icons, Helmet Hair Cover, Beards Fix, Dismemberment Plus, Diplomacy. The official modules are added when you create the playset, and Auto-sort puts Harmony, ButterLib, UIExtenderEx and Mod Configuration Menu first. Most of these mods were made for 1.3/1.4: check each mod's page for your game version. Not tested in a game.",
+  "source": "https://steamcommunity.com/sharedfiles/filedetails/?id=3493018660",
+  "mods": [
+    {
+      "workshop_id": "2859232415",
+      "name": "ButterLib"
+    },
+    {
+      "workshop_id": "2859188632",
+      "name": "Harmony"
+    },
+    {
+      "workshop_id": "2859222409",
+      "name": "UIExtenderEx"
+    },
+    {
+      "workshop_id": "2859238197",
+      "name": "Mod Configuration Menu v5"
+    },
+    {
+      "workshop_id": "3404180590",
+      "name": "Total War Music"
+    },
+    {
+      "workshop_id": "2881380744",
+      "name": "Diplomacy"
+    },
+    {
+      "workshop_id": "2875960358",
+      "name": "Better Time"
+    },
+    {
+      "workshop_id": "2862531759",
+      "name": "Realistic Weather"
+    },
+    {
+      "workshop_id": "2875093027",
+      "name": "Dismemberment (Plus) for v1.4.8"
+    },
+    {
+      "workshop_id": "2933297952",
+      "name": "Beards Fix"
+    },
+    {
+      "workshop_id": "2875645408",
+      "name": "Helmet Hair Cover Continued Plus"
+    },
+    {
+      "workshop_id": "2990327671",
+      "name": "Historical Banner Icons"
+    },
+    {
+      "workshop_id": "3124993149",
+      "name": "AI Banner Icons"
+    },
+    {
+      "workshop_id": "2879991660",
+      "name": "RTS Camera for v1.2.12"
+    }
+  ]
+}

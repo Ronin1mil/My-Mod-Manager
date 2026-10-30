@@ -1,0 +1,211 @@
+{
+  "format": "modmanager-preset",
+  "id": "bannerlord-bannergourd",
+  "game": "bannerlord",
+  "name": "BannerGourd",
+  "status": "unverified",
+  "description": "From the Steam Workshop collection 3615063246 (checked on Steam 2026-10-29: all 50 items public; collection updated 2026-09-30). A large pack chosen for stability: Retinues, Noble Families and Houses Extended, Noble Faces Redone, Breakable Polearms, Sturgia Buff, XP Tweaks, Both Perks. The collection is marked as on hiatus by its author. The official modules are added when you create the playset, and Auto-sort puts Harmony, ButterLib, UIExtenderEx and Mod Configuration Menu first. Most of these mods were made for 1.3/1.4: check each mod's page for your game version. Not tested in a game.",
+  "source": "https://steamcommunity.com/sharedfiles/filedetails/?id=3615063246",
+  "mods": [
+    {
+      "workshop_id": "2859188632",
+      "name": "Harmony"
+    },
+    {
+      "workshop_id": "2875478172",
+      "name": "BetterExceptionWindow"
+    },
+    {
+      "workshop_id": "2859232415",
+      "name": "ButterLib"
+    },
+    {
+      "workshop_id": "2859222409",
+      "name": "UIExtenderEx"
+    },
+    {
+      "workshop_id": "2859238197",
+      "name": "Mod Configuration Menu v5"
+    },
+    {
+      "workshop_id": "3080363208",
+      "name": "Breakable Polearms"
+    },
+    {
+      "workshop_id": "2875138158",
+      "name": "Xorberax's Legacy for v1.4.8"
+    },
+    {
+      "workshop_id": "3599557394",
+      "name": "Retinues - Custom Clan and Kingdom Troops (for v1.4 & v1.5) (DLC compatible)"
+    },
+    {
+      "workshop_id": "2875645408",
+      "name": "Helmet Hair Cover Continued Plus"
+    },
+    {
+      "workshop_id": "3618994041",
+      "name": "Sturgia Buff"
+    },
+    {
+      "workshop_id": "3651991013",
+      "name": "Noble Families and Houses Extended 1.3.x / WarSails"
+    },
+    {
+      "workshop_id": "3652165176",
+      "name": "Noble Faces Redone 1.3.x / WarSails"
+    },
+    {
+      "workshop_id": "3615340073",
+      "name": "Both Perks"
+    },
+    {
+      "workshop_id": "2883675274",
+      "name": "Bannerlord.XPTweaks"
+    },
+    {
+      "workshop_id": "2859265386",
+      "name": "Improved Garrisons"
+    },
+    {
+      "workshop_id": "3620272139",
+      "name": "Party AI Controls 1.3.X"
+    },
+    {
+      "workshop_id": "3636823673",
+      "name": "Kingdom Politics Expanded 1.3.X"
+    },
+    {
+      "workshop_id": "3623885977",
+      "name": "Governors Handle Issues (v1.4.7)"
+    },
+    {
+      "workshop_id": "2875710877",
+      "name": "Fourberie"
+    },
+    {
+      "workshop_id": "2880997722",
+      "name": "DynaCulture"
+    },
+    {
+      "workshop_id": "2905239873",
+      "name": "Culture Switch - Companions"
+    },
+    {
+      "workshop_id": "2905660587",
+      "name": "Culture Switch - Vassals"
+    },
+    {
+      "workshop_id": "2910268800",
+      "name": "Quick Nearby Tournaments"
+    },
+    {
+      "workshop_id": "2956986632",
+      "name": "Remove Fog of War"
+    },
+    {
+      "workshop_id": "2953564744",
+      "name": "Encyclopedia Extender Reforged"
+    },
+    {
+      "workshop_id": "2959469806",
+      "name": "Family Tree"
+    },
+    {
+      "workshop_id": "2916000111",
+      "name": "Encyclopedia Filters Extended"
+    },
+    {
+      "workshop_id": "2961485825",
+      "name": "More Trait Info"
+    },
+    {
+      "workshop_id": "2875076661",
+      "name": "I Don't Care - Campaign Log Filter"
+    },
+    {
+      "workshop_id": "2875194175",
+      "name": "Leave on Click"
+    },
+    {
+      "workshop_id": "3632106688",
+      "name": "Single Click Keeps Travel Speed"
+    },
+    {
+      "workshop_id": "3632079250",
+      "name": "No Cohesion Loss With Clan Only Army"
+    },
+    {
+      "workshop_id": "3654627146",
+      "name": "Auto Deploy Siege Engines"
+    },
+    {
+      "workshop_id": "3619429143",
+      "name": "Army Fleets (1.3.x)"
+    },
+    {
+      "workshop_id": "3615497073",
+      "name": "Bannerlord: Change Party Size Limit"
+    },
+    {
+      "workshop_id": "3629945420",
+      "name": "No Disguise RNG"
+    },
+    {
+      "workshop_id": "3634850795",
+      "name": "Mercenary Counter-Offers"
+    },
+    {
+      "workshop_id": "3626388246",
+      "name": "Better Map Camera"
+    },
+    {
+      "workshop_id": "3626222686",
+      "name": "Immersive Storms"
+    },
+    {
+      "workshop_id": "3635117653",
+      "name": "Me Doing Stuff"
+    },
+    {
+      "workshop_id": "3637149105",
+      "name": "Fleet Menu"
+    },
+    {
+      "workshop_id": "3627110143",
+      "name": "Camp Menu"
+    },
+    {
+      "workshop_id": "3623922895",
+      "name": "Civilian Mounts"
+    },
+    {
+      "workshop_id": "2875960358",
+      "name": "Better Time"
+    },
+    {
+      "workshop_id": "2875978806",
+      "name": "Balanced Tournament Armor"
+    },
+    {
+      "workshop_id": "3320802782",
+      "name": "Troops Prefer Spears"
+    },
+    {
+      "workshop_id": "3614435151",
+      "name": "Unblockable Thrust"
+    },
+    {
+      "workshop_id": "3635060909",
+      "name": "Heal on Kill Updated [ON HIATUS]"
+    },
+    {
+      "workshop_id": "3621078127",
+      "name": "More Bolts"
+    },
+    {
+      "workshop_id": "2880190747",
+      "name": "Enable Achievement"
+    }
+  ]
+}

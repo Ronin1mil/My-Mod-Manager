@@ -214,6 +214,23 @@ class Playing(GameCase):
             self.assertIn("_MODULES_*Native*SandBoxCore*_MODULES_", popen.call_args[0][0])
         self.assertTrue(res["partial"])
 
+    def test_a_workshop_preset_becomes_a_playset_with_the_official_modules_first(self):
+        from modmanager import presets
+        presets.save_user_preset(BL, {"format": "modmanager-preset", "version": 1, "id": "bannerlord-t", "game": "bannerlord",
+                                      "name": "T", "mods": [{"workshop_id": "3000001", "name": "Workshop Mod"},
+                                                            {"workshop_id": "999", "name": "Not here"}]})
+        st, res, _ = self.post("/api/presets/bannerlord-t/apply")
+        self.assertEqual(st, 200, res)
+        ps = next(p for p in self.req("GET", "/api/state")[1]["playsets"] if p["id"] == res["id"])
+        self.assertEqual(ps["mods"][:5], self.L("Native", "SandBoxCore", "CustomBattle", "Sandbox", "StoryMode"))
+        self.assertEqual(set(ps["mods"][5:]), {"ws:3000001", "ws:999"})
+        self.assertEqual(res["missing"], [{"workshop_id": "999", "name": "Not here"}])
+
+    def test_the_built_in_presets_are_offered(self):
+        ids = {p["id"] for p in self.req("GET", "/api/presets")[1]}
+        self.assertGreaterEqual(len({i for i in ids if i.startswith("bannerlord-")}), 8)
+        self.assertIn("bannerlord-2026-essentials", ids)
+
     def test_a_missing_executable_is_explained(self):
         pid = self.post("/api/playsets", {"name": "P"})[1]["id"]
         st, res, _ = self.post(f"/api/playsets/{pid}/launch")
