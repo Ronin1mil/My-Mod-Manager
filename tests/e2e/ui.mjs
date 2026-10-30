@@ -103,7 +103,10 @@ try {
   for (let i = 0; i < 50 && !fs.existsSync(path.join(root, 'game/load.json')); i++) await new Promise(r => setTimeout(r, 100));
   assert.equal(fs.readFileSync(path.join(root, 'game/args.txt'), 'utf8'), '-debug_mode\n');
   const cl = JSON.parse(fs.readFileSync(path.join(root, 'game/load.json'), 'utf8'));
-  assert.deepEqual(cl.enabled_mods, ['mod/Lib.mod', 'mod/A.mod', 'mod/B.mod']);
+  if (GAME === 'vic3')   // Victoria 3 lists each mod's folder under enabledMods, with no .mod files
+    assert.deepEqual(cl.enabledMods.map(m => path.basename(m.path)), ['Lib', 'A', 'B']);
+  else
+    assert.deepEqual(cl.enabled_mods, ['mod/Lib.mod', 'mod/A.mod', 'mod/B.mod']);
 
   // Security headers and host check
   const r = await fetch(`http://127.0.0.1:${port}/`);

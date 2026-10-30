@@ -86,7 +86,9 @@ try {
     await page.waitForSelector(`text=started ${g.name}`);
     const f = path.join(g.user, g.load);
     for (let i = 0; i < 30 && !fs.existsSync(f); i++) await new Promise(r => setTimeout(r, 100));
-    const enabled = JSON.parse(fs.readFileSync(f, 'utf8')).enabled_mods;
+    const load = JSON.parse(fs.readFileSync(f, 'utf8'));
+    // Victoria 3 lists {"path": <folder>} under enabledMods, the others list strings under enabled_mods
+    const enabled = id === 'vic3' ? load.enabledMods.map(m => m.path) : load.enabled_mods;
     assert.equal(enabled.length, 3, `${id}: ${enabled}`);
     assert.ok(enabled[0].includes('Lib'), `${id} loads the dependency first: ${enabled}`);
   }
