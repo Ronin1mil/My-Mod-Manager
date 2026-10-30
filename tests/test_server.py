@@ -27,7 +27,7 @@ def mkmod(root, folder, name, deps=(), files=None):
     (Path(root) / "mod" / f"{folder}.mod").write_text(f'name="{name}"\npath="mod/{folder}"\n')
 
 
-APP_WIDE = ("/api/settings", "/api/update-check", "/api/games")
+APP_WIDE = ("/api/settings", "/api/update-check", "/api/games", "/api/full-rescan")
 
 
 class Base(unittest.TestCase):
@@ -185,6 +185,19 @@ class RescanFindsSteamcmd(Base):
             st = self.post("/api/rescan")[1]
         self.assertEqual(st["steamcmd_found"]["steamcmd"], str(exe))
         self.assertEqual(st["steamcmd"], str(exe))
+
+
+class FullRescanRoute(Base):
+    def test_rescan_button_route_reads_new_mods_of_the_games_used(self):
+        self.hub.settings.update(last_game=self.GAME.id)
+        mkmod(self.r / "user", "d", "D")
+        with mock.patch("modmanager.detect.detect_all", return_value=[]):
+            st, r, _ = self.post("/api/full-rescan")
+        self.assertEqual(st, 200, r)
+        g = r["games"][0]
+        self.assertEqual((g["id"], g["mods"], g["added"]), (self.GAME.id, 5, 1))
+        self.assertIn("local:d", {m["id"] for m in self.req("GET", "/api/state")[1]["mods"]})
+        self.assertEqual(self.req("POST", "/api/full-rescan", {}, headers={"Origin": "http://evil.example"})[0], 403)
 
 
 class Hardening(Base):

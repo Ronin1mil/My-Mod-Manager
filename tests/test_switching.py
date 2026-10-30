@@ -298,3 +298,66 @@ class ParseCache(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FullRescan(_Base):
+    """The Rescan button: start-up's work again, for every game used, while the app runs."""
+
+    def _hub(self):
+        from modmanager.server import Hub as H
+        hub = H(settings=GlobalSettings(self.r / "g.json"), gamelist=[games.VIC3],
+                factory=lambda g, **kw: GameApp(g, user_dir=str(self.user), workshop_dir=str(self.r / "ws"), autodetect=False))
+        hub.settings.update(last_game="vic3")
+        return hub
+
+    def test_new_mods_are_found_and_every_playset_is_worked_out_again(self):
+        from modmanager.server import full_rescan
+        hub = self._hub()
+        app = hub.app("vic3")
+        hub.enable_prewarm()
+        app._prewarm and app._prewarm.join(20)
+        mkmod(self.user, "D", files={"common/traits/d.txt": "shared = { }"})
+        r = full_rescan(hub)
+        g = r["games"][0]
+        self.assertEqual((g["id"], g["mods"], g["added"]), ("vic3", 4, 1))
+        self.assertIn("local:D", app.mods)
+        for pid in app.warm_order():
+            self.assertIn(app._scan_inputs(pid)[2], app._results, "worked out by the rescan")
+        self.assertIs(app.prewarm_lock, hub.lock, "background work is back on afterwards")
+        app._prewarm and app._prewarm.join(20)
+
+    def test_folders_that_are_gone_are_forgotten_and_the_game_found_again(self):
+        from modmanager.server import full_rescan
+        hub = self._hub()
+        app = hub.app("vic3")
+        app.store.update_settings(workshop_dir=str(self.r / "moved-away"), game_dir=str(self.r / "old-install"))
+        found = [{"path": str(self.r / "new-install")}]
+        with mock.patch("modmanager.detect.detect_all", return_value=found) as det:
+            notes = full_rescan(hub)["games"][0]["notes"]
+        det.assert_called_once()
+        s = app.store.settings()
+        self.assertEqual((s["workshop_dir"], s["game_dir"]), ("", str(self.r / "new-install")))
+        text = " / ".join(notes)
+        self.assertIn("moved-away is gone", text)
+        self.assertIn("found the game in", text)
+
+    def test_folders_that_exist_are_kept(self):
+        from modmanager.server import full_rescan
+        hub = self._hub()
+        app = hub.app("vic3")
+        keep = self.r / "my-ws"
+        keep.mkdir()
+        app.store.update_settings(workshop_dir=str(keep))
+        with mock.patch("modmanager.detect.detect_all", return_value=[]):
+            full_rescan(hub)
+        self.assertEqual(app.store.settings()["workshop_dir"], str(keep))
+
+    def test_one_rescan_at_a_time(self):
+        from modmanager.server import full_rescan
+        hub = self._hub()
+        hub.full_rescan_lock.acquire()
+        try:
+            with self.assertRaisesRegex(ValueError, "already running"):
+                full_rescan(hub)
+        finally:
+            hub.full_rescan_lock.release()

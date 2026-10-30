@@ -270,6 +270,39 @@ class GameApp:
     def rescan(self, light=False):
         return self.apply_mods(self.read_mods(), light)
 
+    def redetect(self):
+        """Part of the full Rescan: folders in Settings that are gone are forgotten and looked for again (the game install
+        on every Steam library of every drive, the user and Workshop folders next to it), the mods are read again, and
+        steamcmd is looked for. Folders that still exist are kept, even when they are not the detected ones.
+        -> {game, mods, added, updated, removed, notes: [what changed]}"""
+        s, g, notes = self.store.settings(), self.game, []
+        forget = {}
+        if s["game_dir"] and not detect.find_install_root(s["game_dir"], g):
+            forget["game_dir"] = ""
+            notes.append(f"the game folder {s['game_dir']} is gone")
+        for k, what in (("user_dir", "user folder"), ("workshop_dir", "Workshop folder")):
+            if s[k] and not Path(s[k]).is_dir():
+                forget[k] = ""
+                notes.append(f"the {what} {s[k]} is gone")
+        if not forget.get("game_dir", s["game_dir"]) and not self.cli["game_dir"]:
+            found = detect.detect_all(g, self.extra_libraries)
+            if found:
+                forget["game_dir"] = found[0]["path"]
+                notes.append(f"found the game in {found[0]['path']}")
+        if forget:
+            self.store.update_settings(**forget)
+        before = (self.game_root, self.user_dir, self.workshop_dir)
+        self.apply_settings()
+        for label, old, new in zip(("game folder", "user folder", "Workshop folder"), before, (self.game_root, self.user_dir, self.workshop_dir)):
+            if str(old or "") != str(new or "") and new:
+                notes.append(f"{label}: {new}")
+        sc = self.look_for_steamcmd()
+        if sc:
+            notes.append(f"found steamcmd: {sc['steamcmd']}")
+        d = self.diff or {}
+        return {"game": g.name, "id": g.id, "mods": len(self.mods), "added": d.get("added", 0), "updated": d.get("updated", 0),
+                "removed": d.get("removed", 0), "notes": notes}
+
     def look_for_steamcmd(self, find=None, accounts=None):
         """Part of a Rescan: when Settings has no steamcmd (or one that is gone), look in the usual places and fill it in,
         plus the account name when steamcmd has exactly one cached login and none is set. Never runs steamcmd.
@@ -832,6 +865,7 @@ class Hub:
         self.apps = {}
         self.factory = factory or (lambda g, **kw: GameApp(g, **kw))
         self.lock = threading.RLock()  # one request at a time touches state; uploads/network stream outside it
+        self.full_rescan_lock = threading.Lock()   # one Rescan (every game, every drive) at a time
         self._cache_lock = threading.Lock()
         self._update_cache = None
         self.update_pending = False
@@ -1125,7 +1159,7 @@ def make_handler(hub):
 
         def _do_post(self):
             parts = self.path.strip("/").split("/")
-            if parts[-1] in ("install", "update-check", "downloads", "import-collection", "mod-updates", "self-update"):
+            if parts[-1] in ("install", "update-check", "downloads", "import-collection", "mod-updates", "self-update", "full-rescan"):
                 return self._post()  # slow network/disk work must not hold the lock
             if len(parts) == 3 and parts[0] == "api" and parts[1] in hub.games and parts[2] == "rescan":
                 return self._rescan(parts[1])
@@ -1242,6 +1276,8 @@ def make_handler(hub):
                     if parts == ["api", "custom-games", "remove"]:
                         b = self._body()
                         return self._send(200, hub.remove_custom_game(b.get("id"), b.get("erase_data") is True))
+                    if parts == ["api", "full-rescan"]:
+                        return self._send(200, full_rescan(hub, lambda t: perflog.log("rescan: " + t)))
                     if parts == ["api", "erase-all"]:
                         return self._send(200, hub.erase_all(self._body().get("confirm")))
                     return self._send(404, {"error": "not found"})
@@ -1361,8 +1397,7 @@ def boot(hub, say=print, first=None):
     are compared side by side on separate cores; a game whose workers cannot start or fail is checked here instead, one
     playset after another as before. Progress goes to `say` (the terminal, when there is one)."""
     t0 = time.time()
-    last = hub.settings.get().get("last_game")
-    used = [g for g in hub.games if g == first or g == last or (config_dir() / g).is_dir()]
+    used = used_games(hub, first)
     if not used:
         return
     say("Getting ready: reading mods and checking every playset for conflicts.")
@@ -1375,7 +1410,49 @@ def boot(hub, say=print, first=None):
         say(f"{name}: {len(app.mods)} mods ({time.time() - t:.1f} s)")
         if app.mods:
             apps[gid] = app
-    workers = _start_workers(hub, apps, say) if apps and bootworker.usable() else {}
+    check_playsets(hub, apps, say)
+    say(f"Ready ({time.time() - t0:.1f} s).")
+
+
+def used_games(hub, first=None):
+    """The games start-up and the full Rescan work on: the one asked for, the last one open, and every game with a folder of
+    its own in the app's data folder (it was opened before)."""
+    last = hub.settings.get().get("last_game")
+    return [g for g in hub.games if g == first or g == last or (config_dir() / g).is_dir()]
+
+
+def full_rescan(hub, say=lambda _t: None):
+    """The Rescan button: start-up's work again, for every game used, while the app keeps running. Folders that are gone
+    are looked for again on every drive, the mods are read again, steamcmd is looked for, and every playset's conflicts
+    are worked out again (in worker processes, like at start-up). -> {"games": [GameApp.redetect() ...], "seconds"}"""
+    if not hub.full_rescan_lock.acquire(blocking=False):
+        raise ValueError("A rescan is already running.")
+    try:
+        t0, report, apps, paused = time.time(), [], {}, {}
+        for gid in used_games(hub):
+            with hub.lock:
+                app = hub.app(gid)
+                paused[gid], app.prewarm_lock = app.prewarm_lock, None   # worked out below, side by side, not twice
+                report.append(app.redetect())
+            if app.mods:
+                apps[gid] = app
+        try:
+            check_playsets(hub, apps, say)
+        finally:
+            for gid, lock in paused.items():
+                hub.apps[gid].prewarm_lock = lock
+                if lock:
+                    hub.apps[gid].start_prewarm()   # anything changed meanwhile; finds the rest already done
+        return {"games": report, "seconds": round(time.time() - t0, 1)}
+    finally:
+        hub.full_rescan_lock.release()
+
+
+def check_playsets(hub, apps, say):
+    """Work out the conflicts of every playset of these games: in worker processes when they can start, else here."""
+    if not apps:
+        return
+    workers = _start_workers(hub, apps, say) if bootworker.usable() else {}
     if workers:
         scan.load_cache(next(iter(apps.values())).parse_cache_file())   # meanwhile: this process needs it for later clicks
     for gid, app in apps.items():
@@ -1393,7 +1470,6 @@ def boot(hub, say=print, first=None):
     if scan.cache_dirty():
         with perflog.timed("save parse cache", quiet=True):
             scan.save_cache(next(iter(apps.values())).parse_cache_file())
-    say(f"Ready ({time.time() - t0:.1f} s).")
 
 
 def _start_workers(hub, apps, say):

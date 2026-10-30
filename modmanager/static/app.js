@@ -94,7 +94,7 @@ async function load(rescanMsg) {
   if (!cur()) { S.active = S.playsets.length ? S.playsets[0].id : S.no_mods.id; await api(`playsets/${S.active}/activate`, {}); }
   if (rescanMsg) {
     const d = S.diff, bits = [d.added && `${d.added} new`, d.updated && `${d.updated} updated`, d.removed && `${d.removed} removed`].filter(Boolean);
-    const sc = rescanMsg.steamcmd_found;   // a Rescan also looks for steamcmd when Settings has none
+    const sc = rescanMsg.steamcmd_found;   // Refresh also looks for steamcmd when Settings has none
     toast((bits.length ? `Scan: ${bits.join(', ')} (${d.total} mods)` : `Scan: no changes (${d.total} mods)`) +
       (sc ? `. Found steamcmd: ${sc.steamcmd}${sc.steam_user ? ` (account ${sc.steam_user})` : ''}; it is now set in Settings` : ''));
   }
@@ -485,7 +485,7 @@ async function openPaths(first) {
       <div class="card">
         <h3>Downloading Workshop mods</h3>
         <p class="desc">Optional. <b>Open in Steam</b> needs nothing. To download straight from here, give the path to <code>steamcmd</code> and the Steam account name it is already logged in with. No password is ever asked for, stored or sent by this app.
-          Get steamcmd from Valve: <a href="${STEAMCMD_URL}" target="_blank" rel="noopener noreferrer">SteamCMD download and setup</a> (unzip it, run <code>steamcmd +login &lt;your account&gt;</code> once yourself, then put the path to <code>steamcmd.exe</code> here). Left empty, <b>Rescan</b> looks for it in the usual places, such as <code>C:\steamcmd</code> or Downloads, and fills it in.</p>
+          Get steamcmd from Valve: <a href="${STEAMCMD_URL}" target="_blank" rel="noopener noreferrer">SteamCMD download and setup</a> (unzip it, run <code>steamcmd +login &lt;your account&gt;</code> once yourself, then put the path to <code>steamcmd.exe</code> here). Left empty, <b>Refresh</b> or <b>Rescan</b> looks for it in the usual places, such as <code>C:\steamcmd</code> or Downloads, and fills it in.</p>
         <label class="fld" for="p-cmd">steamcmd executable</label><input type="text" id="p-cmd" value="${esc(S.steamcmd)}">
         <label class="fld" for="p-su">Steam account name</label><input type="text" id="p-su" value="${esc(S.steam_user)}">
       </div>
@@ -618,7 +618,7 @@ function steamStepHtml() {
   return `<div class="steam-step"><b>${i + 1} of ${list.length}:</b> ${esc(m.name)} <span class="mut">#${esc(m.workshop_id)}</span> is open in Steam. Press Subscribe there, then
     ${last ? '' : `<button data-dl="steam-next" class="pri">Next mod →</button>`}
     <button data-dl="steam-again">Open it again</button> <button data-dl="steam-stop">${last ? 'Done' : 'Stop'}</button>
-    ${last ? '<div>That was the last one. Press <b>Rescan</b> once Steam has finished downloading.</div>' : ''}</div>`;
+    ${last ? '<div>That was the last one. Press <b>Refresh</b> once Steam has finished downloading.</div>' : ''}</div>`;
 }
 async function steamOpen() {
   const el = $('dlstat'); if (el) el.innerHTML = steamStepHtml();   // show the step at once; Steam can take a moment
@@ -630,7 +630,7 @@ function viewPresets() {
   const miss = lastMissing.length ? `<div class="pre"><h3>Not installed yet (${lastMissing.length})</h3>
     <p>${lastMissing.map(m => `${esc(m.name)} <span class="mut">#${esc(m.workshop_id)}</span>`).join('<br>')}</p>
     <div class="acts"><button data-dl="steam" title="Opens the first missing mod's Steam page; Next opens the one after it">Open in Steam, one by one…</button>${S.steamcmd && S.steam_user ? '<button data-dl="steamcmd" class="pri">Download with steamcmd</button>' : `<span class="mut">Set steamcmd in Settings to download from here (<a href="${STEAMCMD_URL}" target="_blank" rel="noopener noreferrer">get steamcmd</a>).</span>`}
-    <button data-dl="rescan">Rescan</button></div>
+    <button data-dl="rescan">Refresh</button></div>
     <p class="mut dl-ways"><b>Open in Steam</b>: you press Subscribe on each mod's page; Steam installs them and keeps them updated.
     ${S.game.kind === 'modules' ? `<br><b class="warn">⚠ Download with steamcmd</b>: everything comes down in one go and is copied into the game's <code>Modules</code> folder (an older copy there goes to the backup folder first). <b>Steam does not update these copies</b>, and while one is in <code>Modules</code> the game loads it instead of a subscribed copy of the same mod. That is useful to keep a version that works when an update breaks a mod; to go back to Steam's copy, uninstall the mod here.` : '<br><b>Download with steamcmd</b>: everything comes down in one go into the steamcmd folder; Steam does not update those copies.'}</p><div id="dlstat" class="mut">${steamStepHtml()}</div></div>` : '';
   const imp = `<div class="pre"><h3>Import a Workshop collection</h3><p class="mut">Paste a Steam Workshop collection link. Only the list of mods is fetched from Steam (nothing is downloaded) and saved as a preset.</p>
@@ -734,6 +734,22 @@ view.addEventListener('dragend', () => { drag = null; render(); });
 $('auto').onchange = guard(() => patch({auto_sort: $('auto').checked}));
 $('sortnow').onclick = guard(async () => { Object.assign(cur(), await api(`playsets/${S.active}/autosort`, {})); render(); analyse(); });
 $('rescan').onclick = guard(() => api('rescan', {}).then(r => load(r)));
+// Rescan: start-up's work again for every game, while the app keeps running (folders found again on every drive, every
+// mod read again, steamcmd looked for, every playset's conflicts worked out again)
+$('fullscan').onclick = guard(async () => {
+  const b = $('fullscan'); if (b.disabled) return;
+  b.disabled = true; b.textContent = 'Rescanning…';
+  toast('Rescanning every game and drive. This takes about as long as starting the app.');
+  try {
+    const r = await app('full-rescan', {});
+    await load();
+    const lines = r.games.map(g => {
+      const bits = [g.added && `${g.added} new`, g.updated && `${g.updated} updated`, g.removed && `${g.removed} removed`].filter(Boolean);
+      return `${g.game}: ${g.mods} mods${bits.length ? ' (' + bits.join(', ') + ')' : ''}${g.notes.length ? '; ' + g.notes.join('; ') : ''}`;
+    });
+    toast(`Rescan done in ${r.seconds} s. ` + lines.join(' · '));
+  } finally { b.disabled = false; b.textContent = 'Rescan'; }
+});
 $('new').onclick = guard(async () => {
   const n = prompt('Playset name'); if (!n) return;
   const r = await api('playsets', {name: n}); await api(`playsets/${r.id}/activate`, {}); load();
