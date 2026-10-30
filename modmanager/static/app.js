@@ -1,6 +1,7 @@
 'use strict';
 let G = null, GI = null, S = null, A = null, C = null, P = null, cmpWith = null, drag = null, tab = 'order', sel = null, flt = 'all', q = '', lastMissing = [];
 const REPO_LINK = 'https://github.com/Ronin1mil/My-Mod-Manager/';
+const STEAMCMD_URL = 'https://developer.valvesoftware.com/wiki/SteamCMD';   // Valve's own page: download and setup
 const $ = i => document.getElementById(i);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 let gen = 0, logFile = '', reported = 0;
@@ -479,7 +480,8 @@ async function openPaths(first) {
     <section data-pane="dl" hidden>
       <div class="card">
         <h3>Downloading Workshop mods</h3>
-        <p class="desc">Optional. <b>Open in Steam</b> needs nothing. To download straight from here, give the path to <code>steamcmd</code> and the Steam account name it is already logged in with. No password is ever asked for, stored or sent by this app.</p>
+        <p class="desc">Optional. <b>Open in Steam</b> needs nothing. To download straight from here, give the path to <code>steamcmd</code> and the Steam account name it is already logged in with. No password is ever asked for, stored or sent by this app.
+          Get steamcmd from Valve: <a href="${STEAMCMD_URL}" target="_blank" rel="noopener noreferrer">SteamCMD download and setup</a> (unzip it, run <code>steamcmd +login &lt;your account&gt;</code> once yourself, then put the path to <code>steamcmd.exe</code> here).</p>
         <label class="fld" for="p-cmd">steamcmd executable</label><input type="text" id="p-cmd" value="${esc(S.steamcmd)}">
         <label class="fld" for="p-su">Steam account name</label><input type="text" id="p-su" value="${esc(S.steam_user)}">
       </div>
@@ -609,7 +611,7 @@ function viewPresets() {
   if (!P) { $('view').innerHTML = '<div class="empty">Loading…</div>'; loadPresets(); return; }
   const miss = lastMissing.length ? `<div class="pre"><h3>Not installed yet (${lastMissing.length})</h3>
     <p>${lastMissing.map(m => `${esc(m.name)} <span class="mut">#${esc(m.workshop_id)}</span>`).join('<br>')}</p>
-    <div class="acts"><button data-dl="steam">Open in Steam…</button>${S.steamcmd && S.steam_user ? '<button data-dl="steamcmd" class="pri">Download with steamcmd</button>' : '<span class="mut">Set steamcmd in Settings to download from here.</span>'}
+    <div class="acts"><button data-dl="steam">Open in Steam…</button>${S.steamcmd && S.steam_user ? '<button data-dl="steamcmd" class="pri">Download with steamcmd</button>' : `<span class="mut">Set steamcmd in Settings to download from here (<a href="${STEAMCMD_URL}" target="_blank" rel="noopener noreferrer">get steamcmd</a>).</span>`}
     <button data-dl="rescan">Rescan</button></div><div id="dlstat" class="mut"></div></div>` : '';
   const imp = `<div class="pre"><h3>Import a Workshop collection</h3><p class="mut">Paste a Steam Workshop collection link. Only the list of mods is fetched from Steam (nothing is downloaded) and saved as a preset.</p>
     <div class="acts"><input id="col-url" placeholder="https://steamcommunity.com/sharedfiles/filedetails/?id=…" style="flex:1;min-width:0"><button id="col-go" class="pri">Import</button></div></div>`;
