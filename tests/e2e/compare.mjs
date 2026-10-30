@@ -33,7 +33,7 @@ try {
   await post(`/api/vic3/playsets/${second.id}/update`, { auto_sort: false });
 
   browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 1300, height: 850 } });
+  const page = await browser.newPage({ viewport: { width: 1300, height: 850 }, timezoneId: 'America/New_York' });
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   page.on('dialog', d => d.accept());
@@ -107,9 +107,10 @@ try {
   // ---- "Check now" renders the result; hostile release content is inert
   await page.route('**/api/update-check', route => route.fulfill({ json: {
     current: '0.1.0', latest: '9.9.9', update_available: true, status: 'update', message: 'Version 9.9.9 is available.',
-    url: 'https://evil.example/phish', notes: '<img src=x onerror="window.__pwned=1"> notes', published: '2026-11-01', assets: [] } }));
+    url: 'https://evil.example/phish', notes: '<img src=x onerror="window.__pwned=1"> notes', published: '2026-11-01', published_at: '2026-11-01T02:30:00Z', assets: [] } }));
   await page.click('#s-check');
   await page.waitForSelector('text=Version 9.9.9 is available.');
+  assert.match(await page.locator('#s-result').innerText(), /Oct 31, 2026/, 'a time in UTC is shown in the viewer\'s own time zone (22:30 the day before in New York)');
   assert.equal(await page.locator('#s-result img').count(), 0, 'release notes are text, not HTML');
   assert.equal(await page.evaluate(() => window.__pwned), undefined);
   const href = await page.locator('#s-result a').getAttribute('href');

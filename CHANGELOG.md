@@ -10,6 +10,7 @@ Clicking between playsets with many mods is now instant after the first time, an
 - The mod folders are read without holding up other clicks
 - Updater: an old copy that cannot be removed no longer blocks the next update (it uses `.old1`, `.old2`, ... instead)
 - Installer: uninstalling also removes those leftovers
+- "Built" dates of test builds and releases are shown in your own time zone, with the time (they showed the UTC date, which can be a day ahead)
 
 ## 0.9.0 - Python edition (no exe), add your own games (beta)
 **How to install (this release is the Python edition only)**

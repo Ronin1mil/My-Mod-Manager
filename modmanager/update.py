@@ -74,7 +74,7 @@ def check_nightly(current_build=BUILD, fetch=None, repo=REPO):
     token = os.environ.get("MODMANAGER_GITHUB_TOKEN") or None
     fetch = fetch or (lambda u: default_fetch(u, token))
     base = {"current": current_build or __version__, "latest": None, "update_available": False, "status": "error",
-            "message": "", "url": f"{LINK_PREFIX}releases/tag/test-build", "notes": "", "published": "", "assets": []}
+            "message": "", "url": f"{LINK_PREFIX}releases/tag/test-build", "notes": "", "published": "", "published_at": "", "assets": []}
     try:
         status, rel = fetch(f"{API}/repos/{repo}/releases/tags/test-build")
         if status == 404:
@@ -93,7 +93,7 @@ def check_nightly(current_build=BUILD, fetch=None, repo=REPO):
         newer = latest != current_build
         return {**base, "latest": f"test build {latest}", "build": latest, "update_available": newer, "status": "update" if newer else "current",
                 "message": f"Test build {latest} is available." if newer else "You already have the newest test build.",
-                "published": str(rel.get("published_at") or "")[:10], "assets": assets}
+                "published": str(rel.get("published_at") or "")[:10], "published_at": str(rel.get("published_at") or ""), "assets": assets}
     except (urllib.error.URLError, OSError, TimeoutError):
         return {**base, "status": "unreachable", "message": "Could not reach GitHub. Check your internet connection."}
     except (ValueError, KeyError, TypeError):
@@ -106,7 +106,7 @@ def _clean_url(url, fallback):
 
 def _result(current, status, message, **kw):
     return {"current": current, "latest": None, "update_available": False, "status": status,
-            "message": message, "url": f"{LINK_PREFIX}releases", "notes": "", "published": "", "assets": [], **kw}
+            "message": message, "url": f"{LINK_PREFIX}releases", "notes": "", "published": "", "published_at": "", "assets": [], **kw}
 
 
 def check_for_update(current=__version__, fetch=None, repo=REPO):
@@ -128,7 +128,7 @@ def check_for_update(current=__version__, fetch=None, repo=REPO):
                            f"Version {tag.lstrip('v')} is available." if newer else "You are up to date.",
                            latest=tag.lstrip("v"), update_available=newer,
                            url=_clean_url(rel.get("html_url"), f"{LINK_PREFIX}releases"),
-                           notes=str(rel.get("body") or "")[:4000], published=str(rel.get("published_at") or "")[:10],
+                           notes=str(rel.get("body") or "")[:4000], published=str(rel.get("published_at") or "")[:10], published_at=str(rel.get("published_at") or ""),
                            assets=assets, prerelease=bool(rel.get("prerelease")))
         if status in (200, 404):  # no published release: look at tags
             tstatus, tags = fetch(f"{API}/repos/{repo}/tags?per_page=50")

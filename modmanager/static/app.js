@@ -29,6 +29,8 @@ const api = async (p, b) => {
   }
   const g = gen, r = await call(`/api/${G}/${p}`, b); if (g !== gen) throw new Stale(); return r; };   // current game
 const app = (p, b) => call('/api/' + p, b);        // app-wide
+// GitHub gives times in UTC; show them in the viewer's own time zone (the date alone can be a day ahead of their calendar)
+const when = r => { const d = new Date(r.published_at || ''); return isNaN(d) ? r.published : d.toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'}); };
 const GNAME = () => (S && S.game ? S.game.name : G);
 const M = id => S.mods.find(m => m.id === id);
 const cur = () => (S && S.playsets ? S.playsets.find(p => p.id === S.active) || (S.no_mods && S.no_mods.id === S.active ? S.no_mods : null) : null);
@@ -539,7 +541,7 @@ async function openPaths(first) {
   $('nt-check').onclick = guard(async () => {
     $('nt-status').textContent = 'Checking…'; $('nt-go').disabled = true;
     const r = await app('nightly');
-    $('nt-status').textContent = r.message + (r.published ? ` (built ${r.published})` : '') + (r.update_available && !GI.can_self_update ? ' This copy runs from source files, so it cannot replace itself.' : '');
+    $('nt-status').textContent = r.message + (r.published ? ` (built ${when(r)})` : '') + (r.update_available && !GI.can_self_update ? ' This copy runs from source files, so it cannot replace itself.' : '');
     $('nt-go').disabled = !(r.update_available && GI.can_self_update);
   });
   $('nt-go').onclick = guard(async () => {
@@ -569,7 +571,7 @@ async function openPaths(first) {
     GI.update = u; banner();
     const link = u.url.startsWith(REPO_LINK) ? u.url : REPO_LINK + 'releases';
     $('s-result').innerHTML = `<div class="${u.status === 'update' ? 'ok' : u.status === 'current' ? 'ok' : 'warn'}"><b>${esc(u.message)}</b></div>` +
-      (u.latest ? `<div class="mut">Running ${esc(u.current)} · latest ${esc(u.latest)}${u.published ? ' · ' + esc(u.published) : ''}</div>` : '') +
+      (u.latest ? `<div class="mut">Running ${esc(u.current)} · latest ${esc(u.latest)}${u.published ? ' · ' + esc(when(u)) : ''}</div>` : '') +
       (u.notes ? `<div class="notes">${esc(u.notes)}</div>` : '') +
       (u.status === 'update' ? `<div class="acts">${GI.can_self_update ? '<button class="pri" id="s-now">Download and restart</button> ' : ''}<a href="${esc(link)}" target="_blank" rel="noopener noreferrer">Release page</a></div><div id="s-prog" class="mut"></div>` : '');
     if ($('s-now')) $('s-now').onclick = guard(async () => {

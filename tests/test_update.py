@@ -60,6 +60,7 @@ class Check(unittest.TestCase):
         self.assertEqual(r["assets"][0]["name"], "Vic3-Mod-Manager.exe")
         self.assertEqual(r["notes"], "notes")
         self.assertEqual(r["published"], "2026-10-01")
+        self.assertEqual(r["published_at"], "2026-10-01T00:00:00Z")   # the page shows this in the viewer's own time zone
 
     def test_up_to_date_and_running_ahead(self):
         f = fake({"/releases/latest": (200, release("v0.1.0"))})
