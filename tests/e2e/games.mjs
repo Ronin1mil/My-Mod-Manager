@@ -110,7 +110,7 @@ try {
   await page.click('[data-preset="ck3-rice-stack"]');
   await page.waitForSelector('text=Not installed yet (4)');
   await page.click('[data-dl=steam]');
-  await page.waitForSelector('#toast.on:has-text("Opened in Steam")');
+  await page.waitForSelector('.steam-step:has-text("1 of 4")');
   assert.match(await page.textContent('#view'), /Set steamcmd in Settings/);   // no steamcmd configured -> no download button
   await page.click('[data-tab=problems]');
   await page.waitForSelector('text=its files were not found');

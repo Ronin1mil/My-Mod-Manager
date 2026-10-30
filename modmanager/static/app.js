@@ -73,8 +73,24 @@ function toast(msg, bad) {
 }
 const guard = fn => async (...a) => { try { await fn(...a); } catch (e) { if (!(e instanceof Stale)) fail(e, fn.name); } };
 // Show the real error where the user can see it, and keep a copy in the log file (see the Documents folder).
+const mmss = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+// Steam said "too many requests": a bar counts down until the app may ask Steam again (the server refuses until then)
+let rlTimer = null;
+function showRateLimit(seconds) {
+  let bar = $('ratelimit');
+  if (!bar) { bar = document.createElement('div'); bar.id = 'ratelimit'; bar.setAttribute('role', 'status'); document.body.appendChild(bar); }
+  const end = Date.now() + seconds * 1000;
+  clearInterval(rlTimer);
+  const tick = () => {
+    const left = Math.max(0, Math.round((end - Date.now()) / 1000));
+    bar.innerHTML = left ? `Steam is limiting requests (rate limit). You can try again in <b>${mmss(left)}</b>.` : 'Steam can be asked again now. <button class="sm" id="rl-x">OK</button>';
+    if (!left) { clearInterval(rlTimer); $('rl-x').onclick = () => bar.remove(); }
+  };
+  tick(); rlTimer = setInterval(tick, 1000);
+}
 function fail(e, where) {
   if (e instanceof Stale) return;
+  if (e.body && e.body.rate_limit) { showRateLimit(e.body.retry_in || 60); return; }
   toast(e.message, true);
   if (e.status >= 500 || !e.status) report(e.message, e.stack, where);
   if (e.status >= 500 || e.network) showFatal(e);
@@ -111,9 +127,12 @@ function pollDownload(id) {
     const items = Object.entries(job.items), done = items.filter(([, i]) => i.state === 'done').length;
     const failed = new Map();   // one line per reason: a missing login fails every item the same way
     items.filter(([, i]) => i.state === 'failed').forEach(([k, i]) => failed.set(i.message, [...(failed.get(i.message) || []), k]));
-    if (el) el.innerHTML = `steamcmd: ${done}/${items.length} downloaded` + [...failed].map(([msg, ks]) => `<div class="err">${ks.length > 3 ? `${ks.length} items` : ks.map(k => '#' + esc(k)).join(', ')}: ${esc(msg)}</div>`).join('') +
-      (job.state === 'done' ? `<div class="ok">Done. Files are in <code>${esc(job.dir)}</code>${S.workshop_dir === job.dir ? '' : ' — add that folder as your Workshop folder in Settings so they are found.'}</div>` : '');
-    if (job.state === 'queued' || job.state === 'running') pollDownload(id);
+    const wait = job.state === 'waiting' ? `<div class="warn ratelimit">Steam is limiting downloads (rate limit). Trying again in <b>${mmss(job.retry_in || 0)}</b>.
+      <button class="sm" data-dlretry="${esc(job.id)}">Retry now</button></div>` : '';
+    if (el) el.innerHTML = `steamcmd: ${done}/${items.length} downloaded` + wait + [...failed].map(([msg, ks]) => `<div class="err">${ks.length > 3 ? `${ks.length} items` : ks.map(k => '#' + esc(k)).join(', ')}: ${esc(msg)}</div>`).join('') +
+      (job.state === 'done' ? (S.game.kind === 'modules' ? `<div class="ok">Done. Installed into the game's <code>Modules</code> folder.</div>`
+        : `<div class="ok">Done. Files are in <code>${esc(job.dir)}</code>${S.workshop_dir === job.dir ? '' : ' — add that folder as your Workshop folder in Settings so they are found.'}</div>`) : '');
+    if (job.state === 'queued' || job.state === 'running' || job.state === 'waiting') pollDownload(id);
     else if (done) { await load(true); }
   }), 1500);
 }
@@ -709,6 +728,7 @@ document.addEventListener('click', guard(async e => {
   if (ds.dl === 'steam') { steamQ = {list: lastMissing.slice(), i: 0}; await steamOpen(); }
   if (ds.dl === 'steam-next' && steamQ) { steamQ.i = Math.min(steamQ.i + 1, steamQ.list.length - 1); await steamOpen(); }
   if (ds.dl === 'steam-again' && steamQ) await steamOpen();
+  if (ds.dlretry) { await api('downloads/retry', {id: ds.dlretry}); }
   if (ds.dl === 'steam-stop') { steamQ = null; const el = $('dlstat'); if (el) el.innerHTML = ''; }
   if (ds.dl === 'steamcmd') { steamQ = null; pollDownload((await api('downloads', {ids: lastMissing.map(m => m.workshop_id), method: 'steamcmd'})).job.id); }
   if (ds.fix === 'enable') { Object.assign(p, await api(`playsets/${p.id}/enable`, {id: ds.id})); render(); analyse(); }

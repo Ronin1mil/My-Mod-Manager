@@ -6,6 +6,7 @@ titles. Nothing is installed or downloaded; the result is an ordinary preset.
 """
 import json
 import re
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -28,14 +29,46 @@ def parse_collection_id(text):
     return m.group(1)
 
 
+class RateLimited(ValueError):
+    """Steam said 'too many requests' (HTTP 429). `seconds` until the app asks again."""
+
+    def __init__(self, seconds):
+        self.seconds = max(1, int(seconds))
+        m, s = divmod(self.seconds, 60)
+        super().__init__(f"Steam is limiting requests (rate limit). Try again in {m}:{s:02d}.")
+
+
+_limit = {"until": 0.0, "strikes": 0}   # app-wide: one Steam, one limit
+
+
+def _retry_after(e):
+    """Steam's own wait (Retry-After, in seconds) when it gives one; else 1, 2, 4 ... minutes, at most 15."""
+    try:
+        v = int(str(e.headers.get("Retry-After", "")).strip())
+        if 0 < v <= 3600:
+            return v
+    except (ValueError, TypeError, AttributeError):
+        pass
+    return min(60 * 2 ** (_limit["strikes"] - 1), 15 * 60)
+
+
 def default_post(path, fields, timeout=15):
+    left = _limit["until"] - time.time()
+    if left > 0:   # still inside Steam's limit: asking again now only makes it longer
+        raise RateLimited(left)
     url = f"https://{HOST}{path}"
     data = urllib.parse.urlencode(fields).encode()
     req = urllib.request.Request(url, data=data, headers={"User-Agent": "modmanager-collection-import"})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             raw = r.read(MAX_BYTES + 1)
+        _limit["strikes"] = 0
     except urllib.error.HTTPError as e:
+        if e.code == 429:
+            _limit["strikes"] += 1
+            wait = _retry_after(e)
+            _limit["until"] = time.time() + wait
+            raise RateLimited(wait)
         raise ValueError(f"Steam answered with an error ({e.code}).")
     except (urllib.error.URLError, OSError) as e:
         raise ValueError(f"Could not reach Steam: {getattr(e, 'reason', e)}")

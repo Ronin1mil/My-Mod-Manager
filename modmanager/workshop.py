@@ -19,6 +19,9 @@ ID_RE = re.compile(r"^\d{1,20}$")
 USER_RE = re.compile(r"^[A-Za-z0-9_.\-]{2,64}$")
 MAX_IDS = 300
 STEAMCMD_TIMEOUT = 30 * 60
+BATCH = 10                 # items per steamcmd login
+RATE_LIMIT_WAIT = 30 * 60  # Steam does not say how long a login rate limit lasts; ~30 min is what people report
+RATE_LIMIT_TRIES = 3
 
 
 def clean_ids(ids):
@@ -125,6 +128,21 @@ def failure_line(out):
     return ((why or lines or ["steamcmd failed"])[-1])[:200]
 
 
+def is_rate_limited(out):
+    o = out.lower()
+    return "rate limit" in o or "ratelimit" in o
+
+
+def _item_ok(out, wid):
+    return any("success" in ln.lower() and f"item {wid}" in ln for ln in out.splitlines())
+
+
+def _item_failure(out, wid):
+    """Why this item failed: steamcmd's line about it ('ERROR! Download item <id> failed (...)'), else the run's error line."""
+    mine = [ln.strip() for ln in out.splitlines() if f"item {wid}" in ln and ("error" in ln.lower() or "fail" in ln.lower())]
+    return (mine[-1] if mine else failure_line(out))[:200]
+
+
 def _needs_login(out):
     o = out.lower()
     return any(e in o for e in _LOGIN_ERRORS)
@@ -170,35 +188,78 @@ class Downloads:
         return self.public(job)
 
     def _run(self, job, exe, user, ids, after=None):
-        job["state"] = "running"
-        for wid in ids:
-            it = job["items"][wid]
-            it["state"] = "running"
-            argv = [str(exe), "+login", user, "+workshop_download_item", self.game.app_id, wid, "+quit"]
+        """Log in once per batch of BATCH items (not once per item: many logins in a row is what makes Steam answer
+        'Rate Limit Exceeded'). When Steam does limit us, wait (job state 'waiting', with a countdown) and try the
+        items that are left again, up to RATE_LIMIT_TRIES times; `retry_now` cuts a wait short."""
+        job["state"], waits = "running", 0
+        todo = list(ids)
+        while todo:
+            batch, todo = todo[:BATCH], todo[BATCH:]
+            for wid in batch:
+                job["items"][wid].update(state="running", message="")
+            argv = [str(exe), "+login", user]
+            for wid in batch:
+                argv += ["+workshop_download_item", self.game.app_id, wid]
+            argv.append("+quit")
             try:
-                r = self.runner(argv, capture_output=True, text=True, timeout=STEAMCMD_TIMEOUT, cwd=str(exe.parent))
+                r = self.runner(argv, capture_output=True, text=True, timeout=min(STEAMCMD_TIMEOUT * len(batch), 4 * 3600),
+                                cwd=str(exe.parent))
                 out = (r.stdout or "") + (r.stderr or "")
-                ok = r.returncode == 0 and "Success" in out and (Path(job["dir"]) / wid).is_dir()
-                it["state"] = "done" if ok else "failed"
-                it["message"] = "" if ok else failure_line(out)
+            except (OSError, subprocess.SubprocessError) as e:
+                for wid in batch:
+                    job["items"][wid].update(state="failed", message=str(e)[:200])
+                continue
+            left = []
+            for wid in batch:
+                it = job["items"][wid]
+                ok = _item_ok(out, wid) and (Path(job["dir"]) / wid).is_dir()
+                it["state"], it["message"] = ("done", "") if ok else ("failed", _item_failure(out, wid))
                 if ok and after:
                     try:
                         it["installed"] = after(wid, Path(job["dir"]) / wid)["folder"]
                     except Exception as e:   # downloaded, but not usable yet: say why
                         it["state"], it["message"] = "failed", f"Downloaded, but not installed: {e}"[:200]
-                if not ok and _needs_login(out):   # every other item would fail the same way: stop and say what to do
-                    msg = login_help(exe, user)
-                    for rest in job["items"].values():
-                        if rest["state"] != "done":
-                            rest["state"], rest["message"] = "failed", msg
+                if not ok:
+                    left.append(wid)
+            if left and _needs_login(out):   # every other item would fail the same way: stop and say what to do
+                msg = login_help(exe, user)
+                for rest in job["items"].values():
+                    if rest["state"] != "done":
+                        rest["state"], rest["message"] = "failed", msg
+                break
+            if left and is_rate_limited(out):
+                waits += 1
+                if waits > RATE_LIMIT_TRIES:
+                    for wid in left + todo:
+                        job["items"][wid].update(state="failed", message="Steam kept limiting downloads (rate limit). Try again later.")
                     break
-            except (OSError, subprocess.SubprocessError) as e:
-                it["state"], it["message"] = "failed", str(e)[:200]
+                for wid in left:
+                    job["items"][wid].update(state="queued", message="waiting for Steam's rate limit")
+                self._wait(job, RATE_LIMIT_WAIT * waits)
+                todo = left + todo
         job["state"] = "done" if all(i["state"] == "done" for i in job["items"].values()) else "failed"
+
+    def _wait(self, job, seconds):
+        job["state"], job["retry_at"] = "waiting", time.time() + seconds
+        ev = job.setdefault("wake", threading.Event())
+        ev.clear()
+        ev.wait(seconds)
+        job["state"], job["retry_at"] = "running", None
+
+    def retry_now(self, jid):
+        """End a rate-limit wait early (the user pressed Retry now)."""
+        job = self.jobs.get(str(jid))
+        if not job or job["state"] != "waiting":
+            raise ValueError("That download is not waiting.")
+        job["wake"].set()
+        return self.public(job)
 
     @staticmethod
     def public(job):
-        return {k: v for k, v in job.items() if k != "thread"}
+        out = {k: v for k, v in job.items() if k not in ("thread", "wake", "retry_at")}
+        if job.get("retry_at"):
+            out["retry_in"] = max(0, int(job["retry_at"] - time.time()))   # seconds: the page counts down from here
+        return out
 
     def status(self):
         with self.lock:

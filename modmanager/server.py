@@ -1319,6 +1319,8 @@ def make_handler(hub):
                     return self._send(200, app.mod_updates(getattr(self.server, "collection_post", None)))
                 if parts == ["api", "downloads"]:
                     return self._send(200, app.download(b.get("ids"), str(b.get("method", "steam"))))
+                if parts == ["api", "downloads", "retry"]:
+                    return self._send(200, app.downloads.retry_now(str(b.get("id", ""))))
                 if len(parts) == 4 and parts[:2] == ["api", "mods"] and parts[3] == "uninstall":
                     return self._send(200, app.uninstall(urllib.parse.unquote(parts[2])))
                 if len(parts) == 4 and parts[:2] == ["api", "playsets"]:
@@ -1361,6 +1363,8 @@ def make_handler(hub):
             except TooLarge as e:
                 self.close_connection = True  # the unread body is never consumed
                 self._send(413, {"error": str(e)})
+            except collections.RateLimited as e:   # the page shows a countdown until Steam may be asked again
+                self._send(429, {"error": str(e), "retry_in": e.seconds, "rate_limit": "steam"})
             except (ValueError, install.UnsafeArchive) as e:
                 self._send(400, {"error": str(e)})
             except Exception as e:  # surface to UI rather than hang the request

@@ -145,3 +145,5 @@ button.star{background:none;border:0;padding:0 4px;font-size:16px;line-height:1;
 .ctx hr{border:0;border-top:1px solid var(--line);margin:4px 0}
 .steam-step{margin-top:8px;line-height:2}.steam-step button{margin-left:4px}
 .dl-ways{font-size:12px;margin-top:8px}
+#ratelimit{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:900;background:var(--panel);border:1px solid var(--warn);color:var(--ink);border-radius:var(--r);padding:8px 14px;box-shadow:0 6px 20px rgba(0,0,0,.4);max-width:min(560px,92vw)}
+.ratelimit{margin:6px 0}.ratelimit button{margin-left:6px}

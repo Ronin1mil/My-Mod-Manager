@@ -116,11 +116,15 @@ class FakeRun:
 
     def __call__(self, argv, **kw):
         self.calls.append((argv, kw))
-        wid = argv[argv.index("+workshop_download_item") + 2]
-        if wid in self.fail:
-            return subprocess.CompletedProcess(argv, 8, "ERROR! Download item failed (Failure).\n", "")
-        (self.content / wid).mkdir(parents=True, exist_ok=True)
-        return subprocess.CompletedProcess(argv, 0, f'Success. Downloaded item {wid} to "x"\n', "")
+        wids = [argv[i + 2] for i, a in enumerate(argv) if a == "+workshop_download_item"]
+        out = []
+        for wid in wids:   # steamcmd's own wording, one line per item
+            if wid in self.fail:
+                out.append(f"ERROR! Download item {wid} failed (Failure).")
+            else:
+                (self.content / wid).mkdir(parents=True, exist_ok=True)
+                out.append(f'Success. Downloaded item {wid} to "x" (100 bytes)')
+        return subprocess.CompletedProcess(argv, 8 if any(w in self.fail for w in wids) else 0, "\n".join(out) + "\n", "")
 
 
 class Downloads(unittest.TestCase):
@@ -171,9 +175,9 @@ class Downloads(unittest.TestCase):
         job = dl.start(str(self.exe), "my_account", ["111", "222"])
         done = self.wait(dl, job["id"])
         self.assertEqual(done["state"], "done")
-        self.assertEqual([c[0] for c in run.calls], [
-            [str(self.exe), "+login", "my_account", "+workshop_download_item", "1158310", "111", "+quit"],
-            [str(self.exe), "+login", "my_account", "+workshop_download_item", "1158310", "222", "+quit"]])
+        self.assertEqual([c[0] for c in run.calls], [   # one login for the batch, not one per item
+            [str(self.exe), "+login", "my_account", "+workshop_download_item", "1158310", "111",
+             "+workshop_download_item", "1158310", "222", "+quit"]])
         for _, kw in run.calls:
             self.assertFalse(kw.get("shell"))
             self.assertEqual(kw["cwd"], str(self.exe.parent))
@@ -185,7 +189,7 @@ class Downloads(unittest.TestCase):
         dl = workshop.Downloads(games.CK3, run)
         done = self.wait(dl, dl.start(str(self.exe), "acct", ["111", "222"])["id"])
         self.assertEqual((done["state"], done["items"]["111"]["state"], done["items"]["222"]["state"]), ("failed", "failed", "done"))
-        self.assertIn("failed", done["items"]["111"]["message"].lower())
+        self.assertEqual(done["items"]["111"]["message"], "ERROR! Download item 111 failed (Failure).")
 
     def test_no_saved_login_stops_at_once_and_says_how_to_log_in(self):
         out = "Logging in user 'acct' to Steam Public...\nCached credentials not found.\nFAILED (No Connection)\n"

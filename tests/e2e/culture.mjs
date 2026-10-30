@@ -82,13 +82,15 @@ try {
   assert.ok((await page.locator('#view .row.static').count()) >= 3);
   await shot(page, '04-warnings-not-installed');
 
-  // STEP 5: "Open in Steam…" (Steam client then shows each page; user presses Subscribe)
+  // STEP 5: "Open in Steam, one by one" (Steam shows one page at a time; the user presses Subscribe, then Next mod)
   await page.click('[data-tab=presets]');
   await page.click('[data-dl=steam]');
-  await page.waitForSelector('#toast.on:has-text("Opened in Steam")');
+  await page.waitForSelector('.steam-step:has-text("1 of ")');
+  while (await page.locator('[data-dl=steam-next]').count()) await page.click('[data-dl=steam-next]');
+  await page.waitForSelector('.steam-step:has-text("That was the last one")');
   await shot(page, '05-open-in-steam');
 
-  // STEP 6: Steam downloads (simulated), then Rescan
+  // STEP 6: Steam downloads (simulated), then Refresh
   fakeSteamDownload();
   await page.click('[data-dl=rescan]');
   await page.waitForSelector('text=3/3 installed');

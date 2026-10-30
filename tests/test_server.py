@@ -200,6 +200,19 @@ class FullRescanRoute(Base):
         self.assertEqual(self.req("POST", "/api/full-rescan", {}, headers={"Origin": "http://evil.example"})[0], 403)
 
 
+class SteamRateLimit(Base):
+    def test_the_page_gets_a_429_with_the_seconds_to_count_down(self):
+        from modmanager import collections
+
+        def limited(path, fields):
+            raise collections.RateLimited(90)
+        self.srv.collection_post = limited
+        st, body, _ = self.post("/api/presets/import-collection", {"url": "123"})
+        self.assertEqual(st, 429)
+        self.assertEqual((body["retry_in"], body["rate_limit"]), (90, "steam"))
+        self.assertIn("1:30", body["error"])
+
+
 class Hardening(Base):
     def test_bad_host_and_origin_are_refused(self):
         self.assertEqual(self.req("GET", "/api/state", headers={"Host": "evil.example"})[0], 403)

@@ -86,11 +86,14 @@ class DownloadAndUse(Base):
 
     def run_job(self, a, ids, fail=()):
         def fake(argv, **kw):
-            wid = argv[argv.index("+workshop_download_item") + 2]
-            if wid in fail:
-                return subprocess.CompletedProcess(argv, 8, "ERROR! Download item failed (Failure).\n", "")
-            self.downloaded(wid, f"Mod{wid}")
-            return subprocess.CompletedProcess(argv, 0, f"Success. Downloaded item {wid}\n", "")
+            out = []
+            for wid in [argv[i + 2] for i, a in enumerate(argv) if a == "+workshop_download_item"]:
+                if wid in fail:
+                    out.append(f"ERROR! Download item {wid} failed (Failure).")
+                else:
+                    self.downloaded(wid, f"Mod{wid}")
+                    out.append(f"Success. Downloaded item {wid} to x")
+            return subprocess.CompletedProcess(argv, 0, "\n".join(out) + "\n", "")
         a.downloads.runner = fake
         jid = a.download(ids, "steamcmd")["job"]["id"]
         end = time.time() + 5
