@@ -397,7 +397,7 @@ async function openPaths(first) {
   const d = $('dlg'), st = GI.settings;
   d.className = 'wide';
   d.innerHTML = `<div class="st-head"><h2>${first ? 'Set up ' + esc(GNAME()) : 'Settings'}</h2>
-      <span class="mut">Ronin Mod Manager v${esc(GI.version)}${S.game.verified ? '' : ' · launching is <b>not yet verified</b> on a real ' + esc(GNAME()) + ' install'}</span>
+      <span class="mut">Ronin Mod Manager v${esc(GI.version)}${GI.build ? ' (test build ' + esc(GI.build) + ')' : ''}${S.game.verified ? '' : ' · launching is <b>not yet verified</b> on a real ' + esc(GNAME()) + ' install'}</span>
     </div>
     <div class="st-body">
     <nav class="st-tabs" id="st-tabs"><button data-st="game" class="on"><i>🎮</i>Game</button><button data-st="store"><i>📁</i>Storage</button><button data-st="play"><i>▶</i>Playing</button><button data-st="ui"><i>🎨</i>UI</button><button data-st="dl"><i>⬇</i>Downloads</button><button data-st="app"><i>⟳</i>App &amp; updates</button></nav>
@@ -925,7 +925,7 @@ async function useGame(id, first) {
   applyTheme(g);
   $('game').value = id;
   setLogo(g.id);
-  document.title = g.name + ' · Ronin Mod Manager';
+  document.title = g.name + ' · Ronin Mod Manager' + (GI.build ? ' (test build)' : '');
   await load(first);
 }
 // ---- games the user adds (beta) ----
@@ -1000,7 +1000,7 @@ $('game').onchange = guard(async () => {
 window.addEventListener('hashchange', () => { const w = location.hash.slice(1); if (GI && w !== G && GI.games.some(g => g.id === w)) useGame(w, true).catch(e => fail(e, 'hash')); });
 (async () => {
   GI = await app('games');
-  $('ver').textContent = 'v' + GI.version + (GI.build ? ' · test ' + GI.build : '');
+  $('ver').innerHTML = 'v' + esc(GI.version) + (GI.build ? `<br><b class="testbuild" title="A test build of the next version. Settings > App &amp; updates shows how to go back to a release.">TEST BUILD ${esc(GI.build)}</b>` : '');
   fillGames();
   let want = location.hash.slice(1);
   try { want = want || localStorage.getItem('mm-game') || ''; } catch (e) { /* ignore */ }

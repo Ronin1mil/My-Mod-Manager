@@ -63,6 +63,21 @@ class ChildEnvironment(unittest.TestCase):
         self.assertEqual(env["MODMANAGER_MODE"], "window")  # the window mode is kept
 
 
+class CanRun(unittest.TestCase):
+    def test_a_program_that_starts_passes_and_a_missing_or_failing_one_does_not(self):
+        import sys
+        self.assertEqual(su.can_run(sys.executable), (True, ""))
+        ok, why = su.can_run(Path(sys.executable).with_name("no-such-program"))
+        self.assertFalse(ok)
+        self.assertTrue(why)
+        if sys.platform != "win32":
+            with tempfile.TemporaryDirectory() as t:
+                f = Path(t) / "fails"
+                f.write_text("#!/bin/sh\nexit 5\n")
+                f.chmod(0o755)
+                self.assertEqual(su.can_run(f), (False, "it ended with exit code 5"))
+
+
 class Flow(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -96,6 +111,49 @@ class Flow(unittest.TestCase):
         self.assertEqual(self.exe.read_bytes(), self.payload)
         self.assertEqual((self.d / "app.old").read_text(), "old-version")
         self.assertEqual(self.restarted, [(str(self.exe), ["--port", "9"])])
+
+    def test_a_file_windows_refuses_to_start_is_never_swapped_in(self):
+        u = su.Updater(check=lambda: self.info(), dl=self.dl_factory(), exe=str(self.exe), argv=[],
+                       restarter=lambda e, a: self.restarted.append(1), exiter=lambda: self.exited.append(1),
+                       verify=lambda p: (False, "[WinError 4551] An Application Control policy has blocked this file"))
+        st = u.start(run_async=False)
+        self.assertEqual(st["status"], "error")
+        self.assertIn("4551", st["message"])
+        self.assertIn("Nothing was changed", st["message"])
+        self.assertEqual(self.exe.read_text(), "old-version")
+        self.assertFalse((self.d / "app.new").exists() or (self.d / "app.old").exists() or self.restarted)
+
+    def test_the_new_file_is_test_started_before_the_swap(self):
+        seen = []
+        u = su.Updater(check=lambda: self.info(), dl=self.dl_factory(), exe=str(self.exe), argv=[],
+                       restarter=lambda e, a: None, exiter=lambda: self.exited.append(1),
+                       verify=lambda p: seen.append((Path(p).name, self.exe.read_text())) or (True, ""))
+        self.assertEqual(u.start(run_async=False)["status"], "restarting")
+        self.assertEqual(seen, [("app.new", "old-version")])   # the old program was still in place
+
+    def test_a_new_copy_that_cannot_start_is_rolled_back(self):
+        def boom(e, a):
+            raise OSError("[WinError 4551] blocked")
+        u = su.Updater(check=lambda: self.info(), dl=self.dl_factory(), exe=str(self.exe), argv=[], restarter=boom,
+                       exiter=lambda: self.exited.append(1), verify=lambda p: (True, ""))
+        st = u.start(run_async=False)
+        self.assertEqual(st["status"], "error")
+        self.assertIn("put back", st["message"])
+        self.assertEqual(self.exe.read_text(), "old-version")
+        self.assertEqual(sorted(p.name for p in self.d.iterdir()), ["app"])   # no .old/.new/.bad left over
+        self.assertEqual(self.exited, [])                                     # this copy keeps running
+
+    def test_a_new_copy_that_ends_at_once_is_rolled_back(self):
+        class Dead:
+            returncode = 3
+            def poll(self):
+                return 3
+        u = su.Updater(check=lambda: self.info(), dl=self.dl_factory(), exe=str(self.exe), argv=[],
+                       restarter=lambda e, a: Dead(), exiter=lambda: self.exited.append(1), verify=lambda p: (True, ""))
+        st = u.start(run_async=False)
+        self.assertEqual(st["status"], "error")
+        self.assertEqual(self.exe.read_text(), "old-version")
+        self.assertEqual(self.exited, [])
 
     def test_the_test_build_channel_uses_its_own_check(self):
         calls = []

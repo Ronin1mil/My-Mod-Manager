@@ -5,7 +5,10 @@ Flow, started only by the user pressing "Update now":
   1. ask GitHub for the latest release (update.check_for_update) and pick this platform's file
   2. download it next to the running app (https; github.com / *.githubusercontent.com only; size capped)
   3. verify its SHA-256 against the release's SHA256SUMS.txt - refuse on any mismatch or missing entry
-  4. swap it in (the old copy is kept as <name>.old until the next start) and start the new version
+  4. start the new file once (--version) to learn whether Windows lets it run: Smart App Control and antivirus refuse
+     unsigned downloads at that point, and then nothing is changed
+  5. swap it in (the old copy is kept as <name>.old until the next start) and start the new version; if that copy
+     cannot start or ends at once, the old one is put back
 The hash proves the download is intact and is the file the release lists. It is not a signature: someone
 who can publish releases in the repo can publish a matching hash. Keep the repository's write access tight.
 """
@@ -15,6 +18,7 @@ import re
 import subprocess
 import sys
 import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -131,6 +135,37 @@ def swap(exe, new):
     return old
 
 
+def unswap(exe, old):
+    """Undo swap(): the new file goes aside and the previous version is back under its own name."""
+    exe, old = Path(exe), Path(old)
+    bad = exe.with_name(exe.name + ".bad")
+    try:
+        bad.unlink(missing_ok=True)
+        os.replace(exe, bad)
+    except OSError:
+        pass
+    os.replace(old, exe)
+    try:
+        bad.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def can_run(path):
+    """May this file start on this PC? -> (ok, reason). A new download is started once with --version before it
+    replaces anything: Smart App Control ("An Application Control policy has blocked this file", error 4551) and
+    antivirus refuse an unsigned program when it is started, not when it is downloaded."""
+    flags = 0x08000000 if sys.platform == "win32" else 0  # CREATE_NO_WINDOW
+    try:
+        r = subprocess.run([str(path), "--version"], env=child_environment(), capture_output=True, timeout=90,
+                           stdin=subprocess.DEVNULL, creationflags=flags, cwd=str(Path(path).parent))
+    except subprocess.TimeoutExpired:
+        return True, ""   # it started (a slow first unpack); a blocked file fails at once
+    except OSError as e:
+        return False, str(e)
+    return (True, "") if r.returncode == 0 else (False, f"it ended with exit code {r.returncode}")
+
+
 def cleanup_old():
     """Remove the previous version left by an update. Called at start-up; never raises."""
     if frozen():
@@ -158,17 +193,18 @@ def restart(exe, argv):
     args = [str(exe)] + [a for a in argv if a != "--no-browser"]
     if os.environ.get("MODMANAGER_MODE") != "window":  # a window closes with the old copy, so the new one opens its own
         args.append("--no-browser")                       # a browser tab is still open and reloads itself
-    subprocess.Popen(args, env=env, close_fds=True, creationflags=flags, cwd=str(Path(exe).parent))
+    return subprocess.Popen(args, env=env, close_fds=True, creationflags=flags, cwd=str(Path(exe).parent))
 
 
 class Updater:
     """One update at a time, run in a worker thread; the page polls `status`."""
 
-    def __init__(self, check=None, dl=download, exe=None, argv=None, restarter=restart, exiter=None, check_nightly_=None):
+    def __init__(self, check=None, dl=download, exe=None, argv=None, restarter=restart, exiter=None, check_nightly_=None, verify=None):
         self.check = check or (lambda: check_for_update(stable_current()))
         self.check_nightly = check_nightly_ or check_nightly
         self.channel = "stable"
         self.dl, self.restarter = dl, restarter
+        self.verify = verify or (can_run if frozen() else None)   # a source checkout / a test has nothing to test-start
         self.exe = exe or sys.executable
         self.argv = list(argv if argv is not None else sys.argv[1:])
         self.exiter = exiter or (lambda: os._exit(0))
@@ -226,11 +262,35 @@ class Updater:
                 new.unlink(missing_ok=True)
                 return self._set("error", "The downloaded file does not match its published checksum, so it was "
                                  "discarded and nothing was changed.")
+            if self.verify:
+                self._set("working", "Checking that Windows lets the new version start…")
+                with perflog.timed("update: test-start the new file"):
+                    ok, why = self.verify(new)
+                if not ok:
+                    new.unlink(missing_ok=True)
+                    perflog.log(f"update: the new file cannot start ({why})")
+                    return self._set("error", f"Windows would not start the new version ({why}). That is usually Smart App Control or "
+                                     "antivirus blocking a program that is not signed. Nothing was changed: you are still on the "
+                                     "version you had.")
             with perflog.timed("update: swap in the new file"):
-                swap(exe, new)
+                old = swap(exe, new)
             self._set("restarting", f"Updated to {info['latest']}. Restarting…")
             perflog.log("update: starting the new copy, this one exits in 1.5 s")
-            self.restarter(exe, self.argv)
+            bad = None
+            try:
+                proc = self.restarter(exe, self.argv)
+            except OSError as e:
+                proc, bad = None, str(e)
+            for _ in range(30 if proc is not None else 0):   # a copy that is blocked or crashes at once is seen within 3 s
+                if proc.poll() is not None:
+                    bad = f"it ended at once with exit code {proc.returncode}"
+                    break
+                time.sleep(0.1)
+            if bad:
+                unswap(exe, old)
+                perflog.log(f"update: the new copy did not start ({bad}); the old one was put back")
+                return self._set("error", f"The new version could not be started ({bad}). The previous version was put back, "
+                                 "nothing is lost.")
             threading.Timer(1.5, self.exiter).start()
         except Exception as e:
             try:
