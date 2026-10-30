@@ -138,3 +138,4 @@ dialog.wide.gform{width:min(1500px,97vw);height:min(860px,calc(94vh / var(--zoom
 .gform .st-form .card>*{min-width:0}.gform .st-form .card>p,.gform .st-form .card>[data-wide]{grid-column:1/-1}
 @media (max-width:900px){.gform .st-form .card{grid-template-columns:1fr}}
 .gform .st-form .card>div{display:flex;flex-direction:column;justify-content:space-between}
+.gform .st-form .card>div[hidden]{display:none}
