@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- **Start-up does the slow work first.** Before the window opens, the app reads the mod folders of the games you use, loads what it saved last time, and works out the conflicts of every playset, then opens the real interface with everything ready. Progress is printed in the terminal (run `py Mod-Manager-python.pyzw` from PowerShell to watch it; a double-click has no terminal, so the window simply appears once it is ready). The first start with a big mod list is the long one; later starts only look for changes. Set `MODMANAGER_BOOT=0` to skip this pass
 - The game logo shows at once: it is served straight from the file on your PC (it no longer waits for the game's mods to be read first) and the browser keeps it. No shield is drawn behind it any more, and a game with no logo shows nothing there. The Steam logo download is skipped for games with no Steam app id
 - A copy running a test build follows the test builds first: the update notice and "Check for updates now" offer a newer test build (the banner says "Test build abc1234 is available"), and no longer offer the release of the version it is already on. A release with a higher version number is still offered. Settings > App & updates > Test builds has a new **Go back to the release** button for leaving the test channel
 

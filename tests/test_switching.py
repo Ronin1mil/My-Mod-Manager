@@ -14,7 +14,7 @@ from modmanager.store import GlobalSettings
 from tests.helpers import mkmod
 
 
-class Switching(unittest.TestCase):
+class _Base(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.r = Path(self.tmp.name)
@@ -30,6 +30,8 @@ class Switching(unittest.TestCase):
         self.p1 = self.app.store.create("one", self.ids)
         self.p2 = self.app.store.create("two", self.ids[:2])
 
+
+class Switching(_Base):
     def test_a_second_visit_returns_the_same_answer_without_scanning(self):
         first = self.app.conflicts_job(self.p1)()
         with mock.patch("modmanager.scan.find_conflicts", side_effect=AssertionError("scanned again")):
@@ -127,6 +129,50 @@ class Switching(unittest.TestCase):
         self.assertIs(app.prewarm_lock, hub.lock)
         app._prewarm.join(20)
         self.assertFalse(app._prewarm.is_alive())
+
+
+class Boot(_Base):
+    """The start-up pass: everything slow is done, and reported, before the window opens."""
+
+    def _hub(self):
+        return Hub(settings=GlobalSettings(self.r / "g.json"), gamelist=[games.VIC3],
+                   factory=lambda g, **kw: GameApp(g, user_dir=str(self.user), workshop_dir=str(self.r / "ws"), autodetect=False))
+
+    def test_boot_works_out_every_playset_and_says_what_it_does(self):
+        from modmanager.server import boot
+        hub = self._hub()
+        hub.settings.update(last_game="vic3")
+        app = hub.app("vic3")
+        for ps in list(app.store.data["playsets"]):
+            app.store.delete(ps)
+        a = app.store.create("one", self.ids)
+        b = app.store.create("two", self.ids[:2])
+        said = []
+        boot(hub, said.append)
+        text = "\n".join(said)
+        self.assertIn("Victoria 3: 3 mods", text)
+        self.assertIn('playset 1 of 2', text)
+        self.assertIn('playset 2 of 2 "two"', text)
+        self.assertTrue(said[-1].startswith("Ready"))
+        with mock.patch("modmanager.scan.find_conflicts", side_effect=AssertionError("scanned again")):
+            app.conflicts_job(a)()
+            app.conflicts_job(b)()
+        self.assertTrue(app.parse_cache_file().is_file(), "what was read is saved for the next start")
+
+    def test_boot_does_nothing_for_a_game_never_used(self):
+        from modmanager.server import boot
+        hub = Hub(settings=GlobalSettings(self.r / "g.json"), gamelist=[games.CK3])
+        said = []
+        boot(hub, said.append)   # no last game, no folder for it yet
+        self.assertEqual(said, [])
+        self.assertNotIn("ck3", hub.apps)
+
+    def test_after_boot_changes_are_worked_out_in_the_background_again(self):
+        hub = self._hub()
+        app = hub.app("vic3")
+        self.assertIsNone(app.prewarm_lock)
+        hub.enable_prewarm()
+        self.assertIs(app.prewarm_lock, hub.lock)
 
 
 class ParseCache(unittest.TestCase):

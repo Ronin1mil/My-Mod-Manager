@@ -3,6 +3,7 @@
 URLs:  /api/games, /api/settings, /api/update-check          app-wide
        /api/<game>/state, /api/<game>/playsets/..., ...      one game (ck3 / eu5 / vic3)
 """
+import contextlib
 import json
 import os
 import shutil
@@ -261,6 +262,25 @@ class GameApp:
         self._prewarm = threading.Thread(target=self._prewarm_run, daemon=True, name=f"prewarm-{self.game.id}")
         self._prewarm.start()
 
+    def warm(self, say=None, lock=None):
+        """Work out, now and in order, everything a click would otherwise wait for: the conflicts of every playset (the
+        active one first). Used at start-up, before the window opens; `say(text)` reports how far it is."""
+        say = say or (lambda _t: None)
+        scan.load_cache(self.parse_cache_file())
+        data = self.store.data
+        ids = [p for p in [data["active"], *data["playsets"]] if p in data["playsets"]]
+        ids = list(dict.fromkeys(ids))
+        for n, pid in enumerate(ids, 1):
+            name = data["playsets"][pid]["name"]
+            head = f"playset {n} of {len(ids)} \"{name}\""
+            say(head + " ...")
+            with lock or contextlib.nullcontext():   # only the snapshot needs the app lock; the scan itself runs outside it
+                job = self.conflicts_job(pid, progress=lambda d, t, head=head: say(f"{head}: {d} of {t} mods"))
+            job()
+        if scan.cache_dirty():
+            with perflog.timed(f"{self.game.id}: save parse cache", quiet=True):
+                scan.save_cache(self.parse_cache_file())
+
     def _prewarm_run(self):
         try:
             scan.load_cache(self.parse_cache_file())
@@ -365,7 +385,7 @@ class GameApp:
             out.update(self.conflicts_job(pid, res["order"])())
         return out
 
-    def conflicts_job(self, pid, ordr=None, background=False):
+    def conflicts_job(self, pid, ordr=None, background=False, progress=None):
         """Snapshot what the scan needs (quick, done under the app lock) and return the slow part as a function
         that can run without holding it, so switching games or editing a playset never waits for a scan.
         An answer worked out before is returned as it was. A request from the user stops any older scan (so clicks
@@ -382,7 +402,15 @@ class GameApp:
         hit = self._results.get(key)
         if hit is not None:
             return lambda: hit
-        if background:
+        if progress:   # the start-up pass: nobody else is asking, so no giving way; report how far it is instead
+            done = [0]
+
+            def stop():
+                done[0] += 1
+                if done[0] % 100 == 0:
+                    progress(done[0], len(ordr))
+                return False
+        elif background:
             start = self._scan_token
             stop = lambda: time.sleep(0.002) or self._scan_token is not start   # also yields, so the page stays quick
         else:
@@ -682,6 +710,12 @@ class Hub:
         self.updater = selfupdate.Updater()
         self.updater_forced = False  # tests
         self.update_fetch = None  # tests inject a fake GitHub here
+
+    def enable_prewarm(self):
+        """From now on a game that changed is worked out again in the background (the start-up pass is over)."""
+        self.prewarm = True
+        for a in self.apps.values():
+            a.prewarm_lock = self.lock
 
     @classmethod
     def single(cls, app, **kw):
@@ -1178,14 +1212,38 @@ def make_handler(hub):
     return H
 
 
+def boot(hub, say=print, first=None):
+    """Everything slow, done once before the window opens: read the mod folders of every game that has been used, load what
+    was read last time, and work out the conflicts of every playset. A later start finds most of it saved, so this is
+    quick; the first start with a big mod list is the long one. Progress goes to `say` (the terminal, when there is one)."""
+    t0 = time.time()
+    last = hub.settings.get().get("last_game")
+    used = [g for g in hub.games if g == first or g == last or (config_dir() / g).is_dir()]
+    if not used:
+        return
+    say("Getting ready. The first start with many mods takes a while; later starts are quick.")
+    for gid in used:
+        name = hub.games[gid].name
+        t = time.time()
+        say(f"{name}: reading mods ...")
+        app = hub.app(gid)
+        say(f"{name}: {len(app.mods)} mods ({time.time() - t:.1f} s)")
+        if not app.mods:
+            continue
+        t = time.time()
+        app.warm(lambda m, name=name: say(f"{name}: {m}"), hub.lock)
+        say(f"{name}: ready ({time.time() - t:.1f} s)")
+    say(f"Ready ({time.time() - t0:.1f} s).")
+
+
 def serve(port=8765, open_browser=True, overrides=None, initial_game=None, window=False, **kw):
     """Run the app. `open_browser` shows the page; with `window` it gets its own window and closing it ends the app,
-    otherwise it opens in the default browser and runs until Ctrl+C."""
+    otherwise it opens in the default browser and runs until Ctrl+C. The slow work (see boot) is done before the page opens."""
     import webbrowser
     from . import window as windowmod
     perflog.log(f"=== {APP_NAME} {__version__}{' test build ' + BUILD if BUILD else ''} starting (pid {os.getpid()}, "
                 f"{'packaged' if selfupdate.frozen() else 'python edition' if selfupdate.pyz_path() else 'from source'}, port {port})")
-    hub = Hub(overrides=overrides, prewarm=os.environ.get("MODMANAGER_PREWARM") != "0")
+    hub = Hub(overrides=overrides)
     hub.check_on_launch()  # no-op unless the user enabled "check for updates on launch"
     srv = None
     for attempt in range(40):  # a freshly updated copy waits for the old one to release the port
@@ -1200,26 +1258,36 @@ def serve(port=8765, open_browser=True, overrides=None, initial_game=None, windo
     url = f"http://127.0.0.1:{port}/" + (f"#{initial_game}" if initial_game else "")
     mode = "window" if open_browser and window else "browser" if open_browser else "none"
     os.environ["MODMANAGER_MODE"] = mode  # an updated copy restarts the same way
-    print(f"{APP_NAME} {__version__} running at {url}  (Ctrl+C to quit)")
-    print("  games: " + ", ".join(f"{g.id} ({g.name})" for g in hub.games.values()))
-    if mode == "window":
-        threading.Thread(target=srv.serve_forever, daemon=True, name="server").start()
-        with perflog.timed("open the app window"):
-            result = windowmod.show(url)
-        if result == "closed":
-            srv.shutdown()
-            srv.server_close()
-            return
-        if result is None:
-            webbrowser.open(url)  # no window backend here: the browser it is
+    print(f"{APP_NAME} {__version__} running at {url}  (Ctrl+C to quit)", flush=True)
+    print("  games: " + ", ".join(f"{g.id} ({g.name})" for g in hub.games.values()), flush=True)
+    threading.Thread(target=srv.serve_forever, daemon=True, name="server").start()
+
+    def say(text):
         try:
-            while True:  # "detached" or browser: keep serving until Ctrl+C
-                time.sleep(3600)
-        except KeyboardInterrupt:
-            return
-    if mode == "browser":
-        webbrowser.open(url)
+            print(text, flush=True)
+        except (OSError, ValueError):
+            pass
+        perflog.log("boot: " + text)
+
     try:
-        srv.serve_forever()
+        if os.environ.get("MODMANAGER_BOOT") != "0":
+            boot(hub, say, first=initial_game)
+        if os.environ.get("MODMANAGER_PREWARM") != "0":
+            hub.enable_prewarm()
+        if mode != "none":
+            say("Opening the interface ...")
+        if mode == "window":
+            with perflog.timed("open the app window"):
+                result = windowmod.show(url)
+            if result == "closed":
+                srv.shutdown()
+                srv.server_close()
+                return
+            if result is None:
+                webbrowser.open(url)  # no window backend here: the browser it is
+        elif mode == "browser":
+            webbrowser.open(url)
+        while True:  # keep serving until Ctrl+C (or, for the app window, until it is closed)
+            time.sleep(3600)
     except KeyboardInterrupt:
         pass

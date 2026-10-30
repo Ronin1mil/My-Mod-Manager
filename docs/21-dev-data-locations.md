@@ -53,3 +53,6 @@ Direct files (always the newest test build):
 - https://github.com/Ronin1mil/My-Mod-Manager/releases/download/test-build/Mod-Manager-Setup.exe
 
 Inside the app: Settings -> App & updates -> Test builds -> "Check for a test build".
+
+## Start-up pass
+Before the window opens, `serve()` runs `boot()` (server.py): for each game that was used (the last one, the one asked for with `--game`, and any with a folder in the app data folder) it reads the mod folders, loads `parse-cache.json.gz`, and works out the conflicts of every playset, printing each step to the terminal when there is one. `MODMANAGER_BOOT=0` skips it, `MODMANAGER_PREWARM=0` also stops the background work after it. The same lines go to the activity log (prefix `boot:`) on test builds.
