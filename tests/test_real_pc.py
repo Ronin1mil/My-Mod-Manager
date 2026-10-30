@@ -109,6 +109,16 @@ class Play(Base):
         self.assertNotIn("SteamAppId", launch.steam_env(g))
 
 
+class NoRealLinks(unittest.TestCase):
+    def test_the_test_suite_cannot_open_real_links(self):
+        # a test run on a PC with Steam once started the real Victoria 3 launcher this way
+        import webbrowser
+        import tests
+        self.assertIs(webbrowser.open, tests._no_browser)
+        launch.start(games.VIC3, None, [])
+        self.assertEqual(tests.OPENED[-1], "steam://run/529340")
+
+
 class Eu5Version(Base):
     def test_from_the_games_debug_log_when_the_install_has_no_launcher_folder(self):
         root = self.r / "eu5"

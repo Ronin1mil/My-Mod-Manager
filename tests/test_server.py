@@ -142,8 +142,8 @@ class LoadOrder(Base):
         self.app.game_exe = None
         import webbrowser
         opened = []
-        webbrowser.open = lambda url: opened.append(url) or True
-        st, res, _ = self.post(f"/api/playsets/{pid}/launch")
+        with mock.patch.object(webbrowser, "open", lambda url: opened.append(url) or True):
+            st, res, _ = self.post(f"/api/playsets/{pid}/launch")
         self.assertEqual((st, res["written"], res["via"]), (200, 3, "steam"))
         cl = json.loads((self.r / "user/content_load.json").read_text())
         self.assertEqual([Path(e["path"]).name for e in cl["enabledMods"]], ["lib", "a", "b"])
