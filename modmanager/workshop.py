@@ -113,6 +113,22 @@ def steamcmd_accounts(exe):
     return [n for n in names if USER_RE.match(n)]
 
 
+_LOGIN_ERRORS = ("cached credentials not found", "login failure", "invalid password", "two-factor", "steam guard",
+                 "account logon denied", "password:")
+
+
+def _needs_login(out):
+    o = out.lower()
+    return any(e in o for e in _LOGIN_ERRORS)
+
+
+def login_help(exe, user):
+    """steamcmd had no saved login for this account. The app never handles passwords, so the user logs in once."""
+    return (f"steamcmd is not logged in as '{user}' yet. Log in once yourself: open a terminal and run "
+            f"\"{exe}\" +login {user} +quit, type your password and Steam Guard code there, then press Download again. "
+            "After that steamcmd remembers the login.")
+
+
 def content_dir(steamcmd, game):
     """Where steamcmd puts downloads: next to its executable."""
     return Path(steamcmd).resolve().parent / "steamapps" / "workshop" / "content" / game.app_id
@@ -155,6 +171,12 @@ class Downloads:
                 ok = r.returncode == 0 and "Success" in out and (Path(job["dir"]) / wid).is_dir()
                 it["state"] = "done" if ok else "failed"
                 it["message"] = "" if ok else (out.strip().splitlines() or ["steamcmd failed"])[-1][:200]
+                if not ok and _needs_login(out):   # every other item would fail the same way: stop and say what to do
+                    msg = login_help(exe, user)
+                    for rest in job["items"].values():
+                        if rest["state"] != "done":
+                            rest["state"], rest["message"] = "failed", msg
+                    break
             except (OSError, subprocess.SubprocessError) as e:
                 it["state"], it["message"] = "failed", str(e)[:200]
         job["state"] = "done" if all(i["state"] == "done" for i in job["items"].values()) else "failed"

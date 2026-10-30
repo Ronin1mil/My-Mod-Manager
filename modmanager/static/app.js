@@ -109,7 +109,9 @@ function pollDownload(id) {
     const job = (await api('downloads')).find(j => j.id === id), el = $('dlstat');
     if (!job) return;
     const items = Object.entries(job.items), done = items.filter(([, i]) => i.state === 'done').length;
-    if (el) el.innerHTML = `steamcmd: ${done}/${items.length} downloaded` + items.filter(([, i]) => i.state === 'failed').map(([k, i]) => `<div class="err">#${esc(k)}: ${esc(i.message)}</div>`).join('') +
+    const failed = new Map();   // one line per reason: a missing login fails every item the same way
+    items.filter(([, i]) => i.state === 'failed').forEach(([k, i]) => failed.set(i.message, [...(failed.get(i.message) || []), k]));
+    if (el) el.innerHTML = `steamcmd: ${done}/${items.length} downloaded` + [...failed].map(([msg, ks]) => `<div class="err">${ks.length > 3 ? `${ks.length} items` : ks.map(k => '#' + esc(k)).join(', ')}: ${esc(msg)}</div>`).join('') +
       (job.state === 'done' ? `<div class="ok">Done. Files are in <code>${esc(job.dir)}</code>${S.workshop_dir === job.dir ? '' : ' — add that folder as your Workshop folder in Settings so they are found.'}</div>` : '');
     if (job.state === 'queued' || job.state === 'running') pollDownload(id);
     else if (done) { await load(true); }

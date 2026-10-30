@@ -187,6 +187,18 @@ class Downloads(unittest.TestCase):
         self.assertEqual((done["state"], done["items"]["111"]["state"], done["items"]["222"]["state"]), ("failed", "failed", "done"))
         self.assertIn("failed", done["items"]["111"]["message"].lower())
 
+    def test_no_saved_login_stops_at_once_and_says_how_to_log_in(self):
+        out = "Logging in user 'acct' to Steam Public...\nCached credentials not found.\nFAILED (No Connection)\n"
+        run = mock.Mock(return_value=subprocess.CompletedProcess([], 5, stdout=out, stderr=""))
+        dl = workshop.Downloads(games.CK3, run)
+        done = self.wait(dl, dl.start(str(self.exe), "acct", ["111", "222", "333"])["id"])
+        self.assertEqual(run.call_count, 1, "the other items would fail the same way")
+        self.assertEqual({i["state"] for i in done["items"].values()}, {"failed"})
+        msg = done["items"]["333"]["message"]
+        self.assertIn("+login acct", msg)
+        self.assertIn("not logged in", msg)
+        self.assertNotIn("password=", msg.lower())
+
     def test_missing_binary_and_timeouts_become_item_failures(self):
         for exc in (OSError("cannot execute"), subprocess.TimeoutExpired("x", 1)):
             dl = workshop.Downloads(games.CK3, mock.Mock(side_effect=exc))
