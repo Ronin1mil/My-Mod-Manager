@@ -37,4 +37,5 @@ Filename: "{app}\Mod-Manager.exe"; Description: "Start Ronin Mod Manager"; Flags
 [UninstallDelete]
 ; leftovers of an in-app update (the previous version is kept as .old until the next start)
 Type: files; Name: "{app}\*.old"
+Type: files; Name: "{app}\*.old?"
 Type: files; Name: "{app}\*.new"
