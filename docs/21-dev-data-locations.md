@@ -19,6 +19,7 @@ Folder: `%APPDATA%\Ronin Mod Manager\` (that is `C:\Users\<you>\AppData\Roaming\
 |---|---|
 | `settings.json` | app-wide settings |
 | `custom_games.json` | games added with "Add a game (beta)" |
+| `parse-cache.json.gz` | what was read from mod files (definition names), so a restart does not read them all again; safe to delete |
 | `<game>\playsets.json` | playsets and per-game settings (folders, colour scheme, text size, favourites) |
 | `<game>\library.json` | the mod library: tags, sources, what is new or updated |
 | `<game>\backups\` | mods moved aside when uninstalled or upgraded |

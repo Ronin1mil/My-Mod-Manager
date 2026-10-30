@@ -121,11 +121,11 @@ async function analyse() {
   const keep = A && A.pid === id ? A : null;
   A = {...r, pid: id, conflicts: keep ? keep.conflicts : [], counts: keep ? keep.counts : {}, pending: true};
   render();
-  const c = await api('conflicts/' + id);                          // file/definition conflicts: slow, loaded behind
-  if (!S || id !== S.active || !A) return;
+  const c = await api('conflicts/' + id);                          // file/definition conflicts: slow the first time, then kept by the app
+  if (c.cancelled || !S || id !== S.active || !A) return;          // cancelled: a newer request replaced this scan
   Object.assign(A, c, {pending: false}); render();
 }
-let patchQ = Promise.resolve();
+let patchQ = Promise.resolve(), activateQ = Promise.resolve();
 // Changes to the playset run one after another, each building on the answer to the previous one: a quick second click
 // must add to the first click's result, not overwrite it. `fields` may be a function of the current playset.
 function patch(fields) {
@@ -631,7 +631,12 @@ document.addEventListener('click', guard(async e => {
   if (starPs) { const id = starPs.dataset.favps, ps = S.playsets.find(x => x.id === id); await api(`playsets/${id}/update`, {favorite: !(ps && ps.favorite)}); return load(); }
   if (starMod) { const id = starMod.dataset.favmod, on = !(S.fav_mods || []).includes(id); S.fav_mods = (await api('fav-mod', {id, on})).fav_mods; return render(); }
   const psRow = t.closest('[data-ps]');
-  if (psRow) { await api(`playsets/${psRow.dataset.ps}/activate`, {}); sel = null; return load(); }
+  if (psRow) {   // show the playset at once; the app is told in order, and the answers it already has come back from its memory
+    const id = psRow.dataset.ps; if (id === S.active) return;
+    S.active = id; sel = null; T = null; P = null; render();
+    activateQ = activateQ.then(() => api(`playsets/${id}/activate`, {}), () => api(`playsets/${id}/activate`, {}));
+    await activateQ; return analyse();
+  }
   if (ds.tab) { tab = ds.tab; render(); if (tab === 'compare') { C = null; render(); await loadCompare(); } if (tab === 'files') await loadFiles(); }
   if (ds.f) { flt = ds.f; render(); }
   if (ds.sel) { sel = sel === ds.sel ? null : ds.sel; render(); }
@@ -756,7 +761,9 @@ window.addEventListener('drop', e => {
   const f = e.dataTransfer && e.dataTransfer.files[0];
   if (f) { e.preventDefault(); install(f); }
 });
-window.addEventListener('focus', () => { if (S) api('rescan', {}).then(s => { S = s; render(); analyse(); }).catch(() => {}); });
+window.addEventListener('focus', () => { if (S) api('rescan', {light: true}).then(s => {   // only redraw when a mod was added, changed or removed
+  if (s.scan_gen === S.scan_gen) return;
+  S = s; render(); analyse(); }).catch(() => {}); });
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') { e.preventDefault(); $('new').click(); }
 });

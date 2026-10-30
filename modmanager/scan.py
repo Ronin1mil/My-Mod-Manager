@@ -312,20 +312,74 @@ def loc_keys(text):
     return out
 
 
-_parse_cache = {}
+class ScanCancelled(Exception):
+    """A newer request made the running conflict scan pointless."""
 
 
-def _cached(path, fn):
+_parse_cache = {}   # (path, parser name) -> (mtime_ns, size, frozenset of keys)
+_loaded = set()     # cache files already read into _parse_cache
+_new_entries = 0    # parses done since the cache was last loaded or saved
+CACHE_FORMAT = 1
+MAX_CACHE = 300_000
+
+
+def _cached(path, fn, trusted=None):
     """Memoize a per-file parse (as a frozenset, each key once) on (path, mtime, size) so re-analysis stays fast on
-    big mod lists. `path` is a string from list_files."""
-    st = os.stat(path)
-    key = (path, st.st_mtime_ns, st.st_size, fn.__name__)
+    big mod lists. `path` is a string from list_files. A path in `trusted` was checked since the mods were last read
+    from disk, so it is not stat-ed again (that is one system call per file, which dominates on Windows)."""
+    global _new_entries
+    key = (path, fn.__name__)
     hit = _parse_cache.get(key)
-    if hit is None:
-        if len(_parse_cache) > 300_000:
+    if hit is not None and trusted is not None and key in trusted:
+        return hit[2]
+    st = os.stat(path)
+    if hit is None or hit[0] != st.st_mtime_ns or hit[1] != st.st_size:
+        if len(_parse_cache) > MAX_CACHE:
             _parse_cache.clear()
-        hit = _parse_cache[key] = frozenset(fn(_read(path)))
-    return hit
+        hit = _parse_cache[key] = (st.st_mtime_ns, st.st_size, frozenset(fn(_read(path))))
+        _new_entries += 1
+    if trusted is not None:
+        trusted.add(key)
+    return hit[2]
+
+
+def cache_dirty():
+    return _new_entries > 0
+
+
+def save_cache(path):
+    """Write what was parsed to a gzip'd JSON file, so the next start does not read every mod file again."""
+    global _new_entries
+    import gzip
+    pending = _new_entries
+    rows = [[p, name, v[0], v[1], list(v[2])] for (p, name), v in list(_parse_cache.items())]
+    tmp = Path(str(path) + ".tmp")
+    with gzip.open(tmp, "wt", encoding="utf-8", compresslevel=3) as f:
+        json.dump({"format": CACHE_FORMAT, "entries": rows}, f, separators=(",", ":"))
+    os.replace(tmp, path)
+    _new_entries = max(0, _new_entries - pending)
+
+
+def load_cache(path):
+    """Read a file made by save_cache (once per file). Anything wrong with it just means a cold start."""
+    import gzip
+    if str(path) in _loaded:
+        return 0
+    _loaded.add(str(path))
+    n = 0
+    try:
+        with gzip.open(path, "rt", encoding="utf-8") as f:
+            doc = json.load(f)
+        if not isinstance(doc, dict) or doc.get("format") != CACHE_FORMAT:
+            return 0
+        for p, name, mtime, size, keys in doc["entries"]:
+            key = (p, name)
+            if name in ("top_level_keys", "loc_keys") and key not in _parse_cache:
+                _parse_cache[key] = (mtime, size, frozenset(tuple(k) for k in keys))
+                n += 1
+    except (OSError, ValueError, KeyError, TypeError, EOFError):
+        pass
+    return n
 
 
 def def_category(rel, def_dirs):
@@ -340,9 +394,11 @@ def def_category(rel, def_dirs):
     return None
 
 
-def find_conflicts(mods, order, files_cache=None, def_dirs=DEFAULT_DEF_DIRS, vanilla=None):
+def find_conflicts(mods, order, files_cache=None, def_dirs=DEFAULT_DEF_DIRS, vanilla=None, trusted=None, should_stop=None):
     """order: list of mod ids, first loads first (later wins). `vanilla` = (game folder, only-dirs)
     treats the base game as the first mod; results involving it carry `vanilla: True`.
+    `trusted` (a set) remembers which files were already checked for changes; `should_stop()` returning True between
+    two mods abandons the scan with ScanCancelled.
 
     Returns list of {kind, severity, path, mods:[ids in load order], winner}; definition conflicts also carry
     `files` {mod id: [file that defines the key]} so the UI can show which file each mod overrides it in.
@@ -354,12 +410,13 @@ def find_conflicts(mods, order, files_cache=None, def_dirs=DEFAULT_DEF_DIRS, van
     REPLACE: definitions are intentional overrides (info) unless the winner is a plain redefinition.
     """
     cache = files_cache if files_cache is not None else {}
+    parse = _cached if trusted is None else (lambda p, fn: _cached(p, fn, trusted))
     mods = dict(mods)
     order = list(order)
     if vanilla:
         mods[VANILLA] = {"exists": True, "root": str(vanilla[0]), "replace_path": [], "only": tuple(vanilla[1] or ())}
         order = [VANILLA] + order
-    seen_files, seen_defs, seen_patch, seen_loc = defaultdict(list), defaultdict(list), defaultdict(list), defaultdict(list)
+    seen_files, seen_defs, seen_patch, seen_loc = defaultdict(list), {}, defaultdict(list), defaultdict(list)
     replaced = []
     loaded = []  # (mid, files)
     van_files = {}
@@ -372,6 +429,8 @@ def find_conflicts(mods, order, files_cache=None, def_dirs=DEFAULT_DEF_DIRS, van
         return dir_cat[d]
 
     for mid in order:
+        if should_stop is not None and should_stop():
+            raise ScanCancelled()
         m = mods.get(mid)
         if not m or not m["exists"]:
             continue
@@ -399,28 +458,36 @@ def find_conflicts(mods, order, files_cache=None, def_dirs=DEFAULT_DEF_DIRS, van
             seen_files[rel].append(mid)
             cat = category(rel) if rel.endswith(".txt") else None
             if cat:
-                for k, mode in _cached(p, top_level_keys):
+                for k, mode in parse(p, top_level_keys):
                     if mode and "INJECT" in mode:
                         seen_patch[(cat, k)].append(mid)
-                    else:
-                        seen_defs[(cat, k)].append((mid, rel, mode))
+                    else:   # nearly every key is defined once: keep that as a bare tuple, a list only once a second one shows up
+                        kk = (cat, k)
+                        prev = seen_defs.get(kk)
+                        if prev is None:
+                            seen_defs[kk] = (mid, rel, mode)
+                        elif type(prev) is tuple:
+                            seen_defs[kk] = [prev, (mid, rel, mode)]
+                        else:
+                            prev.append((mid, rel, mode))
             elif "localization" in rel.split("/")[:2] and rel.endswith(".yml") and "/replace/" not in rel:
-                for lang, k in _cached(p, loc_keys):
+                for lang, k in parse(p, loc_keys):
                     seen_loc[(lang, k)].append((mid, rel))
     if van_files:
         wanted = {c for c, _ in seen_defs}
         for rel, p in van_files.items():
             cat = category(rel) if rel.endswith(".txt") else None
             if cat in wanted:
-                for k, mode in _cached(p, top_level_keys):
+                for k, mode in parse(p, top_level_keys):
                     if not (mode and "INJECT" in mode) and (cat, k) in seen_defs:
-                        seen_defs[(cat, k)].append((VANILLA, rel, mode))
+                        prev = seen_defs[(cat, k)]
+                        seen_defs[(cat, k)] = [prev, (VANILLA, rel, mode)] if type(prev) is tuple else prev + [(VANILLA, rel, mode)]
     out = []
     for rel, ids in sorted(seen_files.items()):
         if len(ids) > 1:
             out.append({"kind": "file", "severity": "warn", "path": rel, "mods": ids, "winner": ids[-1]})
     for (cat, k), entries in sorted(seen_defs.items()):
-        if len(entries) < 2:  # nearly every key: one mod defines it, nothing to compare
+        if type(entries) is tuple:  # nearly every key: one mod defines it, nothing to compare
             continue
         ids = {i for i, _, _ in entries}
         by_file = {}  # which mods define the key in which file (only built for the few keys that are shared)

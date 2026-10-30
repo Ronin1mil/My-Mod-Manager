@@ -29,6 +29,7 @@ CSP = ("default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline';
 
 
 MAX_TREE, MAX_RESULT = 5000, 30000
+RESULT_CACHE = 64   # conflict answers kept per game (one per load order recently looked at)
 
 
 class TooLarge(ValueError):
@@ -59,6 +60,12 @@ class GameApp:
         self.downloads = workshop.Downloads(game)
         self.lock = threading.RLock()
         self.mods, self.files, self.diff = {}, {}, {}
+        self.scan_gen = 0            # grows whenever the mods on disk changed: everything computed from them is then stale
+        self._results = {}           # conflict results by (load order, base game, scan_gen): switching playsets is a lookup
+        self._trusted = set()        # parsed files already checked for changes since the last disk read
+        self._scan_token = None      # the newest scan the user asked for; an older one stops
+        self._prewarm = None
+        self.prewarm_lock = None     # set by a Hub that wants the background pre-scan (the lock guarding app state)
         s = self.store.data["settings"]
         self.first_boot = not s.get("game_dir") and not game_dir and not s.get("setup_done")
         if self.first_boot and autodetect:
@@ -211,16 +218,73 @@ class GameApp:
         sets = launcherdb.read_playsets_json(self.user_dir)  # EU5's launcher keeps its playsets in a plain JSON file
         return (Path(self.user_dir) / "playsets.json", sets) if sets else None
 
-    def rescan(self):
+    def read_mods(self):
+        """Read the mod folders. Slow on a big mod list, and touches no app state, so callers need not hold the lock."""
         with perflog.timed(f"{self.game.id}: read mod folders") as t:
             if self.game.kind == "modules":
-                self.mods = scan.scan_modules(self.game_root, self.workshop_dir)
+                mods = scan.scan_modules(self.game_root, self.workshop_dir)
             else:
-                self.mods = scan.scan_mods(self.user_dir, self.workshop_dir)
-            t.note(mods=len(self.mods))
-        self.files = {}  # file listings are cached per mod root until the next rescan
+                mods = scan.scan_mods(self.user_dir, self.workshop_dir)
+            t.note(mods=len(mods))
+        return mods
+
+    def apply_mods(self, mods, light=False):
+        """Adopt a fresh mod list. Light (the window got focus): if nothing was added, changed or removed, everything
+        worked out so far stays valid, so coming back to the window costs nothing. A full rescan (the button, a new
+        path, an install) forgets the file listings too, so files edited inside a mod are seen."""
+        changed = mods != self.mods
+        self.mods = mods
+        if changed or not light:
+            self.files = {}
+            self._results = {}
+            self._trusted = set()
+            self.scan_gen += 1
         with perflog.timed(f"{self.game.id}: update library file", quiet=True):
             self.diff = self.library.merge(self.mods)
+        if changed or not light:
+            self.start_prewarm()
+        return changed
+
+    def rescan(self, light=False):
+        return self.apply_mods(self.read_mods(), light)
+
+    # ---- conflicts: kept per load order, worked out ahead of the click ----
+    def parse_cache_file(self):
+        return config_dir() / "parse-cache.json.gz"
+
+    def start_prewarm(self):
+        """Work out the conflicts of every playset in the background (only when a Hub asked for it), so a click on a
+        playset finds its answer ready. The first run after install is slow; its file parses are saved to disk, so
+        later starts only look for changes."""
+        if self.prewarm_lock is None or (self._prewarm and self._prewarm.is_alive()):
+            return
+        self._prewarm = threading.Thread(target=self._prewarm_run, daemon=True, name=f"prewarm-{self.game.id}")
+        self._prewarm.start()
+
+    def _prewarm_run(self):
+        try:
+            scan.load_cache(self.parse_cache_file())
+            for _ in range(30):   # a round per interruption: the user's own request always goes first
+                with self.prewarm_lock:
+                    gen, data = self.scan_gen, self.store.data
+                    ids = [data["active"]] + [p for p in data["playsets"] if p != data["active"]]
+                    jobs = [self.conflicts_job(p, background=True) for p in ids if p in data["playsets"]]
+                interrupted = False
+                for job in jobs:
+                    if self.scan_gen != gen:
+                        break
+                    if job().get("cancelled"):
+                        interrupted = True
+                        break
+                else:
+                    if self.scan_gen == gen:
+                        break
+                time.sleep(1.0 if interrupted else 0.1)
+            if scan.cache_dirty():
+                with perflog.timed(f"{self.game.id}: save parse cache", quiet=True):
+                    scan.save_cache(self.parse_cache_file())
+        except Exception as e:   # background help only: never take the app down
+            errorlog.write_exception("prewarm", e, self.game.id)
 
     def diagnose(self):
         """The 'Check this game' report (beta): what the app found, step by step, and what it was looking for, so a game
@@ -279,7 +343,7 @@ class GameApp:
             self.store.get(pid)
         s = self.store.settings()
         mods = [{**m, "change": self.library.change(m["id"])} for m in self.mods.values()]
-        return {"game": self.game.public(), "mods": mods, "removed": self.library.removed(), "tag_counts": self.library.tag_counts(), "diff": self.diff,
+        return {"game": self.game.public(), "mods": mods, "removed": self.library.removed(), "tag_counts": self.library.tag_counts(), "diff": self.diff, "scan_gen": self.scan_gen,
                 "playsets": list(d["playsets"].values()), "no_mods": self.store.no_mods(), "fav_mods": list(self.store.data.get("fav_mods", [])), "active": d["active"],
                 "user_dir": str(self.user_dir or ""), "workshop_dir": str(self.workshop_dir or ""),
                 "game_root": str(self.game_root or ""), "game_version": self.game_version,
@@ -301,30 +365,51 @@ class GameApp:
             out.update(self.conflicts_job(pid, res["order"])())
         return out
 
-    def conflicts_job(self, pid, ordr=None):
+    def conflicts_job(self, pid, ordr=None, background=False):
         """Snapshot what the scan needs (quick, done under the app lock) and return the slow part as a function
-        that can run without holding it, so switching games or editing a playset never waits for a scan."""
+        that can run without holding it, so switching games or editing a playset never waits for a scan.
+        An answer worked out before is returned as it was. A request from the user stops any older scan (so clicks
+        cannot pile up); the background pre-scan (`background=True`) is the one that gives way to the user."""
         if ordr is None:
             ps = self.store.get(pid)
             enabled = [m for m in ps["mods"] if m not in ps["disabled"]]
             ordr = order.compute_order(self.mods, enabled, ps["auto_sort"], self.game_version)["order"]
-        mods, files, defs = dict(self.mods), self.files, self.game.def_dirs
+        mods, files, defs, gen, trusted = dict(self.mods), self.files, self.game.def_dirs, self.scan_gen, self._trusted
         van = None
         if self.game_dir and self.game_dir.is_dir() and self.store.settings()["include_vanilla"]:
             van = (self.game_dir, self.game.vanilla_only)
+        key = (tuple(ordr), str(van[0]) if van else "", gen)
+        hit = self._results.get(key)
+        if hit is not None:
+            return lambda: hit
+        if background:
+            start = self._scan_token
+            stop = lambda: time.sleep(0.002) or self._scan_token is not start   # also yields, so the page stays quick
+        else:
+            token = self._scan_token = object()
+            stop = lambda: self._scan_token is not token
 
         def run():
             if not self.game.has_conflicts:  # Bannerlord modules do not share script folders: nothing meaningful to compare
                 return {"conflicts": [], "counts": {}, "truncated": False, "pending": False}
             with perflog.timed(f"{self.game.id}: conflict scan", mods=len(ordr), base_game=bool(van)) as t:
-                conflicts = scan.find_conflicts(mods, ordr, files, defs, van)
+                try:
+                    conflicts = scan.find_conflicts(mods, ordr, files, defs, van, trusted=trusted, should_stop=stop)
+                except scan.ScanCancelled:
+                    t.note(cancelled=True)
+                    return {"conflicts": [], "counts": {}, "truncated": False, "pending": True, "cancelled": True}
                 t.note(found=len(conflicts))
             counts = {}
             for c in conflicts:
                 k = "vanilla" if c.get("vanilla") else c["kind"]
                 counts[k] = counts.get(k, 0) + 1
             cap = scan.MAX_PER_KIND * 4
-            return {"conflicts": conflicts[:cap], "counts": counts, "truncated": len(conflicts) > cap, "pending": False}
+            res = {"conflicts": conflicts[:cap], "counts": counts, "truncated": len(conflicts) > cap, "pending": False}
+            if gen == self.scan_gen:   # the mods changed meanwhile: this answer is already out of date
+                if len(self._results) >= RESULT_CACHE:
+                    self._results.pop(next(iter(self._results)), None)
+                self._results[key] = res
+            return res
         return run
 
     def compare(self, a, b):
@@ -579,12 +664,13 @@ class SaveVersionWarning(Exception):
 class Hub:
     """All games plus app-wide state (settings, update check). Games are created on first use."""
 
-    def __init__(self, overrides=None, settings=None, gamelist=None, factory=None, custom=None):
+    def __init__(self, overrides=None, settings=None, gamelist=None, factory=None, custom=None, prewarm=False):
         # Games the user added (beta) are only read for a normal start; a Hub built around given games has none unless asked
         self.custom = custom or (customgames.CustomGames.default() if gamelist is None else customgames.CustomGames())
         self.games = {g.id: g for g in (gamelist or gamesmod.GAMES.values())}
         self.games.update({g.id: g for g in self.custom.games()})
         self.overrides = overrides or {}  # {game id: GameApp kwargs from the command line}
+        self.prewarm = prewarm            # work out every playset's conflicts in the background (the real app; not tests)
         self.settings = settings or GlobalSettings()
         self.apps = {}
         self.factory = factory or (lambda g, **kw: GameApp(g, **kw))
@@ -612,6 +698,9 @@ class Hub:
                 self.apps[game_id] = self.factory(self.games[game_id], fetch_logos=self.settings.get()["fetch_logos"] and os.environ.get("MODMANAGER_FETCH_LOGOS") != "0",
                                                   auto_import_launcher=self.settings.get()["auto_import_launcher"] and os.environ.get("MODMANAGER_AUTO_IMPORT") != "0",
                                                   **self.overrides.get(game_id, {}))
+                if self.prewarm:
+                    self.apps[game_id].prewarm_lock = self.lock
+                    self.apps[game_id].start_prewarm()
             return self.apps[game_id]
 
     def index(self):
@@ -652,7 +741,7 @@ class Hub:
         if confirm != "ERASE":
             raise ValueError("Type ERASE to confirm.")
         base = config_dir()
-        targets = [base / g for g in self.games] + [self.settings.path]
+        targets = [base / g for g in self.games] + [self.settings.path, base / "parse-cache.json.gz"]
         erased, failed = [], []
         with self.lock:
             self.apps.clear()  # GameApps are rebuilt (and rescan) on first use
@@ -827,6 +916,8 @@ def make_handler(hub):
             parts = self.path.strip("/").split("/")
             if parts[-1] in ("install", "update-check", "downloads", "import-collection", "mod-updates", "self-update"):
                 return self._post()  # slow network/disk work must not hold the lock
+            if len(parts) == 3 and parts[0] == "api" and parts[1] in hub.games and parts[2] == "rescan":
+                return self._rescan(parts[1])
             with hub.lock:
                 self._post()
 
@@ -886,6 +977,31 @@ def make_handler(hub):
             if name in STATIC_TYPES:  # fixed allow-list, never a path from the request
                 return self._send(200, (STATIC / name).read_bytes(), STATIC_TYPES[name])
             self._send(404, {"error": "not found"})
+
+        def _rescan(self, game_id):
+            """Read the mod folders without holding the lock (seconds on a big list), then adopt the result under it.
+            {"light": true} (window focus) keeps everything worked out so far when no mod changed."""
+            host = self.headers.get("Host", "")
+            origin = self.headers.get("Origin")
+            if not self._host_ok() or (origin and origin.split("//", 1)[-1] != host):
+                self._drain()
+                return self._send(403, {"error": "bad origin"})
+            try:
+                light = self._body().get("light") is True
+                with hub.lock:
+                    app = hub.app(game_id)
+                mods = app.read_mods()
+                with hub.lock:
+                    app.apply_mods(mods, light)
+                    return self._send(200, app.state())
+            except TooLarge as e:
+                self.close_connection = True
+                self._send(413, {"error": str(e)})
+            except ValueError as e:
+                self._send(400, {"error": str(e)})
+            except Exception as e:
+                errorlog.write_exception("server", e, f"POST {self.path.split('?')[0]}")
+                self._send(500, {"error": f"{type(e).__name__}: {e}", "log_file": str(errorlog.log_path())})
 
         def _post(self):
             # reject cross-site requests: only same-origin requests from our own page
@@ -1031,7 +1147,7 @@ def serve(port=8765, open_browser=True, overrides=None, initial_game=None, windo
     from . import window as windowmod
     perflog.log(f"=== {APP_NAME} {__version__}{' test build ' + BUILD if BUILD else ''} starting (pid {os.getpid()}, "
                 f"{'packaged' if selfupdate.frozen() else 'python edition' if selfupdate.pyz_path() else 'from source'}, port {port})")
-    hub = Hub(overrides=overrides)
+    hub = Hub(overrides=overrides, prewarm=os.environ.get("MODMANAGER_PREWARM") != "0")
     hub.check_on_launch()  # no-op unless the user enabled "check for updates on launch"
     srv = None
     for attempt in range(40):  # a freshly updated copy waits for the old one to release the port

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+**Switching between big playsets is fast**
+- Clicking a playset shows it at once. Before, every click walked and read every file of every mod again, and slow scans from earlier clicks piled up behind each other until the window seemed to ignore clicks
+- The answer for each playset's file/definition conflicts is kept: going back to a playset you already opened is instant
+- A click now stops an older scan nobody is waiting for, and the app works out the other playsets quietly in the background after start-up (the first start with a big mod list is the slow one; what it read is saved in `parse-cache.json.gz` in the app folder, so later starts only look for changes)
+- Coming back to the window no longer rescans everything: if no mod was added, changed or removed, nothing is redrawn or recomputed. The **Rescan** button still re-reads everything, including files edited inside a mod
+- The mod folders are read without holding up other clicks
+
 ## 0.9.0 - Python edition (no exe), add your own games (beta)
 **How to install (this release is the Python edition only)**
 
