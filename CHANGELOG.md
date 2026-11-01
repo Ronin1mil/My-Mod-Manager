@@ -1,6 +1,16 @@
 # Changelog
 
-## Unreleased
+## 0.9.14 - Crusader Kings III: changes reach the game at once
+A mod you add in the app now shows up in Crusader Kings III even when you start the game from Steam.
+
+**How to install (Python edition only, no exe)**
+- You need Windows 10 or 11, **Python 3.8 or newer** from python.org and Edge or Chrome. Nothing else
+- Download **`Mod-Manager-python.pyzw`** below and double-click it, or run `py Mod-Manager-python.pyzw`. Your playsets and settings are kept
+- Already on 0.9.x? Use **Check for updates** in the app: it updates itself
+
+**Confirmed on a real PC:** CK3 with the Divine Intervention Cheat Menu added in the app. Victoria 3, Europa Universalis V and Bannerlord still write their files at Play, as before.
+
+**What changed**
 
 - **Crusader Kings III: a change to the active playset now reaches the game at once, without pressing Play.** Starting CK3 from Steam opens the Paradox launcher, which writes its own active playset over `dlc_load.json` before the game starts, so a mod added only in this app (a cheat mod, for example) was missing in the game. After every change to the active playset (add, remove, reorder, switch on/off, sort, switch playset) the app writes `dlc_load.json` and also the launcher's own playset in `launcher-v2.sqlite`: the launcher playset with the same name gets the same mods in the same order and on/off state and becomes the active one (a new one is made when there is none of that name). Only while the Paradox launcher is closed (the status next to Play says so otherwise); the database is backed up once a day first (`launcher-v2.sqlite.ronin-backup-<date>`); a mod the launcher has never seen is listed as not known yet (the launcher finds it itself the next time it starts). Other games still write their files at Play
 
