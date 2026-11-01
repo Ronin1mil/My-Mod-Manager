@@ -5,7 +5,12 @@ Paradox games (CK3, EU5, VIC3) keep their own playsets in the game's user folder
 ## What is read
 `playsets` (name, active, removed), `playsets_mods` (which mods, enabled, position) and `mods` (Workshop id, Paradox mod id, descriptor name, folder, display name). The table and column names were read from the source of [Irony Mod Manager](https://github.com/bcssov/IronyModManager), which imports the same file; older launcher versions lack some columns, so each column is optional. **Not verified against a current launcher on a real PC**: if the Import menu reports an error, send the error log.
 
-The database is never opened in place: it (and its `-wal`/`-shm` side files) is copied to a temporary folder and read there, so the launcher and its playsets cannot be damaged and the launcher may stay open.
+Reading never opens the database in place: it (and its `-wal`/`-shm` side files) is copied to a temporary folder and read there, so the launcher and its playsets cannot be damaged and the launcher may stay open.
+
+## Writing back (Crusader Kings III only, since 0.9.14)
+Starting CK3 from Steam opens the Paradox launcher, which writes **its** active playset into `dlc_load.json` before the game starts, so a mod added only in this app was missing in the game. After every change to the active playset (add, remove, reorder, switch on/off, sort, switch playset) `launchersync.py` writes `dlc_load.json` and the launcher's database: the launcher playset with the same name gets the same mods in the same order and on/off state and becomes the active one (a new one is made when none has that name).
+
+Rules: never while the launcher is running (it keeps its own copy and would write it back; the status next to Play says so); the database is backed up once a day first (`launcher-v2.sqlite.ronin-backup-<date>`); a mod the launcher has never seen is listed as not known yet (it learns it at its next start). Other games still write their files at Play. The result is in `RoninModManager-ck3.log` as a `SYNC:` line.
 
 ## How a launcher mod becomes one of ours
 In this order: its Workshop id, its descriptor name (`mod/ugc_<id>.mod`, `mod/<name>.mod`), its folder, its display name. A Workshop mod that is not installed is kept in the playset as `ws:<id>` (shown as "not installed", downloadable like any preset mod). A mod that exists only on Paradox's own mod service (no Workshop id) cannot be matched and is reported in the result.

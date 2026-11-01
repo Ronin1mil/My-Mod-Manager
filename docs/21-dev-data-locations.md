@@ -32,12 +32,18 @@ Folder: `%APPDATA%\Ronin Mod Manager\` (that is `C:\Users\<you>\AppData\Roaming\
 ## The games' own files (read by the app; only the load file is written)
 | Game | Documents folder | Load file written by Play | Launcher data read for Import |
 |---|---|---|---|
-| Crusader Kings III | `Documents\Paradox Interactive\Crusader Kings III\` | `dlc_load.json` | `launcher-v2.sqlite` |
+| Crusader Kings III | `Documents\Paradox Interactive\Crusader Kings III\` | `dlc_load.json`, and after every change the launcher's playset in `launcher-v2.sqlite` (docs/16) | `launcher-v2.sqlite` |
 | Victoria 3 | `Documents\Paradox Interactive\Victoria 3\` | `content_load.json` (`enabledMods`, absolute paths) | `launcher-v2.sqlite` |
 | Europa Universalis V | `Documents\Paradox Interactive\Europa Universalis V\` | `dlc_load.json` (and the active playset in `playsets.json`, which is what EU5 really uses) | `playsets.json` |
 | Mount & Blade II: Bannerlord | `Documents\Mount and Blade II Bannerlord\` | none (modules go on the command line) | `Configs\LauncherData.xml` |
 
 Local mods: `<Documents folder>\mod\<mod>\` with a `mod\<mod>.mod` stub (Paradox games); Bannerlord modules: `<install>\Modules\<ModuleId>\`.
+
+## Shortcuts (Windows)
+| What | Where |
+|---|---|
+| Desktop icon | `Ronin Mod Manager.lnk` on the Desktop (asked once at first start; Settings > App & updates) |
+| Add to Steam | `<Steam>\userdata\<account>\config\shortcuts.vdf`, backed up next to it as `shortcuts.vdf.ronin-backup-<time>` |
 
 ## Steam
 | What | Where |

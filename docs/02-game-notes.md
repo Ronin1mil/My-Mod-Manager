@@ -22,7 +22,7 @@ Legend: **[known]** documented or confirmed by the working standalone managers' 
 | Steam app id | 1158310 |
 | Install marker | `game/common` |
 | Definition folders | `common/`, `events/` |
-| Load file | `<user dir>/dlc_load.json` = `{"enabled_mods": ["mod/Local.mod", "mod/ugc_123.mod"], "disabled_dlcs": []}` **[known]** by the previous standalone manager, **[verify]** it is honoured by the current game version and not overwritten by the launcher |
+| Load file | `<user dir>/dlc_load.json` = `{"enabled_mods": ["mod/Local.mod", "mod/ugc_123.mod"], "disabled_dlcs": []}` **[known]** by the previous standalone manager, **[confirmed]**. Starting from Steam opens the Paradox launcher, which writes its own active playset over this file, so the app also keeps the launcher's playset of the same name in step (docs/16) |
 | Workshop entries | need `mod/ugc_<id>.mod` (created if missing) |
 | Base game | the whole `game/` folder |
 

@@ -19,6 +19,8 @@
 | `selfupdate.py` | replace the running packaged app with a newer release (checksum-verified) |
 | `launcherdb.py` | read-only import of the game launcher's playsets |
 | `gamelog.py`, `errorlog.py`, `perflog.py` | the per-game log, the error log, the activity log (test builds) |
+| `launchersync.py` | CK3: write the active playset into the Paradox launcher's database after every change |
+| `shortcut.py`, `steamshortcut.py` | desktop icon, and listing the app in Steam as a non-Steam game (Windows) |
 | `bootworker.py` | worker processes that work out conflicts at start-up |
 | `window.py` | the app window (Edge/Chrome app mode, default browser fallback) |
 | `presets.py` | curated playsets: validate, load (built-in + yours), apply, save |

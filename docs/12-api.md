@@ -12,6 +12,7 @@ JSON over HTTP on `127.0.0.1` (default port 8765). Everything is same-origin onl
 | `POST /api/update-check` | `{force?}` -> release check result (cached 10 min) |
 | `POST /api/self-update` · `GET /api/self-update` | start the checksum-verified update · its progress |
 | `POST /api/full-rescan` | **Rescan**: start-up's work again for every game |
+| `POST /api/desktop-shortcut` · `POST /api/add-to-steam` | make the desktop icon (`{make: true}`) · add the app to Steam's non-Steam games (Steam closed) |
 | `POST /api/erase-all` | Settings -> Erase all data (needs the typed word) |
 | `POST /api/client-error` | the page reports a script error (goes to the error log) |
 

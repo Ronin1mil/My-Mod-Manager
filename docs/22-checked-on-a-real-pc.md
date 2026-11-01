@@ -19,6 +19,9 @@ What the four built-in games actually look like on a Windows 11 PC with all of t
 | Launcher database | `launcher-v2.sqlite` | none (`playsets.json` is the list) | `launcher-v2.sqlite` | `Configs\LauncherData.xml` **not present** |
 | `launcher\launcher-settings.json` | yes (`exePath ../binaries/ck3.exe`, `exeArgs -gdpr-compliant`) | **no `launcher` folder** | yes (`exePath ../binaries/victoria3.exe`) | n/a |
 
+## After this page was written
+0.9.14 (CK3): the Paradox launcher overwrote `dlc_load.json` when CK3 was started from Steam, so a mod added only in the app (Divine Intervention Cheat Menu) was missing; the app now also writes the launcher's playset (docs/16). Confirmed on a real PC.
+
 ## Victoria 3: the load file was written in the wrong format
 The app wrote `{"enabled_mods": ["mod/ugc_<id>.mod", ...]}` like CK3. The file the Paradox launcher writes is different:
 

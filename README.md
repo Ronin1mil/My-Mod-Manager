@@ -15,6 +15,8 @@ Later versions: press **Check for updates** in the app. It downloads the new fil
 
 There is no exe because Smart App Control blocks unsigned programs, so releases carry only this file. (Test builds still include an unsigned exe and installer for PCs that allow them.)
 
+**Start it from the desktop or from Steam.** The first start asks once whether to put a Ronin Mod Manager icon on the desktop. Settings → App & updates can also make it later, and has **Add to Steam** (Steam must be closed), which lists the app in your Steam library as a non-Steam game. Windows only.
+
 **From source** (any OS, also for development): `git clone`, or **Code → Download ZIP** and unzip. Then `python -m modmanager`, or double-click `Start Ronin Mod Manager.bat` (Windows) / `.command` (macOS/Linux).
 
 ## Use it in six steps
@@ -30,7 +32,7 @@ Right-click a playset for Open, Rename, Duplicate, Favourite, Settings and Delet
 ## Status: what is confirmed on a real PC
 | Game | Play | Notes |
 |---|---|---|
-| Crusader Kings III | **confirmed** | starts `ck3.exe` directly with the playset's mods |
+| Crusader Kings III | **confirmed** | starts `ck3.exe` directly with the playset's mods; every change to the active playset also reaches the Paradox launcher (see below) |
 | Europa Universalis V | **confirmed** | puts the mods into the game's own active playset (`playsets.json`) |
 | Victoria 3 | not yet | file format checked on a real PC; Play not yet tried |
 | Bannerlord | not yet | modules and dependencies checked on a real PC; Play not yet tried |
@@ -59,6 +61,8 @@ Your Windows user name is replaced by `<user>` in these files. Settings → Prob
 - **Import the launcher's playsets** ([docs/16](docs/16-launcher-import.md)).
 - **Presets** from Workshop collections ([docs/11](docs/11-presets-and-downloads.md)); **getting Workshop mods** via *Open in Steam* or optional `steamcmd` (no password is ever handled by the app).
 - **Install `.zip`/`.tar*` mods** by drag and drop (checked for unsafe contents); uninstall and upgrades keep the old version in a backup folder.
+- **CK3 changes reach the game at once**: starting CK3 from Steam opens the Paradox launcher, which writes its own active playset over the app's. So after every change to the active playset the app also writes it into the launcher's playset of the same name and makes that the launcher's active one (only while the launcher is closed; the database is backed up once a day first).
+- **Desktop icon and Add to Steam** (Windows): start the app from the desktop or your Steam library.
 - **Saves per playset**: a playset made now gets its own save folder, so the game's save list shows only that playset's saves.
 - **Add your own game** (beta, Stellaris and Imperator: Rome templates included, unchecked): [docs/20](docs/20-v0.9-plan.md).
 - **Updates** from this repository's Releases, and an optional test channel ([docs/19](docs/19-test-builds-and-releases.md)). Checks are manual unless you turn on "check when the manager starts".
@@ -76,7 +80,7 @@ Your Windows user name is replaced by `<user>` in these files. Settings → Prob
 More: [docs/02-game-notes.md](docs/02-game-notes.md), [docs/17-bannerlord.md](docs/17-bannerlord.md).
 
 ## Known limits
-- The official launcher keeps its own playsets in `launcher-v2.sqlite`; this tool never edits it. Start the game from this tool so its load order is used.
+- The official launcher keeps its own playsets in `launcher-v2.sqlite`. Only Crusader Kings III's is written, and only while the launcher is closed (a daily backup is kept); for Victoria 3 it is read-only. Start the game from this tool so its load order is used.
 - Mods install from `.zip` and `.tar*` archives; `.7z` and `.rar` are not supported.
 - Definition scanning covers top-level keys in the game's script folders; it does not model per-database merge rules.
 - Saves per playset are confirmed for CK3 only.
