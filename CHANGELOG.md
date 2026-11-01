@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Crusader Kings III: a change to the active playset now reaches the game at once, without pressing Play.** Starting CK3 from Steam opens the Paradox launcher, which writes its own active playset over `dlc_load.json` before the game starts, so a mod added only in this app (a cheat mod, for example) was missing in the game. After every change to the active playset (add, remove, reorder, switch on/off, sort, switch playset) the app writes `dlc_load.json` and also the launcher's own playset in `launcher-v2.sqlite`: the launcher playset with the same name gets the same mods in the same order and on/off state and becomes the active one (a new one is made when there is none of that name). Only while the Paradox launcher is closed (the status next to Play says so otherwise); the database is backed up once a day first (`launcher-v2.sqlite.ronin-backup-<date>`); a mod the launcher has never seen is listed as not known yet (the launcher finds it itself the next time it starts). Other games still write their files at Play
+
 ## 0.9.13 - Desktop icon and Add to Steam
 Start Ronin Mod Manager from a desktop icon or from your Steam library.
 

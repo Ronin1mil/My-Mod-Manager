@@ -141,6 +141,16 @@ function pollUpdate() {
   polls++;
   setTimeout(guard(async () => { const st = await app('games'); GI.update = st.update; GI.update_pending = st.update_pending; GI.settings = st.settings; banner(); pollUpdate(); }), 1000);
 }
+// CK3: every change to the active playset goes straight into the game's files and the Paradox launcher's playset
+function syncNote() {
+  const g = A && A.game_sync; if (!g) return '';   // null for games that are only written at Play
+  const miss = g.missing && g.missing.length ? ` <span class="warn" title="${esc(g.missing.join(', '))}">(${g.missing.length} not in the Paradox launcher yet: start it once so it finds them)</span>` : '';
+  if (g.status === 'synced') return ` · <span class="ok" title="Written to dlc_load.json and to the Paradox launcher's playset &quot;${esc(g.playset)}&quot;, now its active one">✓ ${esc(GNAME())} and its launcher have this playset</span>` + miss;
+  if (g.status === 'launcher_open') return ` · <span class="warn" title="The Paradox launcher keeps its own copy of its playsets while it runs">Close the Paradox launcher, then change something here: it still has its old playset</span>`;
+  if (g.status === 'no_db') return ` · <span class="ok" title="No Paradox launcher database was found; the game reads dlc_load.json">✓ written to dlc_load.json</span>`;
+  if (g.status === 'error') return ` · <span class="err" title="${esc(g.message || '')}">Could not update the game's playset (Play still works)</span>`;
+  return '';
+}
 async function analyse() {
   const id = S.active, r = await api('analyse/' + id + '?fast=1');   // load-order problems: quick
   if (!S || id !== S.active) return;
@@ -207,7 +217,7 @@ function render() {
     .map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('');
   const active = p.mods.length - p.disabled.length;
   $('status').innerHTML = `${esc(GNAME())}${S.game_version ? ` ${esc(S.game_version)}` : ''} · ${active} mod${active === 1 ? '' : 's'} active` +
-    (errs ? ` · <span class="err">${errs} error${errs === 1 ? '' : 's'}</span>` : A && nIss ? ` · <span class="warn">${nIss} warning${nIss === 1 ? '' : 's'}</span>` : '');
+    (errs ? ` · <span class="err">${errs} error${errs === 1 ? '' : 's'}</span>` : A && nIss ? ` · <span class="warn">${nIss} warning${nIss === 1 ? '' : 's'}</span>` : '') + syncNote();
   ({order: viewOrder, library: viewLibrary, problems: viewProblems, conflicts: viewConflicts, compare: viewCompare, presets: viewPresets, files: viewFiles})[tab](p);
   drawer();
 }

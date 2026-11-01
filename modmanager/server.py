@@ -17,10 +17,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from . import APP_NAME, BUILD, __version__, collections, compare, detect, games as gamesmod, install, launch, order, presets, saves, scan, update, updates
-from . import bootworker, customgames, errorlog, gamelog, launcherdb, perflog, selfupdate, shortcut, steamshortcut, workshop
+from . import bootworker, customgames, errorlog, gamelog, launcherdb, launchersync, perflog, selfupdate, shortcut, steamshortcut, workshop
 from .library import Library
 from .paths import LOGO_TYPES, config_dir, fetch_best_logo, find_first, find_logo, game_version, launcher_exe, user_dirs, workshop_dirs
-from .store import GlobalSettings, Store, write_load_file
+from .store import GlobalSettings, Store, mod_entry, write_load_file
 
 STATIC = Path(__file__).parent / "static"
 STATIC_TYPES = {"index.html": "text/html; charset=utf-8", "app.js": "text/javascript; charset=utf-8",
@@ -32,6 +32,8 @@ CSP = ("default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline';
 
 
 MAX_TREE, MAX_RESULT = 5000, 30000
+LIVE_SYNC = ("ck3",)   # games whose own files follow every change to the active playset (others: at Play)
+SYNC_ACTIONS = ("update", "activate", "autosort", "enable", "enable_all", "disable_all", "prune", "delete")
 RESULT_CACHE = 64   # conflict answers kept per game (one per load order recently looked at)
 
 
@@ -62,6 +64,8 @@ class GameApp:
         self.opener = opener  # tests inject a fake "open this URL" (Steam)
         self.downloads = workshop.Downloads(game)
         self.lock = threading.RLock()
+        self.live_sync = game.id in LIVE_SYNC
+        self.last_sync = None        # what sync_game did last (shown next to Play)
         self.state_lock = None       # set by a Hub: the lock its requests hold (background work that changes state takes it)
         self.mods, self.files, self.diff = {}, {}, {}
         self.scan_gen = 0            # grows whenever the mods on disk changed: everything computed from them is then stale
@@ -270,6 +274,31 @@ class GameApp:
     def rescan(self, light=False):
         return self.apply_mods(self.read_mods(), light)
 
+    def sync_game(self):
+        """CK3: right after a change to the playsets, the game gets the app's active playset without pressing Play.
+        dlc_load.json is written (a game started directly reads it), and the Paradox launcher's database gets a playset
+        of the same name with the same mods, made its active one (starting from Steam goes through the launcher, which
+        writes its own active playset over dlc_load.json). Never raises; the result is shown next to Play."""
+        if not self.live_sync or not self.user_dir:
+            return None
+        pid = self.store.data["active"]
+        res = {"at": int(time.time()), "playset": ""}
+        try:
+            ps = self.store.get(pid)
+            res["playset"] = ps["name"]
+            ids, _ = self._chosen(pid, None)
+            write_load_file(self.game, self.user_dir, self.mods, ids, ps["name"])
+            off = [m for m in ps["mods"] if m in ps["disabled"]]
+            res.update(launchersync.sync(self.user_dir, ps["name"], ids, off, self.mods, lambda m: mod_entry(self.game, m)))
+        except Exception as e:   # the app keeps working; Play still writes the files
+            res.update(status="error", message=f"{type(e).__name__}: {e}")
+            errorlog.write_exception("game sync", e, self.game.id)
+        gamelog.log(self.game.id, f"SYNC: playset {res['playset']!r} -> {res.get('status')}" +
+                    (f", not known to the launcher yet: {', '.join(res['missing'])}" if res.get("missing") else "") +
+                    (f" ({res['message']})" if res.get("message") else ""))
+        self.last_sync = res
+        return res
+
     def redetect(self):
         """Part of the full Rescan: folders in Settings that are gone are forgotten and looked for again (the game install
         on every Steam library of every drive, the user and Workshop folders next to it), the mods are read again, and
@@ -451,7 +480,7 @@ class GameApp:
             res = order.compute_order(self.mods, enabled, ps["auto_sort"], self.game_version)
             t.note(mods=len(enabled))
         out = {"issues": res["issues"], "notes": res["notes"], "conflicts": [], "counts": {}, "truncated": False,
-               "pending": not conflicts}
+               "pending": not conflicts, "game_sync": self.last_sync}
         if conflicts:
             out.update(self.conflicts_job(pid, res["order"])())
         return out
@@ -1021,6 +1050,9 @@ def make_handler(hub):
             pass
 
         def _send(self, code, body, ctype="application/json", headers=()):
+            app, self._sync_app = getattr(self, "_sync_app", None), None
+            if app is not None and code < 400:
+                app.sync_game()   # before the answer, so the page's next request already sees the result
             self._status = code
             try:
                 self._send_now(code, body, ctype, headers)
@@ -1267,8 +1299,11 @@ def make_handler(hub):
             if not self._host_ok() or (origin and origin.split("//", 1)[-1] != host):
                 self._drain()
                 return self._send(403, {"error": "bad origin"})
+            self._sync_app = None
             try:
                 parts, app = self._route()
+                if app is not None and app.live_sync and len(parts) == 4 and parts[:2] == ["api", "playsets"] and parts[3] in SYNC_ACTIONS:
+                    self._sync_app = app   # just before the answer goes out: the game's own files get the change (see GameApp.sync_game)
                 if app is None:  # app-wide routes
                     if parts == ["api", "self-update"]:
                         ch = self._body().get("channel", "stable")
