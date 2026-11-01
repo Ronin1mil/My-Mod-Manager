@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Add to Steam** (Settings > App & updates, Windows): puts Ronin Mod Manager in your Steam library as a non-Steam game, with its icon, so it starts from Steam. Only while Steam is closed (Steam rewrites that list when it exits); your other non-Steam games are kept exactly, the old list is backed up next to it as `shortcuts.vdf.ronin-backup-<time>`, and pressing it again updates the entry instead of adding a second one. It goes to the Steam account that logs in automatically (or logged in last)
 - **Desktop icon.** At the first start (Windows) the app asks once whether to put a Ronin Mod Manager icon on the desktop; Settings > App & updates can make it later. It starts this copy of the app: the installed exe, the `.pyzw` file with `pythonw`, or a source folder with `pythonw -m modmanager` (no console window), with the app's own icon. Windows writes the shortcut itself; nothing is asked again after either answer
 
 ## 0.9.12 - Saves per playset, faster start-up, Rescan, steamcmd for Bannerlord, Steam rate limits

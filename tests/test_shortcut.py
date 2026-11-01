@@ -73,7 +73,7 @@ class Asked(unittest.TestCase):
     def test_the_page_learns_whether_to_ask(self):
         info = self.hub.index()
         self.assertFalse(info["settings"]["shortcut_asked"])
-        self.assertEqual(set(info["shortcut"]), {"supported", "exists", "path"})
+        self.assertEqual(set(info["shortcut"]), {"supported", "exists", "path", "steam"})
 
     def test_no_thanks_is_remembered_and_makes_nothing(self):
         with mock.patch.object(shortcut, "create", side_effect=AssertionError("made one")):

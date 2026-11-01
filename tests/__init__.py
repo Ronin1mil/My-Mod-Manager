@@ -33,3 +33,9 @@ _workshop.find_steamcmd = lambda: None
 
 # The desktop shortcut goes to a throwaway "desktop", never the real one.
 os.environ["MODMANAGER_DESKTOP_DIR"] = os.path.join(_cfg, "Desktop")
+
+# Nor may a test read or change the real Steam's list of non-Steam games.
+from modmanager import steamshortcut as _steamshortcut  # noqa: E402
+
+REAL_STEAM_ROOT = _steamshortcut.steam_root
+_steamshortcut.steam_root = lambda: None

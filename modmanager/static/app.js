@@ -515,6 +515,12 @@ async function openPaths(first) {
         <p class="desc">${GI.shortcut.exists ? 'There is a Ronin Mod Manager icon on your desktop.' : 'No Ronin Mod Manager icon on your desktop yet.'} Making it again points it at this copy of the app.</p>
         <div class="acts"><button id="s-shortcut">${GI.shortcut.exists ? 'Make it again' : 'Make desktop icon'}</button></div>
       </div>` : ''}
+      ${GI.shortcut && GI.shortcut.steam && GI.shortcut.steam.available ? `<div class="card">
+        <h3>Steam library</h3>
+        <p class="desc">${GI.shortcut.steam.added ? 'Ronin Mod Manager is in your Steam library as a non-Steam game.' : 'Add Ronin Mod Manager to your Steam library as a non-Steam game, so you can start it from Steam.'}
+          <b>Close Steam first</b> (Steam &gt; Exit): Steam rewrites that list when it exits. Your other non-Steam games are kept, and the old list is backed up next to it.</p>
+        <div class="acts"><button id="s-steam">${GI.shortcut.steam.added ? 'Update it in Steam' : 'Add to Steam'}</button></div>
+      </div>` : ''}
       <div class="card">
         <h3>Updates</h3>
         <p class="desc">${GI.can_self_update ? 'This is the downloaded app. When a newer version exists, update from the banner at the top. Your playsets and settings are kept.' : 'This copy runs from source files, so it cannot replace itself. Update it with Git or download the ZIP again. The downloadable app from the Releases page updates itself.'}</p>
@@ -545,6 +551,11 @@ async function openPaths(first) {
     </div>
     </div>
     <div class="st-foot"><span class="mut">Changes on this window are applied when you press Save.</span><span><button id="p-cancel">${first ? 'Skip' : 'Cancel'}</button> <button id="p-save" class="pri">Save</button></span></div>`;
+  if ($('s-steam')) $('s-steam').onclick = guard(async () => {
+    const r = await app('add-to-steam', {}); GI.shortcut = r.shortcut;
+    toast(r.updated ? 'Updated Ronin Mod Manager in your Steam library. Start Steam to see it.' : 'Added Ronin Mod Manager to your Steam library. Start Steam to see it.');
+    $('s-steam').textContent = 'Update it in Steam';
+  });
   if ($('s-shortcut')) $('s-shortcut').onclick = guard(async () => {
     GI.shortcut = await app('desktop-shortcut', {make: true}); GI.settings.shortcut_asked = true;
     toast('Made "Ronin Mod Manager" on your desktop.'); $('s-shortcut').textContent = 'Make it again';

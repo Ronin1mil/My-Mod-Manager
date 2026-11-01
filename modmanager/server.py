@@ -17,7 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from . import APP_NAME, BUILD, __version__, collections, compare, detect, games as gamesmod, install, launch, order, presets, saves, scan, update, updates
-from . import bootworker, customgames, errorlog, gamelog, launcherdb, perflog, selfupdate, shortcut, workshop
+from . import bootworker, customgames, errorlog, gamelog, launcherdb, perflog, selfupdate, shortcut, steamshortcut, workshop
 from .library import Library
 from .paths import LOGO_TYPES, config_dir, fetch_best_logo, find_first, find_logo, game_version, launcher_exe, user_dirs, workshop_dirs
 from .store import GlobalSettings, Store, write_load_file
@@ -911,7 +911,8 @@ class Hub:
                 "update_pending": self.update_pending, "shortcut": self.shortcut_info()}
 
     def shortcut_info(self):
-        return {"supported": shortcut.supported(), "exists": shortcut.supported() and shortcut.exists(), "path": str(shortcut.path())}
+        return {"supported": shortcut.supported(), "exists": shortcut.supported() and shortcut.exists(), "path": str(shortcut.path()),
+                "steam": steamshortcut.status() if shortcut.supported() else {"available": False, "added": False}}
 
     def desktop_shortcut(self, make):
         """The start-up question's answer (or the Settings button): make the shortcut or not; either way it is not asked again."""
@@ -1288,6 +1289,8 @@ def make_handler(hub):
                         return self._send(200, hub.remove_custom_game(b.get("id"), b.get("erase_data") is True))
                     if parts == ["api", "desktop-shortcut"]:
                         return self._send(200, hub.desktop_shortcut(self._body().get("make") is True))
+                    if parts == ["api", "add-to-steam"]:
+                        return self._send(200, {**steamshortcut.add(config_dir()), "shortcut": hub.shortcut_info()})
                     if parts == ["api", "full-rescan"]:
                         return self._send(200, full_rescan(hub, lambda t: perflog.log("rescan: " + t)))
                     if parts == ["api", "erase-all"]:
