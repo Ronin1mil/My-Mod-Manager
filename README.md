@@ -11,7 +11,7 @@ Python standard library only (3.8+), no exe: it runs a small local server and sh
 2. Download **`Mod-Manager-python.pyzw`** from the [Releases page](../../releases) and double-click it (or run `py Mod-Manager-python.pyzw` in PowerShell to see what it is doing).
 3. The app window opens. Pick your game in the sidebar. The first time, a setup dialog finds the install (every Steam library, any drive) and asks you to confirm it.
 
-Later versions: press **Check for updates** in the app. It downloads the new file, checks its SHA-256 against the release's `SHA256SUMS.txt`, replaces itself and restarts. Your playsets and settings are kept.
+Later versions: press **Tools ▾ > Check for updates** in the app. It downloads the new file, checks its SHA-256 against the release's `SHA256SUMS.txt`, replaces itself and restarts. Your playsets and settings are kept.
 
 There is no exe because Smart App Control blocks unsigned programs, so releases carry only this file. (Test builds still include an unsigned exe and installer for PCs that allow them.)
 

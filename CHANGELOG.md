@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.1 - Check for updates is one click away
+**Tools > Check for updates** asks GitHub for the newest release right from the main window. If one exists it asks, downloads `Mod-Manager-python.pyzw`, verifies its checksum, replaces itself and restarts. Your playsets and settings are kept. The same check in Settings > App & updates and the banner still work.
+
 ## 1.0.0 - Pictures, a loading screen and a calmer window
 Every mod now shows its own picture, switching games has a proper loading screen, and the header keeps to the buttons you use all the time.
 

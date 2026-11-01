@@ -152,6 +152,25 @@ try {
   await page.reload();
   await page.waitForSelector('#banner:not([hidden])');  // a newer version shows again
 
+  // ---- Tools > Check for updates: says "up to date", or offers the newest version and asks the app to install it
+  {
+    const p3 = await browser.newPage({ viewport: { width: 1000, height: 700 } });
+    p3.on('dialog', d => d.accept());
+    let reply = { status: 'current', message: 'You are up to date (1.0.0).', update_available: false };
+    await p3.route('**/api/update-check', r => r.fulfill({ json: reply }));
+    await p3.route('**/api/games', async route => { const r = await route.fetch(); const j = await r.json(); j.can_self_update = true; await route.fulfill({ json: j }); });
+    let posted = null;
+    await p3.route('**/api/self-update', r => { if (r.request().method() === 'POST') posted = r.request().postDataJSON(); return r.abort(); });
+    await p3.goto(`${base}/#vic3`); await p3.waitForSelector('#view .row, #view .empty');
+    await p3.click('#toolsbtn'); await p3.click('#updbtn');
+    await p3.waitForFunction(() => /up to date/.test(document.getElementById('toast').textContent));
+    reply = { status: 'update', message: 'Version 9.9.9 is available.', update_available: true, latest: '9.9.9', current: '1.0.0', url: 'https://github.com/Ronin1mil/My-Mod-Manager/releases/tag/v9.9.9' };
+    await p3.click('#toolsbtn'); await p3.click('#updbtn');
+    await p3.waitForFunction(() => true); await p3.waitForTimeout(500);
+    assert.deepEqual(posted, { channel: 'stable' }, 'the stable channel is asked to install');
+    await p3.close();
+  }
+
   // ---- an update leaves exactly one window: the old app window waits for the new copy to be ready, then closes itself
   {
     const p2 = await browser.newPage({ viewport: { width: 1000, height: 700 } });

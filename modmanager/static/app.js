@@ -846,6 +846,18 @@ $('fullscan').onclick = guard(async () => {
     toast(`Rescan done in ${r.seconds} s. ` + lines.join(' · '));
   } finally { b.disabled = false; b.textContent = 'Rescan'; }
 });
+// Tools > Check for updates: the same check as Settings, but one click away; installs the newest release after a yes
+$('updbtn').onclick = guard(async () => {
+  const b = $('updbtn'); if (b.disabled) return;
+  b.disabled = true; tools(false); toast('Checking for a newer version…');
+  try {
+    const u = await app('update-check', {force: true});
+    GI.update = u; banner();
+    if (u.status !== 'update') return toast(u.message || 'You are up to date.');
+    if (!GI.can_self_update) return toast(`Version ${u.latest} is out. This copy runs from source files, so it cannot replace itself: see Settings > App & updates.`);
+    await selfUpdate(undefined, true, u.build ? 'nightly' : 'stable');
+  } finally { b.disabled = false; }
+});
 $('new').onclick = guard(async () => {
   const n = prompt('Playset name'); if (!n) return;
   const r = await api('playsets', {name: n}); await api(`playsets/${r.id}/activate`, {}); load();
