@@ -147,3 +147,64 @@ button.star{background:none;border:0;padding:0 4px;font-size:16px;line-height:1;
 .dl-ways{font-size:12px;margin-top:8px}
 #ratelimit{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:900;background:var(--panel);border:1px solid var(--warn);color:var(--ink);border-radius:var(--r);padding:8px 14px;box-shadow:0 6px 20px rgba(0,0,0,.4);max-width:min(560px,92vw)}
 .ratelimit{margin:6px 0}.ratelimit button{margin-left:6px}
+
+/* ---- 1.0 look: pictures, loading screens, calmer header ---- */
+:root{--shadow:0 6px 18px rgba(0,0,0,.35);--ease:cubic-bezier(.2,.7,.2,1)}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+button{transition:border-color .15s,background .15s,transform .1s}button:active:not(:disabled){transform:translateY(1px)}
+.row{transition:border-color .15s,background .15s}.row:hover{border-color:color-mix(in srgb,var(--acc) 45%,var(--line))}
+#center{position:relative}
+#top{padding:14px 20px;gap:10px;background:linear-gradient(var(--side),transparent)}
+h1{font-size:22px}
+
+/* Tools menu: Refresh and Rescan live here so the header keeps to what you use all the time */
+.menuwrap{position:relative}
+.menu{position:absolute;right:0;top:calc(100% + 6px);min-width:260px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px;box-shadow:var(--shadow);z-index:8;display:flex;flex-direction:column;gap:2px}
+.menu[hidden]{display:none}
+.menu button{border:0;background:none;text-align:left;padding:8px 10px;border-radius:7px;display:flex;flex-direction:column}
+.menu button:hover:not(:disabled){background:var(--bg)}.menu small{color:var(--mut);font-size:12px}
+
+/* A mod's picture, or a coloured tile with its initials */
+.th{position:relative;flex:none;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;border-radius:6px;cursor:pointer;
+  background:linear-gradient(135deg,hsl(var(--h) 45% 30%),hsl(calc(var(--h) + 40) 50% 18%));color:hsl(var(--h) 70% 85%)}
+.th b{font:700 .9em var(--serif);letter-spacing:.04em;opacity:.85}
+.th img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .35s var(--ease)}.th img.ok{opacity:1}
+.th.sm{width:56px;height:32px;font-size:12px}.th.md{width:112px;height:63px;font-size:18px;box-shadow:var(--shadow)}
+.th.cover{width:100%;aspect-ratio:16/9;border-radius:0;font-size:30px}.th.xl{width:100%;aspect-ratio:16/9;font-size:40px;border-radius:10px}
+.d-img{margin:0 0 12px}
+
+/* The strip of the active mods above the load order */
+.hero{margin:0 0 14px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:linear-gradient(135deg,var(--panel),var(--side))}
+.hero-t{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}.hero-t b{font:600 15px var(--serif);color:var(--acc)}
+.hero-strip{display:flex;gap:8px;overflow:hidden;align-items:center}
+.hero-strip .th{animation:rise .55s var(--ease) both;animation-delay:calc(var(--i) * 45ms)}
+.hero-strip .more{flex:none;color:var(--mut);padding:0 10px;font-size:15px}
+@keyframes rise{from{opacity:0;transform:translateY(14px) scale(.96)}to{opacity:1;transform:none}}
+
+/* Library as pictures */
+.mcs{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;margin:8px 0 18px}
+.mc{position:relative;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;background:var(--panel);overflow:hidden;transition:transform .15s var(--ease),border-color .15s,box-shadow .15s}
+.mc:hover{transform:translateY(-3px);border-color:var(--acc);box-shadow:var(--shadow)}.mc.sel{border-color:var(--acc)}
+.mc .star{position:absolute;top:6px;right:6px;background:rgba(0,0,0,.55);border-color:transparent;border-radius:50%;width:28px;height:28px;padding:0;line-height:1}
+.mc-b{display:flex;flex-direction:column;gap:6px;padding:10px 12px 12px;flex:1}
+.mc-b .nm{white-space:normal;font-weight:600;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.mc-m{display:flex;gap:4px;flex-wrap:wrap}.mc-f{display:flex;justify-content:space-between;align-items:center;margin-top:auto;font-size:12px}
+
+/* Loading screens */
+#boot{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;pointer-events:none;
+  background:radial-gradient(circle at 50% 38%,color-mix(in srgb,var(--p3) 55%,var(--bg)),var(--bg) 70%);transition:opacity .45s var(--ease)}
+#boot.gone{opacity:0}
+.boot-in{display:flex;flex-direction:column;align-items:center;gap:14px;width:min(440px,86vw);text-align:center}.boot-in .boot-bar{width:min(320px,100%)}
+.boot-name{font:600 26px var(--serif);letter-spacing:.12em;text-transform:uppercase;color:var(--ink)}
+.boot-mark{display:flex;gap:6px}.boot-mark i{width:16px;height:40px;border-radius:4px;background:var(--acc);animation:bar 1s ease-in-out infinite}
+.boot-mark i:nth-child(2){animation-delay:.15s;background:var(--p2)}.boot-mark i:nth-child(3){animation-delay:.3s;background:var(--p1)}
+@keyframes bar{0%,100%{transform:scaleY(.45);opacity:.6}50%{transform:scaleY(1);opacity:1}}
+.boot-bar{width:100%;height:4px;border-radius:2px;background:var(--line);overflow:hidden}
+.boot-bar i{display:block;height:100%;width:40%;border-radius:2px;background:linear-gradient(90deg,transparent,var(--acc),transparent);animation:slide 1.1s ease-in-out infinite}
+@keyframes slide{from{transform:translateX(-110%)}to{transform:translateX(280%)}}
+.boot-msg{color:var(--mut);font-size:13px;min-height:1.4em}
+#busy{position:absolute;inset:0;z-index:6;display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:opacity .18s;
+  background:var(--bg)}
+#busy.on{opacity:1}
+#busylogo img{max-width:260px;max-height:110px;object-fit:contain;filter:drop-shadow(0 4px 12px rgba(0,0,0,.6))}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}

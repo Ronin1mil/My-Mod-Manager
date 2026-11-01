@@ -26,6 +26,7 @@ JSON over HTTP on `127.0.0.1` (default port 8765). Everything is same-origin onl
 | `GET presets` · `POST presets/<id>/apply` | list presets with installed counts · create a playset -> `{id, missing, status}` |
 | `GET downloads` · `POST downloads` | steamcmd jobs · `{ids, method: "steam"\|"steamcmd"}` |
 | `GET detect` · `GET inspect?path=` | installs found on this PC · validate a pasted path |
+| `GET thumb/<mod id>` | the mod's own picture (png/jpg/webp/gif, 3 MB cap, links not followed); `204` when it has none; cached 5 min (ETag) |
 | `GET logo` | the user's own logo image, 404 if none |
 | `POST paths` | `{game_dir?, user_dir?, workshop_dir?, include_vanilla?, steamcmd?, steam_user?}` (validated; sets `setup_done`) |
 | `POST skip-setup` · `POST rescan` | remember "skip" · rescan mods (body `{"light": true}`, sent when the window gets focus: keeps everything already worked out if no mod changed; `state.scan_gen` grows whenever the mods changed) |

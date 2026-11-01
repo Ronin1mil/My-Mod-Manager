@@ -56,6 +56,7 @@ try {
   await page.waitForFunction(() => !document.getElementById('dlg').open);
   await page.selectOption('#game', 'ck3');
   await page.waitForFunction(() => document.title.startsWith('Crusader'));
+  await page.waitForFunction(() => getComputedStyle(document.documentElement).getPropertyValue('--acc').trim() === '#8fd08a');   // the player's colours are applied once the game's state has arrived
   assert.equal(await css('--acc'), '#8fd08a');
 
   // back to the game's own look

@@ -50,7 +50,7 @@ try {
   await page.waitForFunction(() => !document.getElementById('dlg').open);
   await page.waitForSelector('#view .row');
   const rows = () => page.locator('#view .row .nm').allTextContents();
-  const refresh = async () => { await page.click('#rescan'); await page.waitForTimeout(400); };  // pick up edits made outside the page
+  const refresh = async () => { await page.click('#toolsbtn'); await page.click('#rescan'); await page.waitForTimeout(400); };  // pick up edits made outside the page
   const order = async pid => (await get('/api/vic3/state')).playsets.find(p => p.id === pid).mods.map(m => m.split(':')[1]);
 
   // ---- Compare: add what is only in the other playset

@@ -34,7 +34,7 @@ try {
   await page.waitForSelector('#dlg[open]', { timeout: 3000 }).then(() => page.click('#p-cancel')).catch(() => {});
   await page.waitForFunction(() => !document.getElementById('dlg').open);
   await page.click('[data-tab=library]');
-  const names = () => page.locator('#view .row .nm').allTextContents();
+  const names = () => page.locator('#view :is(.row,.mc) .nm').allTextContents();
   const heads = () => page.locator('#view .grp').evaluateAll(els => els.map(e => e.firstChild.textContent.trim()));
 
   // default: Workshop first, then Local, each grouped by tag (no tag last), names within a tag
@@ -63,7 +63,7 @@ try {
   await page.reload(); await page.waitForSelector('#tabs button'); await page.click('[data-tab=library]');
   await page.selectOption('#lib-sort', 'used');
   assert.deepEqual((await names()).slice(0, 3), ['Mid Workshop', 'Alpha Local', 'Art Workshop']);   // 2 playsets, then 1, then 1 (by name)
-  assert.match(await page.locator('#view .row').first().textContent(), /2 playsets/);
+  assert.match(await page.locator('#view :is(.row,.mc)').first().textContent(), /2 playsets/);
   await page.click('[data-favmod="ws:333"]');                       // star a mod
   await page.waitForSelector('[data-favmod="ws:333"].on');
   await page.selectOption('#lib-sort', 'fav');

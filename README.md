@@ -53,6 +53,7 @@ Your Windows user name is replaced by `<user>` in these files. Settings → Prob
 
 ## Features
 - **Playsets**: unlimited, each with its own mods, order, notes, launch arguments and (optionally) its own save folder; duplicate, export/import to share.
+- **Pictures**: every mod shows its own `thumbnail.png` on a card (or a coloured tile when it has none); a loading screen covers start-up and switching games.
 - **Library**: local and Workshop mods, flagged new / updated / removed; **Rescan** redoes start-up's work while the app runs.
 - **Auto-sort** from dependencies with a "why is it here?" per mod.
 - **Problems with one-click fixes**: missing/disabled dependency, wrong order, loops, incompatible mods, duplicate names, wrong game version, missing files, damaged metadata.

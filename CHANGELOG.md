@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.0.0 - Pictures, a loading screen and a calmer window
+Every mod now shows its own picture, switching games has a proper loading screen, and the header keeps to the buttons you use all the time.
+
+**How to install (Python edition only, no exe)**
+- You need Windows 10 or 11, **Python 3.8 or newer** from python.org and Edge or Chrome. Nothing else
+- Download **`Mod-Manager-python.pyzw`** below and double-click it, or run `py Mod-Manager-python.pyzw`. Your playsets and settings are kept
+- Already on 0.9.x? Use **Check for updates** in the app: it updates itself
+
+**What changed**
+
+- **Mod pictures.** A mod's own `thumbnail.png` (or `.jpg`, `.webp`, `.gif`; also `preview.*`, `cover.*`, `icon.*`; in the mod folder, `.metadata` or `metadata`) is shown on the Library cards, next to every mod in the load order, and large at the top of the details panel. A mod without a picture gets a coloured tile with its initials, so nothing looks broken. Pictures are read from the mod's folder only (links are not followed, files over 3 MB are ignored); nothing is downloaded
+- **Library as pictures.** The Library tab shows cards by default; **List** switches back to the old rows and the choice is remembered
+- **An active-mods strip** on top of the Load order: the pictures of the first 16 enabled mods, rising in one after another each time you open a game
+- **Loading screens.** Starting the app shows a loading screen (logo bars, progress line, what it is doing) instead of an empty window, and switching games covers the middle with the game's logo until its mods are read, instead of showing the previous game's list
+- **A calmer header.** Refresh and Rescan moved into a **Tools** menu; Install mod, Auto-sort and Playset settings stay in view. Nothing was removed
+- Focus outlines on every control, gentle hover and press feedback, and no animation at all when Windows is set to reduce motion
+- Fixed: the colour scheme chosen under Settings > UI could show the game's own colours for a moment after switching games
+
 ## 0.9.14 - Crusader Kings III: changes reach the game at once
 A mod you add in the app now shows up in Crusader Kings III even when you start the game from Steam.
 

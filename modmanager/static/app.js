@@ -47,6 +47,37 @@ function updPanel() {
     (unk ? `<p class="mut">${unk} mod(s) could not be compared (no Steam record yet, or the item is hidden).</p>` : '') +
     '<p class="mut">Steam normally downloads updates itself; open the page only if it has not.</p></div>';
 }
+// ---- pictures and loading screens ----
+// A mod's own picture (thumbnail.png and the like) comes from /api/<game>/thumb/<id>; a mod without one, or a game that has
+// none, gets a coloured tile with its initials, so every card looks finished and nothing jumps when a picture arrives.
+const hue = s => { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
+const initials = n => (String(n).match(/[A-Za-z0-9]+/g) || ['?']).slice(0, 2).map(w => w[0].toUpperCase()).join('');
+function thumb(m, size = 'sm', i = 0, pick = true) {
+  const src = `/api/${encodeURIComponent(G)}/thumb/${encodeURIComponent(m.id)}`;
+  return `<span class="th ${size}" style="--h:${hue(m.name)};--i:${i}"${pick ? ` data-sel="${esc(m.id)}"` : ''}><b>${esc(initials(m.name))}</b>${m.exists === false ? '' : `<img alt="" loading="lazy" decoding="async" src="${src}">`}</span>`;
+}
+document.addEventListener('error', e => { const i = e.target; if (i && i.tagName === 'IMG' && i.closest && i.closest('.th')) i.remove(); }, true);   // no picture: the tile stays
+document.addEventListener('load', e => { const i = e.target; if (i && i.tagName === 'IMG' && i.closest && i.closest('.th')) i.classList.add('ok'); }, true);
+// The first start covers the whole window; switching games covers the middle only, with the game's own logo.
+let bootAt = Date.now();
+function bootDone() {
+  const b = $('boot'); if (!b || b.classList.contains('gone')) return;
+  setTimeout(() => { b.classList.add('gone'); setTimeout(() => b.remove(), 500); }, Math.max(0, 700 - (Date.now() - bootAt)));
+}
+function bootSay(t) { const m = $('bootmsg'); if (m) m.textContent = t; }
+function busy(on, msg, id) {
+  const b = $('busy'); if (!b) return;
+  if (on) {
+    $('busymsg').textContent = msg || 'Loading…';
+    $('busylogo').innerHTML = id ? `<img alt="" src="/api/${encodeURIComponent(id)}/logo">` : '';
+    const img = $('busylogo').querySelector('img'); if (img) img.onerror = () => img.remove();
+  }
+  b.classList.toggle('on', !!on);
+}
+const tools = open => { $('toolsmenu').hidden = !open; $('toolsbtn').setAttribute('aria-expanded', String(open)); };
+$('toolsbtn').onclick = e => { e.stopPropagation(); tools($('toolsmenu').hidden); };
+document.addEventListener('click', () => tools(false));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') tools(false); });
 // ---- file trees ----
 function mountTree(box, entries) {
   const root = {d: {}, f: []};
@@ -230,11 +261,14 @@ function viewOrder(p) {
   const bar = `<div class="bar"><span class="mut">Top loads first, bottom wins.</span><span class="grow"></span>
     <button class="sm" data-bulk="enable_all">Enable all</button><button class="sm" data-bulk="disable_all">Disable all</button>
     <button class="sm" data-bulk="prune" title="Remove mods that are no longer installed">Prune</button></div>`;
-  $('view').innerHTML = bar + p.mods.map((id, i) => {
+  const live = p.mods.filter(id => !p.disabled.includes(id)).map(M).filter(Boolean);
+  const hero = live.length ? `<div class="hero"><div class="hero-t"><b>${live.length} active mod${live.length === 1 ? '' : 's'}</b><span class="mut">${esc(GNAME())}${S.game_version ? ' ' + esc(S.game_version) : ''}</span></div>
+    <div class="hero-strip">${live.slice(0, 16).map((m, i) => thumb(m, 'md', i, false)).join('')}${live.length > 16 ? `<span class="more">+${live.length - 16}</span>` : ''}</div></div>` : '';
+  $('view').innerHTML = hero + bar + p.mods.map((id, i) => {
     const m = M(id), off = p.disabled.includes(id), w = worst(id);
     return `<div class="row ${off ? 'off' : ''} ${id === sel ? 'sel' : ''}" data-i="${i}">
       <span class="h" draggable="true">⠿</span><span class="n">${i + 1}</span>
-      <label class="tick"><input type="checkbox" data-tog="${esc(id)}" ${off ? '' : 'checked'}></label>
+      <label class="tick"><input type="checkbox" data-tog="${esc(id)}" ${off ? '' : 'checked'}></label>${m ? thumb(m, 'sm') : ''}
       <span class="nm" data-sel="${esc(id)}">${esc(m ? m.name : id + ' (not installed)')}</span>
       ${m ? badges(m, w && !off ? `<span class="b ${w}">${w === 'err' ? 'error' : 'warning'}</span>` : '') : (w && !off ? `<span class="b ${w}">${w === 'err' ? 'error' : 'warning'}</span>` : '')}
       <button class="sm" data-mv="${i},-1">↑</button><button class="sm" data-mv="${i},1">↓</button><button class="sm" data-rm="${esc(id)}">✕</button></div>`;
@@ -245,8 +279,9 @@ function viewOrder(p) {
 // The tags come from each mod's own descriptor or metadata, read at every scan and kept in the library file.
 const SORTS = {name: 'Name', source: 'Workshop, then Local', 'source-tag': 'Workshop / Local, then tag', tag: 'Tag', used: 'Most playsets first', fav: 'Favourites first'};
 let libUse = {}, favOnly = false;
-let libSort = 'source-tag', libTag = '';
+let libSort = 'source-tag', libTag = '', libView = 'cards';
 try { libSort = localStorage.getItem('libSort') || libSort; } catch (e) { /* storage blocked: the default is fine */ }
+try { libView = localStorage.getItem('libView') === 'list' ? 'list' : 'cards'; } catch (e) { /* default */ }
 if (!SORTS[libSort]) libSort = 'source-tag';
 const SRC_ORDER = {workshop: 0, local: 1};
 const SRC_NAME = {workshop: 'Workshop', local: 'Local'};
@@ -275,6 +310,15 @@ function libRow(m, p) {
   return `<div class="row ${m.id === sel ? 'sel' : ''}"><button class="star ${fav ? 'on' : ''}" data-favmod="${esc(m.id)}" title="${fav ? 'Remove from favourites' : 'Add to favourites'}" aria-label="Favourite">${fav ? '★' : '☆'}</button><span class="nm" data-sel="${esc(m.id)}" title="${esc(m.root)}">${esc(m.name)}</span><span class="mut" title="How many of your playsets contain this mod">${n} playset${n === 1 ? '' : 's'}</span>${tags.map(t => `<span class="tg">${esc(t)}</span>`).join('')}${badges(m)}
         <button class="sm" data-add="${esc(m.id)}" ${inn || !m.exists ? 'disabled' : ''}>${inn ? '✓ Added' : '+ Add'}</button></div>`;
 }
+function libCard(m, p) {
+  const inn = p.mods.includes(m.id), tags = (m.tags || []).slice(0, 2), fav = (S.fav_mods || []).includes(m.id), n = libUse[m.id] || 0;
+  return `<div class="mc ${m.id === sel ? 'sel' : ''}">${thumb(m, 'cover')}
+    <button class="star ${fav ? 'on' : ''}" data-favmod="${esc(m.id)}" title="${fav ? 'Remove from favourites' : 'Add to favourites'}" aria-label="Favourite">${fav ? '★' : '☆'}</button>
+    <div class="mc-b"><span class="nm" data-sel="${esc(m.id)}" title="${esc(m.root)}">${esc(m.name)}</span>
+      <div class="mc-m">${badges(m)}${tags.map(t => `<span class="b">${esc(t)}</span>`).join('')}</div>
+      <div class="mc-f"><span class="mut">${n} playset${n === 1 ? '' : 's'}</span><button class="sm" data-add="${esc(m.id)}" ${inn || !m.exists ? 'disabled' : ''}>${inn ? '✓ Added' : '+ Add'}</button></div></div></div>`;
+}
+const libItems = (mods, p) => libView === 'cards' ? `<div class="mcs">${mods.map(m => libCard(m, p)).join('')}</div>` : mods.map(m => libRow(m, p)).join('');
 function viewLibrary(p) {
   if (libTag && !(libTag in (S.tag_counts || {}))) libTag = '';   // a tag of another game
   const f = q.toLowerCase();
@@ -284,13 +328,14 @@ function viewLibrary(p) {
   const rem = S.removed.length ? `<div class="row static"><span class="warn">Removed since last scan:</span> ${S.removed.map(r => esc(r.name)).join(', ')}</div>` : '';
   const tagOpts = Object.entries(S.tag_counts || {}).map(([t, n]) => `<option value="${esc(t)}" ${t === libTag ? 'selected' : ''}>${esc(t)} (${n})</option>`).join('');
   const rows = libGroups(list).map(g => (g.h ? `<div class="grp">${esc(g.h)} <span class="mut">${g.sub ? g.sub.reduce((n, s) => n + s.mods.length, 0) : g.mods.length}</span></div>` : '') +
-    (g.sub ? g.sub.map(s => `<div class="grp sub">${esc(s.h)} <span class="mut">${s.mods.length}</span></div>` + s.mods.map(m => libRow(m, p)).join('')).join('') : g.mods.map(m => libRow(m, p)).join(''))).join('');
+    (g.sub ? g.sub.map(s => `<div class="grp sub">${esc(s.h)} <span class="mut">${s.mods.length}</span></div>` + libItems(s.mods, p)).join('') : libItems(g.mods, p))).join('');
   $('view').innerHTML = `<div class="bar"><input type="search" id="q" placeholder="Search name or tag…" value="${esc(q)}">
     <select id="lib-sort" title="Sort the library" aria-label="Sort">${Object.entries(SORTS).map(([k, n]) => `<option value="${k}" ${k === libSort ? 'selected' : ''}>Sort: ${n}</option>`).join('')}</select>
     <select id="lib-tag" title="Show only mods with this tag" aria-label="Tag"><option value="">All tags</option>${tagOpts}</select>
-    <button id="favonly" class="${favOnly ? 'on' : ''}" title="Show only your favourite mods">★ Favourites only</button><button id="addall">Add all shown</button><button id="modupd" title="Ask Steam which Workshop mods have a newer version">Check mod updates</button></div>${updPanel()}${rem}` +
+    <button id="libview" title="Switch between pictures and a plain list">${libView === 'cards' ? '☰ List' : '▦ Pictures'}</button><button id="favonly" class="${favOnly ? 'on' : ''}" title="Show only your favourite mods">★ Favourites only</button><button id="addall">Add all shown</button><button id="modupd" title="Ask Steam which Workshop mods have a newer version">Check mod updates</button></div>${updPanel()}${rem}` +
     (rows || `<div class="empty">No mods found.<br>${S.user_dir ? 'Drop a mod archive (.zip, .tar.gz) here to install one, or check the folders in Settings.' : esc(GNAME()) + ' user folder not found. Set it in Settings → Game folders.'}</div>`);
   $('lib-sort').onchange = () => { libSort = $('lib-sort').value; try { localStorage.setItem('libSort', libSort); } catch (e) { /* only a convenience */ } viewLibrary(cur()); };
+  $('libview').onclick = () => { libView = libView === 'cards' ? 'list' : 'cards'; try { localStorage.setItem('libView', libView); } catch (e) { /* only a convenience */ } viewLibrary(cur()); };
   $('favonly').onclick = () => { favOnly = !favOnly; viewLibrary(cur()); };
   $('lib-tag').onchange = () => { libTag = $('lib-tag').value; viewLibrary(cur()); };
   $('modupd').onclick = guard(async () => { $('modupd').disabled = true; try { U = await api('mod-updates', {}); } finally { $('modupd').disabled = false; } viewLibrary(cur()); });
@@ -700,7 +745,7 @@ function drawer() {
     const st = !dm ? '<span class="b err">not installed</span>' : p.mods.includes(dm.id) && !p.disabled.includes(dm.id) ? '<span class="b ok">enabled</span>' : '<span class="b warn">not enabled</span>';
     return `<p>${esc(x)} ${st}</p>`;
   }).join('') || '<p class="mut">None</p>';
-  d.innerHTML = `<button class="sm" data-close="1" style="float:right">✕</button><h2>${esc(m.name)}</h2>
+  d.innerHTML = `<button class="sm" data-close="1" style="float:right">✕</button><div class="d-img">${thumb(m, 'xl')}</div><h2>${esc(m.name)}</h2>
     <p class="mut">${esc(m.version ? 'v' + m.version : '')} ${badges(m)}</p>
     ${m.description ? `<p>${esc(m.description)}</p>` : ''}
     ${m.supported_version ? `<h3>Made for game version</h3><p>${esc(m.supported_version)}</p>` : ''}
@@ -728,7 +773,8 @@ document.addEventListener('click', guard(async e => {
   }
   if (ds.tab) { tab = ds.tab; render(); if (tab === 'compare') { C = null; render(); await loadCompare(); } if (tab === 'files') await loadFiles(); }
   if (ds.f) { flt = ds.f; render(); }
-  if (ds.sel) { sel = sel === ds.sel ? null : ds.sel; render(); }
+  const pick = t.closest('[data-sel]');   // a picture's tile holds an image inside it
+  if (pick) { const id = pick.dataset.sel; sel = sel === id ? null : id; render(); }
   if (ds.close) { sel = null; render(); }
   if (ds.add) await patch(q => ({mods: q.mods.includes(ds.add) ? q.mods : [...q.mods, ds.add]}));
   if (ds.rm) await patch(q => ({mods: q.mods.filter(x => x !== ds.rm)}));
@@ -1101,7 +1147,9 @@ async function useGame(id, first) {
   $('game').value = id;
   setLogo(g.id);
   document.title = g.name + ' · Ronin Mod Manager' + (GI.build ? ' (test build)' : '');
-  await load(first);
+  busy(true, `Opening ${g.name}…`, g.id);
+  $('view').innerHTML = ''; $('pslist').innerHTML = ''; $('psfixed').innerHTML = ''; $('title').textContent = g.name; $('drawer').className = '';   // nothing of the game just left stays on screen
+  try { await load(first); } finally { busy(false); }
 }
 // ---- games the user adds (beta) ----
 const ADD_GAME = '__add';
@@ -1179,15 +1227,19 @@ setInterval(() => { fetch('/api/ping').catch(() => {}); }, 5000);   // "this pag
     const early = location.hash.slice(1) || localStorage.getItem('mm-game') || '';
     if (/^[A-Za-z0-9_.-]{1,64}$/.test(early)) setLogo(early);
   } catch (e) { /* storage may be blocked */ }
+  bootSay('Finding your games…');
   GI = await app('games');
+  bootSay('Reading your mods…');
   $('ver').innerHTML = 'v' + esc(GI.version) + (GI.build ? `<br><b class="testbuild" title="A test build of the next version. Settings > App &amp; updates shows how to go back to a release.">TEST BUILD ${esc(GI.build)}</b>` : '');
   fillGames();
   let want = location.hash.slice(1);
   try { want = want || localStorage.getItem('mm-game') || ''; } catch (e) { /* ignore */ }
   want = GI.games.some(g => g.id === want) ? want : (GI.games.some(g => g.id === GI.last_game) ? GI.last_game : GI.games[0].id);
   await useGame(want, true);
+  bootSay('Ready');
+  bootDone();
   askShortcut();
-})().catch(e => fail(e, 'startup'));
+})().catch(e => { bootDone(); fail(e, 'startup'); });
 
 // Once, at start-up: offer a desktop icon that starts this copy (Windows; not asked again after either answer)
 function askShortcut() {

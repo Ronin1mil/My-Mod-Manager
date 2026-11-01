@@ -17,7 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from . import APP_NAME, BUILD, __version__, collections, compare, detect, games as gamesmod, install, launch, order, presets, saves, scan, update, updates
-from . import bootworker, customgames, errorlog, gamelog, launcherdb, launchersync, perflog, selfupdate, shortcut, steamshortcut, workshop
+from . import bootworker, thumbs, customgames, errorlog, gamelog, launcherdb, launchersync, perflog, selfupdate, shortcut, steamshortcut, workshop
 from .library import Library
 from .paths import LOGO_TYPES, config_dir, fetch_best_logo, find_first, find_logo, game_version, launcher_exe, user_dirs, workshop_dirs
 from .store import GlobalSettings, Store, mod_entry, write_load_file
@@ -1144,6 +1144,8 @@ def make_handler(hub):
                 return self._send(200, {})
             if len(p) == 3 and p[0] == "api" and p[1] in hub.games and p[2] == "logo":
                 return self._logo(p[1])
+            if len(p) == 4 and p[0] == "api" and p[1] in hub.games and p[2] == "thumb":
+                return self._thumb(p[1], p[3])
             with hub.lock:
                 self._get()
 
@@ -1177,6 +1179,26 @@ def make_handler(hub):
             except Exception as e:
                 errorlog.write_exception("server", e, self.path.split("?")[0])
                 return self._send(500, {"error": f"{type(e).__name__}: {e}", "log_file": str(errorlog.log_path())})
+
+        def _thumb(self, game_id, mod_id):
+            """A mod's own picture (thumbnail.png and the like), read from its folder only. Answered without the lock: it
+            only looks the mod up. 204 (nothing) when the mod has none; the page then draws a coloured tile instead."""
+            if not self._host_ok():
+                return self._send(403, {"error": "bad host"})
+            try:
+                app = hub.apps.get(game_id)
+                m = app.mods.get(urllib.parse.unquote(mod_id)) if app else None
+                pic = thumbs.find(m["root"]) if m and m.get("exists") else None
+                if not pic:
+                    return self._send(204, b"", "image/png", [("Cache-Control", "max-age=60")])   # not 404: the browser logs those as errors, one per mod
+                st = pic.stat()
+                tag = f'"{st.st_mtime_ns:x}-{st.st_size:x}"'
+                head = [("ETag", tag), ("Cache-Control", "max-age=300")]   # a mod's picture rarely changes; 800 mods must not ask again on every redraw
+                if self.headers.get("If-None-Match") == tag:
+                    return self._send(304, b"", thumbs.TYPES[pic.suffix.lower()], head)
+                return self._send(200, pic.read_bytes(), thumbs.TYPES[pic.suffix.lower()], head)
+            except OSError:
+                return self._send(204, b"", "image/png")
 
         def _heavy_get(self, p):
             """Slow read-only views: snapshot under the lock, compute outside it."""

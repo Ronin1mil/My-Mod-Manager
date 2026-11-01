@@ -49,7 +49,7 @@ try {
   page.on('console', m => m.type() === 'error' && errors.push(m.text()));
   page.on('dialog', d => d.accept());
   const acc = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--acc').trim());
-  const names = () => page.locator('#view .row .nm').allTextContents();
+  const names = () => page.locator('#view :is(.row,.mc) .nm').allTextContents();
 
   await page.goto(`${base}/`);
   await page.waitForSelector('#game option:nth-child(3)', { state: 'attached' });
@@ -77,7 +77,7 @@ try {
     // build a playset, check conflicts use this game's script folders, press Play
     for (const mid of ['local:Add', 'local:Lib', 'ws:999']) await page.click(`[data-add="${mid}"]`);
     await page.click('[data-tab=order]');
-    await page.waitForFunction(() => document.querySelectorAll('#view .row').length === 3);
+    await page.waitForFunction(() => document.querySelectorAll('#view :is(.row,.mc)').length === 3);
     const order = await names();
     assert.ok(order.indexOf(`${id} Core`) < order.indexOf(`${id} Addon`), `dependency first for ${id}: ${order}`);
     await page.click('[data-tab=conflicts]');

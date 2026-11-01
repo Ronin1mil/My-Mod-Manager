@@ -3,6 +3,11 @@
 <title>Ronin Mod Manager</title>
 <link rel="stylesheet" href="/style.css">
 </head><body>
+<div id="boot" role="status" aria-live="polite"><div class="boot-in">
+ <div class="boot-mark" aria-hidden="true"><i></i><i></i><i></i></div>
+ <div class="boot-name">Ronin Mod Manager</div>
+ <div class="boot-bar"><i></i></div>
+ <div class="boot-msg" id="bootmsg">Starting…</div></div></div>
 <div id="app">
  <aside id="side">
   <div class="logo" id="logo"></div>
@@ -20,13 +25,17 @@
    <label class="chk" title="Keep dependencies loading first automatically"><input type="checkbox" id="auto"> Auto-sort</label>
    <button id="sortnow" title="Reorder so dependencies load first">Sort now</button>
    <button id="installbtn">Install mod…</button><input type="file" id="installf" accept=".zip,.tar,.gz,.tgz,.bz2,.tbz2,.xz,.txz" hidden>
-   <button id="rescan" title="Read this game's mod folders again">Refresh</button>
-   <button id="fullscan" title="Every game: look for moved folders on every drive, read every mod again, find steamcmd and check every playset again (like starting the app)">Rescan</button>
+   <span class="menuwrap"><button id="toolsbtn" aria-haspopup="true" aria-expanded="false">Tools ▾</button>
+    <div id="toolsmenu" class="menu" hidden>
+     <button id="rescan" title="Read this game's mod folders again">Refresh<small>Read this game's mod folders again</small></button>
+     <button id="fullscan" title="Every game: look for moved folders on every drive, read every mod again, find steamcmd and check every playset again (like starting the app)">Rescan<small>Every game, like starting the app</small></button>
+    </div></span>
    <button id="cfg">Playset settings</button>
   </header>
   <div id="banner" hidden></div>
   <nav id="tabs"></nav>
   <div id="view"></div>
+  <div id="busy" aria-hidden="true"><div class="boot-in"><div id="busylogo"></div><div class="boot-bar"><i></i></div><div class="boot-msg" id="busymsg"></div></div></div>
   <footer id="play">
    <div id="status" class="mut"></div>
    <span class="grow"></span>
