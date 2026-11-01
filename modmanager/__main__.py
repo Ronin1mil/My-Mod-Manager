@@ -22,6 +22,7 @@ ap.add_argument("--fetch-logo", action="store_true", help="download --game's log
 ap.add_argument("--check-update", action="store_true", help="check GitHub for a newer version and exit")
 ap.add_argument("--list-games", action="store_true", help="list supported games and exit")
 ap.add_argument("--version", action="store_true", help="print the version and exit")
+ap.add_argument("--update-first", action="store_true", help="install a newer release before opening, if the 'install new versions when it starts' setting is on")
 ap.add_argument("--no-browser", action="store_true", help="only run the server; open nothing")
 ap.add_argument("--browser", action="store_true", help="open the page in the default browser instead of the app window")
 ap.add_argument("--probe-window", metavar="FILE", help=argparse.SUPPRESS)
@@ -62,6 +63,20 @@ errorlog.install_hooks()
 from modmanager import selfupdate
 
 selfupdate.cleanup_old()
+if a.update_first and selfupdate.can_self_update() and not os.environ.get("MODMANAGER_RESTARTED"):
+    try:   # offline or any trouble: just open the version we have
+        from modmanager.store import GlobalSettings
+        if GlobalSettings().get()["update_first"]:
+            up = selfupdate.Updater(argv=[x for x in sys.argv[1:] if x != "--update-first"])
+            st = up.start(run_async=False)
+            if st["status"] == "restarting":   # the new version was started; this one leaves
+                import time
+                time.sleep(2)
+                raise SystemExit(0)
+    except SystemExit:
+        raise
+    except Exception as e:
+        errorlog.write_exception("update-first", e)
 print(f"Errors are written to {errorlog.log_path()}")
 try:
     serve(a.port, not a.no_browser, overrides={a.game: per_game} if a.game else None, initial_game=a.game,

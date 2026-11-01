@@ -58,3 +58,9 @@ class UiSettings(GameCase):
             self.assertEqual(self.post("/api/ui", bad)[0], 400, bad)
         self.assertEqual(self.req("GET", "/api/state")[1]["ui_scheme"], "forest")  # a refused change changes nothing
         self.assertEqual(self.req("GET", "/api/ck3/state")[1]["ui_scheme"], "default")  # another game is untouched
+
+    def test_picture_size_is_saved_and_validated(self):
+        self.assertEqual(self.req("GET", "/api/state")[1]["ui_img"], "normal")
+        self.assertEqual(self.post("/api/ui", {"ui_img": "xlarge"})[1]["ui_img"], "xlarge")
+        self.assertEqual(self.post("/api/ui", {"ui_img": "gigantic"})[0], 400)
+        self.assertEqual(self.req("GET", "/api/state")[1]["ui_img"], "xlarge")

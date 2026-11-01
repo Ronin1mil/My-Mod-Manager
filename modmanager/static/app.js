@@ -527,6 +527,11 @@ async function openPaths(first) {
         <p class="desc">Makes everything in the app bigger or smaller.</p>
         <select id="ui-text">${Object.entries(TEXT_SIZES).map(([k, [n]]) => `<option value="${k}" ${S.ui_text === k ? 'selected' : ''}>${n}</option>`).join('')}</select>
       </div>
+      <div class="card">
+        <h3>Picture size</h3>
+        <p class="desc">How big the mod pictures and the rows are. They also grow with the text size above.</p>
+        <select id="ui-img">${Object.entries(IMG_SIZES).map(([k, [n]]) => `<option value="${k}" ${(S.ui_img || 'normal') === k ? 'selected' : ''}>${n}</option>`).join('')}</select>
+      </div>
       <div class="card"><div class="acts"><button id="ui-all">Use these for all games</button><span class="mut" id="ui-msg"></span></div></div>
     </section>
     <section data-pane="store" hidden>
@@ -565,6 +570,12 @@ async function openPaths(first) {
       </div>
     </section>
     <section data-pane="app" hidden>
+      ${GI.launcher && GI.launcher.supported ? `<div class="card">
+        <h3>Start file</h3>
+        <p class="desc">${GI.launcher.installed ? `Installed: <code>${esc(GI.launcher.bat)}</code>. Start the app from that .bat (or a shortcut to it).${GI.launcher.here ? '' : ' This window is not that copy; running "Install on this PC" again copies this one over it.'}` : 'Puts a copy of the app and a "Ronin Mod Manager.bat" in a folder of its own (inside your user profile, no admin needed), so you can delete the downloaded file and always start the same place.'}</p>
+        <div class="acts">${GI.launcher.can_install ? `<button id="s-launcher">${GI.launcher.installed ? 'Install again' : 'Install on this PC'}</button>` : '<span class="mut">Only the downloaded .pyzw file can do this.</span>'}</div>
+        <label class="srow"><span class="rt"><b>Install new versions when it starts</b><span class="hint">When the .bat starts the app it asks GitHub for a newer release, checks its checksum, installs it and then opens. Mods are never updated by this. Off if you are offline: it just opens.</span></span><input type="checkbox" class="sw" id="s-first" ${st.update_first ? 'checked' : ''}></label>
+      </div>` : ''}
       ${GI.shortcut && GI.shortcut.supported ? `<div class="card">
         <h3>Desktop icon</h3>
         <p class="desc">${GI.shortcut.exists ? 'There is a Ronin Mod Manager icon on your desktop.' : 'No Ronin Mod Manager icon on your desktop yet.'} Making it again points it at this copy of the app.</p>
@@ -611,6 +622,11 @@ async function openPaths(first) {
     toast(r.updated ? 'Updated Ronin Mod Manager in your Steam library. Start Steam to see it.' : 'Added Ronin Mod Manager to your Steam library. Start Steam to see it.');
     $('s-steam').textContent = 'Update it in Steam';
   });
+  if ($('s-launcher')) $('s-launcher').onclick = guard(async () => {
+    const r = await app('install-launcher', {}); GI.launcher = r; GI.settings = r.settings;
+    toast('Installed. Start it from ' + r.bat); $('s-launcher').textContent = 'Install again'; if ($('s-first')) $('s-first').checked = true;
+  });
+  if ($('s-first')) $('s-first').onchange = guard(async () => { GI.settings = await app('settings', {update_first: $('s-first').checked}); toast($('s-first').checked ? 'New versions install when the app starts.' : 'The app opens without looking for a new version.'); });
   if ($('s-shortcut')) $('s-shortcut').onclick = guard(async () => {
     GI.shortcut = await app('desktop-shortcut', {make: true}); GI.settings.shortcut_asked = true;
     toast('Made "Ronin Mod Manager" on your desktop.'); $('s-shortcut').textContent = 'Make it again';
@@ -648,7 +664,8 @@ async function openPaths(first) {
     d.querySelectorAll('[data-scheme]').forEach(x => x.classList.toggle('on', x === b));
   }); });
   $('ui-text').onchange = guard(() => saveUI({ui_text: $('ui-text').value}));
-  $('ui-all').onclick = guard(async () => { await saveUI({ui_scheme: S.ui_scheme, ui_text: S.ui_text}, true); $('ui-msg').textContent = 'Done.'; });
+  $('ui-img').onchange = guard(() => saveUI({ui_img: $('ui-img').value}));
+  $('ui-all').onclick = guard(async () => { await saveUI({ui_scheme: S.ui_scheme, ui_text: S.ui_text, ui_img: S.ui_img || 'normal'}, true); $('ui-msg').textContent = 'Done.'; });
   $('nt-check').onclick = guard(async () => {
     $('nt-status').textContent = 'Checking…'; $('nt-go').disabled = true;
     const r = await app('nightly');
@@ -1122,12 +1139,16 @@ const SCHEMES = {
   rose: {name: 'Rose', dark: true, v: {'--bg': '#150d12', '--side': '#1b1018', '--panel': '#241520', '--line': '#43263a', '--ink': '#f6e6ee', '--mut': '#b496a6', '--acc': '#f08cb4', '--accink': '#2a0c1a', '--p1': '#8a2f5c', '--p2': '#ad3f75', '--p3': '#6a2247'}},
   contrast: {name: 'High contrast', dark: true, v: {'--bg': '#000000', '--side': '#000000', '--panel': '#0d0d0d', '--line': '#8a8a8a', '--ink': '#ffffff', '--mut': '#d0d0d0', '--acc': '#ffd400', '--accink': '#000000', '--p1': '#1f3fd0', '--p2': '#2f55f0', '--p3': '#1a34a8'}},
 };
+const IMG_SIZES = {small: ['Small', .75], normal: ['Normal', 1], large: ['Large', 1.3], xlarge: ['Huge', 1.7]};
 const TEXT_SIZES = {small: ['Small', .9], normal: ['Normal', 1], large: ['Large', 1.15], xlarge: ['Extra large', 1.3]};
 function applyUI() {
   const root = document.documentElement.style, sc = S && SCHEMES[S.ui_scheme];
   if (sc) { Object.entries(sc.v).forEach(([k, v]) => root.setProperty(k, v)); root.colorScheme = sc.dark ? 'dark' : 'light'; }
   else if (G && GI) applyTheme(GI.games.find(g => g.id === G) || {});
   root.setProperty('--zoom', String((TEXT_SIZES[S && S.ui_text] || TEXT_SIZES.normal)[1]));
+  // pictures and rows grow with the text size on top of the page zoom, and with their own size setting
+  const t = (TEXT_SIZES[S && S.ui_text] || TEXT_SIZES.normal)[1], im = (IMG_SIZES[S && S.ui_img] || IMG_SIZES.normal)[1];
+  root.setProperty('--imgk', String(+(im * t).toFixed(3))); root.setProperty('--rowk', String(+t.toFixed(3)));
 }
 // The header shows the game's own logo (its picture with the name in it) and nothing else: no stand-in while it loads, and
 // nothing at all when there is none. The app keeps the file and the browser revalidates it, so it is there as the page is.

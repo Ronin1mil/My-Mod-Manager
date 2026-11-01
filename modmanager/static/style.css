@@ -208,3 +208,11 @@ h1{font-size:22px}
 #busy.on{opacity:1}
 #busylogo img{max-width:260px;max-height:110px;object-fit:contain;filter:drop-shadow(0 4px 12px rgba(0,0,0,.6))}
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+
+/* Bigger pictures (about double), growing with the text size and the "Picture size" setting (--imgk), rows with the text (--rowk) */
+.th.sm{width:calc(112px * var(--imgk,1));height:calc(63px * var(--imgk,1));font-size:calc(20px * var(--imgk,1));border-radius:8px}
+.th.md{width:calc(180px * var(--imgk,1));height:calc(101px * var(--imgk,1));font-size:calc(26px * var(--imgk,1))}
+.mcs{grid-template-columns:repeat(auto-fill,minmax(calc(280px * (0.6 + 0.4 * var(--imgk,1))),1fr))}
+.th.cover{font-size:calc(40px * var(--imgk,1))}
+.row{padding:calc(8px * var(--rowk,1)) 12px;gap:calc(10px * var(--rowk,1))}
+.row .nm{font-size:calc(1em * var(--rowk,1))}

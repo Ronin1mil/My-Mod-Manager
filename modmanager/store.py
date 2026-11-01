@@ -20,11 +20,12 @@ DEFAULTS = {"notes": "", "launch_args": [], "auto_sort": True, "separate_saves":
 # per-game settings (folders + base-game comparison); app-wide ones live in GlobalSettings
 SETTINGS_DEFAULTS = {"game_dir": "", "user_dir": "", "workshop_dir": "", "include_vanilla": True,
                      "setup_done": False, "steamcmd": "", "steam_user": "", "save_version_check": True,
-                     "ui_scheme": "default", "ui_text": "normal"}
+                     "ui_scheme": "default", "ui_text": "normal", "ui_img": "normal"}
 UI_SCHEMES = ("default", "midnight", "parchment", "forest", "slate", "rose", "contrast")
 UI_TEXT = ("small", "normal", "large", "xlarge")
+UI_IMG = UI_TEXT
 GLOBAL_DEFAULTS = {"auto_update_check": False, "dismissed_update": "", "last_game": "", "fetch_logos": True,
-                   "auto_import_launcher": True, "show_import_button": True, "shortcut_asked": False}
+                   "auto_import_launcher": True, "show_import_button": True, "shortcut_asked": False, "update_first": False}
 
 
 def _defaults():
@@ -82,7 +83,7 @@ class Store:
                 raise ValueError(f"Invalid setting '{k}'.")
             if isinstance(v, str) and len(v) > 1000:
                 raise ValueError(f"Invalid value for '{k}'.")
-            if (k == "ui_scheme" and v not in UI_SCHEMES) or (k == "ui_text" and v not in UI_TEXT):
+            if (k == "ui_scheme" and v not in UI_SCHEMES) or (k == "ui_text" and v not in UI_TEXT) or (k == "ui_img" and v not in UI_IMG):
                 raise ValueError(f"Invalid value for '{k}'.")
             clean[k] = v
         self.data.setdefault("settings", {}).update(clean)

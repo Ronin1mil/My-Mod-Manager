@@ -85,6 +85,11 @@ def check_nightly(current_build=BUILD, fetch=None, repo=REPO):
         if not m:
             return {**base, "message": "The test build has no build id, so it cannot be compared."}
         latest = m.group(1)
+        v = re.search(r"^version:\s*(\S+)\s*$", str(rel.get("body") or ""), re.M)
+        built = parse_version(v.group(1)) if v else None
+        if built and _key(built) < _key(parse_version(__version__)):   # the test build is of an OLDER version than this copy
+            return {**base, "latest": f"test build {latest}", "build": latest, "status": "current",
+                    "message": f"The newest test build is from version {v.group(1)}, older than the {__version__} you have, so it is not offered."}
         assets = [{"name": a["name"][:100], "url": a["browser_download_url"], "size": int(a.get("size") or 0),
                    "api_url": f"{API}/repos/{repo}/releases/assets/{int(a['id'])}" if str(a.get("id", "")).isdigit() else ""}
                   for a in rel.get("assets") or []

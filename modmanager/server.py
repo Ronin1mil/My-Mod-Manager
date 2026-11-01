@@ -17,7 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from . import APP_NAME, BUILD, __version__, collections, compare, detect, games as gamesmod, install, launch, order, presets, saves, scan, update, updates
-from . import bootworker, thumbs, customgames, errorlog, gamelog, launcherdb, launchersync, perflog, selfupdate, shortcut, steamshortcut, workshop
+from . import launcher, bootworker, thumbs, customgames, errorlog, gamelog, launcherdb, launchersync, perflog, selfupdate, shortcut, steamshortcut, workshop
 from .library import Library
 from .paths import LOGO_TYPES, config_dir, fetch_best_logo, find_first, find_logo, game_version, launcher_exe, user_dirs, workshop_dirs
 from .store import GlobalSettings, Store, mod_entry, write_load_file
@@ -468,7 +468,7 @@ class GameApp:
                 "user_dir": str(self.user_dir or ""), "workshop_dir": str(self.workshop_dir or ""),
                 "game_root": str(self.game_root or ""), "game_version": self.game_version,
                 "game_log": str(gamelog.log_path(self.game.id)), "has_logo": bool(self.logo), "logo_pending": self.logo_pending, "include_vanilla": s["include_vanilla"],
-                "ui_scheme": s["ui_scheme"], "ui_text": s["ui_text"], "setup_done": s["setup_done"], "save_version_check": s["save_version_check"], "steamcmd": s["steamcmd"], "steam_user": s["steam_user"],
+                "ui_scheme": s["ui_scheme"], "ui_text": s["ui_text"], "ui_img": s["ui_img"], "setup_done": s["setup_done"], "save_version_check": s["save_version_check"], "steamcmd": s["steamcmd"], "steam_user": s["steam_user"],
                 "setup_needed": not s["setup_done"] and not (self.game_root and self.user_dir)}
 
     def analyse(self, pid, conflicts=True):
@@ -937,11 +937,24 @@ class Hub:
         return {"log_file": str(errorlog.log_path()), "can_self_update": selfupdate.can_self_update() or self.updater_forced, "games": [g.public() for g in self.games.values()], "last_game": s["last_game"],
                 "custom_games": self.custom.defs, "game_templates": customgames.TEMPLATES,
                 "version": __version__, "build": BUILD, "mode": os.environ.get("MODMANAGER_MODE", ""), "ready": self.ready, "settings": s, "update": self._update_cache[1] if self._update_cache else None,
-                "update_pending": self.update_pending, "shortcut": self.shortcut_info()}
+                "update_pending": self.update_pending, "shortcut": self.shortcut_info(), "launcher": self.launcher_info()}
 
     def shortcut_info(self):
         return {"supported": shortcut.supported(), "exists": shortcut.supported() and shortcut.exists(), "path": str(shortcut.path()),
                 "steam": steamshortcut.status() if shortcut.supported() else {"available": False, "added": False}}
+
+    def launcher_info(self):
+        py = selfupdate.pyz_path()
+        return {"supported": launcher.supported(), "can_install": bool(py), "installed": launcher.installed(),
+                "here": launcher.running_installed(py), "folder": str(launcher.app_dir()), "bat": str(launcher.bat_path())}
+
+    def install_launcher(self):
+        """Settings > Install on this PC: copy the running app file and write the .bat. Turns on install-on-start."""
+        if not launcher.supported():
+            raise ValueError("The start file is for Windows.")
+        launcher.install(selfupdate.pyz_path())
+        self.settings.update(update_first=True)
+        return {**self.launcher_info(), "settings": self.settings.get()}
 
     def desktop_shortcut(self, make):
         """The start-up question's answer (or the Settings button): make the shortcut or not; either way it is not asked again."""
@@ -1346,6 +1359,8 @@ def make_handler(hub):
                         return self._send(200, hub.remove_custom_game(b.get("id"), b.get("erase_data") is True))
                     if parts == ["api", "desktop-shortcut"]:
                         return self._send(200, hub.desktop_shortcut(self._body().get("make") is True))
+                    if parts == ["api", "install-launcher"]:
+                        return self._send(200, hub.install_launcher())
                     if parts == ["api", "add-to-steam"]:
                         return self._send(200, {**steamshortcut.add(config_dir()), "shortcut": hub.shortcut_info()})
                     if parts == ["api", "full-rescan"]:
@@ -1364,7 +1379,7 @@ def make_handler(hub):
                         raise ValueError("'on' must be true or false.")
                     return self._send(200, {"fav_mods": app.store.set_favorite_mod(b.get("id", ""), b["on"])})
                 if parts == ["api", "ui"]:
-                    app.store.update_settings(**{k: b[k] for k in ("ui_scheme", "ui_text") if k in b})
+                    app.store.update_settings(**{k: b[k] for k in ("ui_scheme", "ui_text", "ui_img") if k in b})
                     return self._send(200, app.state())
                 if parts == ["api", "skip-setup"]:
                     app.store.update_settings(setup_done=True)

@@ -1,7 +1,11 @@
 # Changelog
 
-## 1.0.1 - Check for updates is one click away
-**Tools > Check for updates** asks GitHub for the newest release right from the main window. If one exists it asks, downloads `Mod-Manager-python.pyzw`, verifies its checksum, replaces itself and restarts. Your playsets and settings are kept. The same check in Settings > App & updates and the banner still work.
+## 1.0.1 - Bigger pictures, a start file and updates that cannot go backwards
+- **Check for updates** is in the Tools menu: it asks, downloads the newest release, verifies its checksum, replaces itself and restarts. Your playsets and settings are kept
+- **Pictures are about twice as big**, and they (and the rows) now grow with the text size. Settings > UI has a new **Picture size** (Small, Normal, Large, Huge)
+- **Start file (Windows)**: Settings > App & updates > **Install on this PC** copies the app to a folder of its own (`%LOCALAPPDATA%\Ronin Mod Manager\app`) and writes `Ronin Mod Manager.bat` there. Start the app from that .bat. No admin rights needed, nothing else on the PC is touched
+- **Install new versions when it starts** (turned on by the install above): the .bat's start asks GitHub for a newer release, checks it, installs it and then opens. Mods are never updated by this. Offline, it just opens
+- A test build is no longer offered when it is from an older version than the one you have (test builds now say their version)
 
 ## 1.0.0 - Pictures, a loading screen and a calmer window
 Every mod now shows its own picture, switching games has a proper loading screen, and the header keeps to the buttons you use all the time.

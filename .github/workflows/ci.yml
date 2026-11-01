@@ -273,7 +273,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           SHORT="${GITHUB_SHA::7}"
-          printf 'Test build of the branch being worked on. It may contain bugs; install it from Settings -> App & updates -> Test builds.\n\nbuild: %s\n\nLatest change: %s\n' "$SHORT" "$(git log -1 --format=%s)" > notes.md
+          VER=$(python -c "import re;print(re.search(r'__version__\s*=\s*\"([^\"]+)\"',open('modmanager/__init__.py').read()).group(1))")
+          printf 'Test build of the branch being worked on. It may contain bugs; install it from Settings -> App & updates -> Test builds.\n\nbuild: %s\nversion: %s\n\nLatest change: %s\n' "$SHORT" "$VER" "$(git log -1 --format=%s)" > notes.md
           gh release delete test-build --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || true
           gh release create test-build dist/* --repo "$GITHUB_REPOSITORY" --prerelease --target "$GITHUB_SHA" --title "Test build $SHORT" --notes-file notes.md
 
