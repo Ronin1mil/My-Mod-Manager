@@ -4,9 +4,9 @@ Everything below runs without a game, Steam or network. **Nothing here proves th
 
 ## Run
 ```bash
-python -m unittest discover -s tests -t .                       # 244 tests, ~8 s; Python 3.8-3.13 (CI) - also run locally on 3.11/3.12/3.13
+python -m unittest discover -s tests -t .                       # ~500 tests, ~15 s; Python 3.8-3.13 (CI)
 npm i --no-save playwright && npx playwright install chromium
-for t in ui order compare games; do node tests/e2e/$t.mjs; done  # browser end-to-end
+node tests/e2e/ui.mjs                                            # browser end-to-end; one script per area in tests/e2e (ls it)
 GAME=ck3 node tests/e2e/ui.mjs                                   # the same flow on CK3 (default VIC3)
 ```
 `tests/__init__.py` points `MODMANAGER_CONFIG_DIR` at a throwaway folder, and each server test uses its own, so no test touches your real config or Steam.
@@ -35,5 +35,7 @@ GAME=ck3 node tests/e2e/ui.mjs                                   # the same flow
 - `python -m modmanager` worked but the PyInstaller entry would not: relative imports in `__main__.py` (found while writing CI; absolute imports now).
 - Tests that read a non-hermetic config folder (fixed with `MODMANAGER_CONFIG_DIR`).
 
-## Not tested (needs a real install or a real machine)
-Real game start, whether the stock launcher overrides the load file, EU5's load file format, junction handling on Windows, the Windows `.exe`, real `steamcmd`, the update check against the real repository, a Steam client handling `steam://url/CommunityFilePage/<id>`.
+## Not tested by the suite (needs a real install or a real machine)
+Real game start (checked by hand: CK3 and EU5 confirmed, see docs/22), Play for Victoria 3 and Bannerlord, real `steamcmd`, a Steam client handling `steam://url/CommunityFilePage/<id>`.
+
+**Running the suite on a PC with the games installed:** the tests replace `webbrowser.open` so they cannot open `steam://` links. Twelve tests in `test_detect.py` and `test_multigame.py` expect "no game found" and fail when they find your real Steam install; they are meant for a machine without the games, like CI. `MODMANAGER_FOLLOW_UP=0` (set by `tests/__init__.py`) stops the game log's 15/90 s look-again timers.

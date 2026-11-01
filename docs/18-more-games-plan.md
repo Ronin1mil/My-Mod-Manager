@@ -1,6 +1,13 @@
 # Plan: more games (Imperator: Rome, Stellaris, Civilization VI, Cities: Skylines)
 
-Nothing here is built yet. Every file name and path below is **from memory of other mod managers and must be checked on a real install** before the game is marked as working; each game ships with `verified = False` like Bannerlord did. The games I know you play from this project are Crusader Kings III, Europa Universalis V, Victoria 3 and Bannerlord, so anything beyond the four you named is a question at the end.
+Not built as built-in games yet. Stellaris and Imperator: Rome exist only as unchecked templates in **Add a game (beta)** ([20-v0.9-plan.md](20-v0.9-plan.md)). Every file name and path below is **from memory of other mod managers and must be checked on a real install** before a game is marked as working; each game ships with `verified = False` like Bannerlord did. The games used to prove the app are Crusader Kings III, Europa Universalis V, Victoria 3 and Bannerlord ([22-checked-on-a-real-pc.md](22-checked-on-a-real-pc.md) shows how they were checked).
+
+## How to add one (also for a local session on a PC that has the game)
+1. Install the game, run it once, enable two or three mods in its own launcher.
+2. In the app: **Add a game (beta)** with the template, then **Settings -> Game -> Check this game**. It says what was found and what was looked for. Correct the field it points at until every check passes.
+3. Press Play on a small playset, then send or read `RoninModManager-<game id>.log`: it holds the game's files before and after, and again 15 and 90 seconds later. If the game rewrites its own file, that is where it shows (this is how EU5's real format was found).
+4. Move what you learned into `modmanager/games.py` as a built-in `Game` with `verified=False`, pin it in `tests/test_games.py`, add fake-install tests (copy the Bannerlord or EU5 ones), a section in `docs/02-game-notes.md`, and a CHANGELOG entry.
+5. Run `python -m unittest discover -s tests -t .`, push to `nightly`, and use the test build. Only after a confirmed Play does the game become `verified=True`.
 
 ## Order of work
 1. **Stellaris** and **Imperator: Rome** (Paradox engine, small changes)
@@ -42,6 +49,6 @@ Work needed:
 - UI: hide Conflicts, Saves and Compare for kinds that do not have them (already done for `modules`), hide Auto-sort for games without order.
 - Each new game adds fake-install tests and a Playwright script; presets and launcher import are optional per game.
 
-## Questions for you
-1. Which other games do you play that lack a good mod manager? Candidates that fit the existing engine cheaply: Hearts of Iron IV, Crusader Kings II, Europa Universalis IV (Paradox, same family as the three already here). Others (Total War, Skyrim, Stardew) need their own kind.
-2. Should Civilization VI and Cities: Skylines wait until a real install shows how they store enabled mods?
+## Not decided
+- Which other games are wanted? Cheap fits for the existing engine: Hearts of Iron IV, Crusader Kings II, Europa Universalis IV (same Paradox family). Total War, Skyrim and Stardew need their own kind.
+- Civilization VI and Cities: Skylines wait until a real install shows how they store enabled mods.

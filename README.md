@@ -1,91 +1,113 @@
 # Ronin Mod Manager
 
-One mod manager for **Crusader Kings III**, **Europa Universalis V**, **Victoria 3** and **Mount & Blade II: Bannerlord**. Pick a playset, see *why* two mods fight, press **Play**, and the game starts with exactly that playset's mods. Python standard library only (3.8+), and its own app window.
+One mod manager for **Crusader Kings III**, **Europa Universalis V**, **Victoria 3** and **Mount & Blade II: Bannerlord** (and games you add yourself, beta). Pick a playset, see *why* two mods fight, press **Play**, and the game starts with exactly that playset's mods.
 
-This repository replaces the three standalone managers (`ck3-mod-manager`, `eu5-mod-manager`, `vic3-mod-manager`). Nothing is read from their folders any more; playsets from the games' own launchers can be imported, see [docs/10-migration.md](docs/10-migration.md).
+Python standard library only (3.8+), no exe: it runs a small local server and shows it in its own Edge/Chrome window.
 
-> **Made with AI.** This project was written with the help of an AI coding assistant (Claude by Anthropic) at the direction of its maintainer. It is tested against fake installs only (see Status below), so use it with that in mind and keep backups of your saves.
+> **Made with AI.** Written with the help of an AI coding assistant (Claude by Anthropic) at the direction of its maintainer. Tested against fake installs and on one real Windows PC (see Status). Keep backups of your saves.
 
-```bash
-python -m modmanager                       # opens the app window (served on 127.0.0.1:8765), pick the game in the sidebar
-python -m modmanager --browser             # use the default browser instead of the app window
-python -m modmanager --no-browser          # only run the server
-python -m modmanager --game eu5            # open a specific game first
-python -m modmanager --game ck3 --user-dir "D:/Docs/Paradox Interactive/Crusader Kings III" \
-                                --workshop-dir "D:/Steam/steamapps/workshop/content/1158310"
-python -m modmanager --list-games
-```
+## Install (Windows)
+1. Install **Python 3.8 or newer** from python.org (keep "py launcher" ticked; check with `py --version`). You also need Edge or Chrome.
+2. Download **`Mod-Manager-python.pyzw`** from the [Releases page](../../releases) and double-click it (or run `py Mod-Manager-python.pyzw` in PowerShell to see what it is doing).
+3. The app window opens. Pick your game in the sidebar. The first time, a setup dialog finds the install (every Steam library, any drive) and asks you to confirm it.
 
-The first time you open a game, a setup dialog finds the install (every Steam library, any drive, renamed folders) and asks you to confirm it. You can paste *any* path inside the install and it resolves to the root.
+Later versions: press **Check for updates** in the app. It downloads the new file, checks its SHA-256 against the release's `SHA256SUMS.txt`, replaces itself and restarts. Your playsets and settings are kept.
 
-> **Status:** everything is tested against fake installs and a stub game (see [docs/08-testing.md](docs/08-testing.md)). **Crusader Kings III and Europa Universalis V are confirmed on a real install** (Play starts the game with the playset's mods). The files of VIC3 and Bannerlord were checked on a real PC ([docs/22-checked-on-a-real-pc.md](docs/22-checked-on-a-real-pc.md)), but Play is not yet confirmed for them. The in-app setup dialog says so, and [docs/13-verification-checklist.md](docs/13-verification-checklist.md) lists the five-minute checks that settle it per game.
+There is no exe because Smart App Control blocks unsigned programs, so releases carry only this file. (Test builds still include an unsigned exe and installer for PCs that allow them.)
 
-## Python edition (no exe; for PCs where Smart App Control blocks unsigned programs)
-Needs **Python 3.8+ from python.org** (keep "py launcher" ticked; check with `py --version`) and Edge or Chrome. Download **`Mod-Manager-python.pyzw`** from the Releases page and double-click it, or run `py Mod-Manager-python.pyzw`. It updates itself like the exe. Details and limits are in the release notes of 0.9.0 (install steps) and the changelog.
+**From source** (any OS, also for development): `git clone`, or **Code → Download ZIP** and unzip. Then `python -m modmanager`, or double-click `Start Ronin Mod Manager.bat` (Windows) / `.command` (macOS/Linux).
 
-## Download the app (recommended once a release exists)
-Open the repository's **Releases** page. On Windows download **`Mod-Manager-Setup.exe`** and run it: it installs for your user (no administrator rights), adds a Start-menu entry (and optionally a desktop shortcut) and an uninstaller. Prefer no installer? `Mod-Manager-windows.exe` runs on its own. macOS and Linux apps are not built yet (saved for later); use the Python route below. No Python needed on Windows. Start it and your browser opens the app. When a newer release is published a banner offers **Update now**: the app downloads the new version, checks it against the release's `SHA256SUMS.txt`, replaces itself and restarts. Your playsets and settings live in your user folder and are kept.
-Unsigned apps trigger a warning the first time: Windows SmartScreen ("More info" → "Run anyway"), macOS ("System Settings → Privacy & Security → Open Anyway"). See `docs/14-updates-and-errors.md`.
+## Use it in six steps
+1. **Pick the game** in the sidebar (each game has its own playsets, library, backups and colours).
+2. **Make a playset**: *+ New*, or *Presets* for a ready-made list, or *Import* the playsets the game's own launcher already has.
+3. **Add mods**: the *Library* tab lists every local and Workshop mod found; add the ones you want and set their order on the *Load order* tab (drag rows, tick to enable). Drop a `.zip` on the window to install a mod.
+4. **Fix warnings**: the *Warnings* tab names each issue (missing dependency, wrong order, incompatible mod) with a one-click fix. **Auto-sort** keeps dependencies first and explains each position ("why is it here?").
+5. **Look at conflicts**: the *Conflicts* tab shows which mod wins when two change the same file or definition. *Compare* puts two playsets side by side.
+6. **Press Play.** The app writes what the game needs and starts it. The log of what it did is saved (see below).
 
-If something goes wrong, the details are written to **`Documents/Ronin Mod Manager/RoninModManager-errors.log`** (the red banner in the app shows the exact path). Send that file when reporting a problem.
+Right-click a playset for Open, Rename, Duplicate, Favourite, Settings and Delete.
 
-## Window
-The app opens in its own window and closing the window quits it. On Windows and macOS that is a native window around the system web view (Windows needs the Edge WebView2 runtime, which Windows 11 and current Windows 10 already have). Without it the app falls back to an Edge/Chrome "app" window, then to your default browser (`--browser` forces the browser). Under the hood it is still a small server on `127.0.0.1` that only this PC can reach. The native window is built and probed in CI but has **not** been opened on a real Windows or macOS desktop yet.
+## Status: what is confirmed on a real PC
+| Game | Play | Notes |
+|---|---|---|
+| Crusader Kings III | **confirmed** | starts `ck3.exe` directly with the playset's mods |
+| Europa Universalis V | **confirmed** | puts the mods into the game's own active playset (`playsets.json`) |
+| Victoria 3 | not yet | file format checked on a real PC; Play not yet tried |
+| Bannerlord | not yet | modules and dependencies checked on a real PC; Play not yet tried |
+| Games you add | beta | never marked verified |
 
-## Quick start (no Git)
-On GitHub press **Code → Download ZIP**, unzip it, and double-click `Start Ronin Mod Manager.bat` (Windows) or `Start Ronin Mod Manager.command` (macOS/Linux). You need Python 3.8+ installed.
+Everything else is tested against fake installs and a stub game ([docs/08-testing.md](docs/08-testing.md)). What a real PC showed, and what was fixed because of it: [docs/22-checked-on-a-real-pc.md](docs/22-checked-on-a-real-pc.md). Five-minute checks for the rest: [docs/13-verification-checklist.md](docs/13-verification-checklist.md).
+
+## If something goes wrong
+Send the file, not a description. Everything is in `Documents\Ronin Mod Manager\` (open Documents from File Explorer; OneDrive may redirect it):
+
+| File | Holds |
+|---|---|
+| `RoninModManager-<game>.log` (for example `-eu5.log`) | what the app did with that game: what it found, every Play (playset, mods in order, the game's files before and after, and again 15 and 90 seconds later) |
+| `RoninModManager-errors.log` | crashes, failed requests, page errors |
+| `RoninModManager-activity.log` | test builds only: timing of every step |
+
+Your Windows user name is replaced by `<user>` in these files. Settings → Problems shows the exact paths (that is the Settings section, not the *Warnings* tab). Settings → Game → **Check this game** reports what was found and what was looked for.
 
 ## Features
-- **Three games, one app.** A game switcher with a per-game theme; every game keeps its own playsets, library, backups and settings. Adding a game is a data entry in `modmanager/games.py`.
-- **Playsets**: unlimited, each with its own mods, load order, notes, extra launch arguments and (optionally) its **own save folder**; duplicate, export/import to share (a file for the wrong game is refused with a clear message).
-- **Library**: scans local and Steam Workshop mods on start, on **Refresh** and when you return to the window; flags mods that are **new / updated / removed**.
-- **Auto-sort** from dependencies (by name or by metadata id), with a **"why is it here?"** explanation per mod; your manual order is respected wherever no rule applies.
-- **Problems with one-click fixes**: missing or disabled dependency (enables it and what it needs), wrong order, dependency loops, incompatible mods, duplicate names, mods built for another game version, missing files, damaged metadata.
-- **Conflicts with the winner shown**: whole-file overrides, same definition in different files (`REPLACE:` winners marked intentional, `INJECT:` listed separately as *patches*), `replace_path` wiping earlier mods, duplicate localization keys.
-- **Base-game comparison**: what each mod overrides in the vanilla game (toggle in Settings; base files are only parsed where a mod defines the same keys, so it stays fast).
-- **Import the launcher's playsets**: the sidebar **Import** menu (and an automatic import when a game opens) brings in the playsets that already exist in the game's own Paradox launcher; see [docs/16-launcher-import.md](docs/16-launcher-import.md).
-- **Presets**: curated playsets as plain JSON (for example a RICE stack for CK3); one click turns one into a playset and lists what is not installed yet. See [docs/11-presets-and-downloads.md](docs/11-presets-and-downloads.md).
-- **Getting Workshop mods**: *Open in Steam* (you press Subscribe) or, optionally, `steamcmd` with an account you already logged in. No password is ever handled by this app.
-- **Install `.zip` mods** by drag and drop (checked for unsafe contents); **uninstall** and **upgrades** keep the old version in a backup folder.
-- **Compare playsets** side by side, with one-click *Add*, *Match state*, *Match order*.
-- **Updates** from this repository's Releases: the downloaded app offers an **Update now** button (checksum-verified); a copy run from source only reports that a newer version exists. Checks are manual, `--check-update`, or on start (**off by default**).
-- **Play** writes the game's load file (previous one saved as `.bak`), creates missing Workshop descriptors where the game needs them, and starts the game through Steam (or `--game-exe`).
+- **Playsets**: unlimited, each with its own mods, order, notes, launch arguments and (optionally) its own save folder; duplicate, export/import to share.
+- **Library**: local and Workshop mods, flagged new / updated / removed; **Rescan** redoes start-up's work while the app runs.
+- **Auto-sort** from dependencies with a "why is it here?" per mod.
+- **Problems with one-click fixes**: missing/disabled dependency, wrong order, loops, incompatible mods, duplicate names, wrong game version, missing files, damaged metadata.
+- **Conflicts with the winner shown**: whole-file overrides, same definition in different files (`REPLACE:` marked intentional, `INJECT:` listed as patches), `replace_path`, duplicate localization keys; and what each mod changes in the base game.
+- **Compare playsets** side by side (*Compare* tab).
+- **Import the launcher's playsets** ([docs/16](docs/16-launcher-import.md)).
+- **Presets** from Workshop collections ([docs/11](docs/11-presets-and-downloads.md)); **getting Workshop mods** via *Open in Steam* or optional `steamcmd` (no password is ever handled by the app).
+- **Install `.zip`/`.tar*` mods** by drag and drop (checked for unsafe contents); uninstall and upgrades keep the old version in a backup folder.
+- **Saves per playset**: a playset made now gets its own save folder, so the game's save list shows only that playset's saves.
+- **Add your own game** (beta, Stellaris and Imperator: Rome templates included, unchecked): [docs/20](docs/20-v0.9-plan.md).
+- **Updates** from this repository's Releases, and an optional test channel ([docs/19](docs/19-test-builds-and-releases.md)). Checks are manual unless you turn on "check when the manager starts".
 
 ## What differs per game
-| | Crusader Kings III | Europa Universalis V | Victoria 3 |
-|---|---|---|---|
-| Steam app id | 1158310 | 3450310 | 529340 |
-| Load file in the user folder | `dlc_load.json` | `dlc_load.json` | `content_load.json` |
-| Entries in it | `mod/<name>.mod`, `mod/ugc_<id>.mod` | `mod/<folder>`, or the Workshop path; plus the game's own `playsets.json` | `enabledMods: [{"path": <absolute mod folder>}]` |
-| Play starts | the game's exe (from `launcher/launcher-settings.json`) | Steam | the game's exe (from `launcher/launcher-settings.json`) |
-| Install marker | `game/common` | `game/in_game` | `game/common` |
-| Definition folders | `common/`, `events/` | `in_game/common/` | `common/`, `events/` |
-| Base game compared | all of `game/` | `in_game`, `main_menu`, `loading_screen` | all of `game/` |
+| | Crusader Kings III | Europa Universalis V | Victoria 3 | Bannerlord |
+|---|---|---|---|---|
+| Steam app id | 1158310 | 3450310 | 529340 | 261550 |
+| What Play writes | `dlc_load.json` | `playsets.json` (active playset) and `dlc_load.json` | `content_load.json` | nothing |
+| Entries | `mod/<name>.mod`, `mod/ugc_<id>.mod` | folder paths in the game's playset | `enabledMods: [{"path": <folder>}]` | module ids on the command line |
+| Play starts | `binaries/ck3.exe` | Steam | `binaries/victoria3.exe` | `Bannerlord.exe` |
+| Mod is | folder with `.mod`/metadata | folder with metadata | folder with metadata | folder with `SubModule.xml` |
+| Conflict analysis | yes | yes | yes | no (load order only) |
 
-Details and what is still to verify: [docs/02-game-notes.md](docs/02-game-notes.md).
+More: [docs/02-game-notes.md](docs/02-game-notes.md), [docs/17-bannerlord.md](docs/17-bannerlord.md).
 
-**Bannerlord** works differently (modules with a `SubModule.xml`, started with a module list on the command line, no load file, no conflict analysis) and is **unverified on a real install**: see [docs/17-bannerlord.md](docs/17-bannerlord.md).
+## Known limits
+- The official launcher keeps its own playsets in `launcher-v2.sqlite`; this tool never edits it. Start the game from this tool so its load order is used.
+- Mods install from `.zip` and `.tar*` archives; `.7z` and `.rar` are not supported.
+- Definition scanning covers top-level keys in the game's script folders; it does not model per-database merge rules.
+- Saves per playset are confirmed for CK3 only.
+- Workshop ids in presets were checked on Steam but the presets were not played.
+- Windows only for now; the Python code also runs on macOS and Linux, but nothing else is tried.
 
 ## Logo and trademarks
 No game artwork is stored in this repository. The header shows each game's logo, read from your own Steam cache, a `logo.*` in the game's config folder, or a file passed with `--logo`. If none is found, the app downloads Steam's public logo once and keeps it on your PC (turn this off under Settings → App & updates, or with `MODMANAGER_FETCH_LOGOS=0`).
 
-This is an unofficial fan tool. It is not affiliated with or endorsed by Paradox Interactive or Valve. Crusader Kings, Europa Universalis, Victoria and Steam, and their names and logos, belong to their owners.
+This is an unofficial fan tool, not affiliated with or endorsed by Paradox Interactive, Taleworlds or Valve. The games' names and logos belong to their owners.
 
-## Known limits
-- The official launcher keeps its own playsets in `launcher-v2.sqlite`; this tool does not edit it. Start the game through this tool so its load order is used.
-- Mods install from `.zip` and `.tar` archives (`.tar.gz`, `.tar.bz2`, `.tar.xz`); `.7z` and `.rar` are not supported.
-- Definition scanning covers top-level keys in the game's script folders; it does not understand per-database merge rules.
-- Saves per playset: a new playset gets its own save folder; one playset per game (chosen in Playset settings) keeps the game's existing saves. Not yet confirmed in a game.
-- Presets ship with **unverified** Workshop ids; read [docs/11](docs/11-presets-and-downloads.md) before relying on one.
+## Command line
+```bash
+python -m modmanager                       # app window on 127.0.0.1:8765
+python -m modmanager --browser             # default browser instead of the app window
+python -m modmanager --no-browser          # only run the server
+python -m modmanager --game eu5            # open this game first
+python -m modmanager --game ck3 --user-dir "D:/Docs/Paradox Interactive/Crusader Kings III" --workshop-dir "D:/Steam/steamapps/workshop/content/1158310"
+python -m modmanager --list-games | --version | --check-update
+```
+The server answers `127.0.0.1` only. Set `MODMANAGER_CONFIG_DIR` to keep the app's data somewhere else.
 
 ## Development
 ```bash
-python -m unittest discover -s tests -t .          # unit/API/fuzz/stub-game tests
+python -m unittest discover -s tests -t .          # ~500 unit/API/fuzz/stub-game tests, no game needed
 npm i --no-save playwright && npx playwright install chromium
-for t in ui order compare games features culture switch; do node tests/e2e/$t.mjs; done   # browser end-to-end
+node tests/e2e/ui.mjs                               # browser end-to-end (one script per area in tests/e2e)
 GAME=ck3 node tests/e2e/ui.mjs                      # the same flow on CK3
+python tools/build_pyz.py dist/Mod-Manager-python.pyzw
 ```
-Set `MODMANAGER_CONFIG_DIR` to keep the config somewhere else (tests do).
+Branches: work happens on `nightly`; every push builds the test build. `main` is releases only ([docs/15-releasing.md](docs/15-releasing.md), [docs/19-test-builds-and-releases.md](docs/19-test-builds-and-releases.md)). Add a game: [docs/03-architecture.md](docs/03-architecture.md).
 
 ## Sources and credits
 Where facts in this project come from. Nothing here is copied code; the open-source projects were read to learn file layouts.
@@ -119,23 +141,27 @@ This project was written with the help of an AI coding assistant (see the note a
 |---|---|
 | [docs/00-vision.md](docs/00-vision.md) | Vision, principles, non-goals |
 | [docs/01-requirements.md](docs/01-requirements.md) | Feature checklist |
-| [docs/02-game-notes.md](docs/02-game-notes.md) | Per-game facts, assumptions, what to verify |
+| [docs/02-game-notes.md](docs/02-game-notes.md) | Per-game facts, what is confirmed |
 | [docs/03-architecture.md](docs/03-architecture.md) | Modules, data, how to add a game |
 | [docs/04-ui-design.md](docs/04-ui-design.md) | Screens and UX rules |
-| [docs/05-roadmap.md](docs/05-roadmap.md) | Milestones |
-| [docs/06-decisions.md](docs/06-decisions.md) | Decisions, including the merge |
+| [docs/05-roadmap.md](docs/05-roadmap.md) | Done and next |
+| [docs/06-decisions.md](docs/06-decisions.md) | Decisions and why |
 | [docs/07-security.md](docs/07-security.md) | Security rules |
 | [docs/08-testing.md](docs/08-testing.md) | What is tested and how |
-| [docs/09-build-log.md](docs/09-build-log.md) | What was built, found, fixed and left unverified |
+| [docs/09-build-log.md](docs/09-build-log.md) | History: how the three managers became one |
 | [docs/10-migration.md](docs/10-migration.md) | Moving from the standalone managers |
-| [docs/11-presets-and-downloads.md](docs/11-presets-and-downloads.md) | Presets, Workshop downloads |
+| [docs/11-presets-and-downloads.md](docs/11-presets-and-downloads.md) | Presets, Workshop downloads, steamcmd |
 | [docs/12-api.md](docs/12-api.md) | HTTP API reference |
 | [docs/13-verification-checklist.md](docs/13-verification-checklist.md) | Checks to run on a real install |
+| [docs/14-updates-and-errors.md](docs/14-updates-and-errors.md) | Self-update, logs, the app window |
+| [docs/15-releasing.md](docs/15-releasing.md) | How to publish a release |
 | [docs/16-launcher-import.md](docs/16-launcher-import.md) | Importing the launcher's playsets |
 | [docs/17-bannerlord.md](docs/17-bannerlord.md) | Bannerlord: modules, order, launching |
-| [docs/19-test-builds-and-releases.md](docs/19-test-builds-and-releases.md) | Test builds (nightly) and how releases are made |
-| [docs/20-v0.9-plan.md](docs/20-v0.9-plan.md) | Adding your own games (beta) and what was considered and left out |
-| [docs/22-checked-on-a-real-pc.md](docs/22-checked-on-a-real-pc.md) | What the four games' files look like on a real PC and what was fixed because of it |
+| [docs/18-more-games-plan.md](docs/18-more-games-plan.md) | Plan for Stellaris, Imperator, Civ VI, Cities: Skylines |
+| [docs/19-test-builds-and-releases.md](docs/19-test-builds-and-releases.md) | Test builds (nightly) and releases |
+| [docs/20-v0.9-plan.md](docs/20-v0.9-plan.md) | Adding your own games (beta), what was left out |
+| [docs/21-dev-data-locations.md](docs/21-dev-data-locations.md) | Where every file and log is (for testers) |
+| [docs/22-checked-on-a-real-pc.md](docs/22-checked-on-a-real-pc.md) | What a real PC showed, and the fixes |
 
 ## License
 [MIT](LICENSE) © 2026 Ronin1mil

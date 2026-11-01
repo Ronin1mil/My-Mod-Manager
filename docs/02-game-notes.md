@@ -2,7 +2,7 @@
 
 Legend: **[known]** documented or confirmed by the working standalone managers' behaviour on the files they read; **[assumed]** best knowledge, not confirmed on a real install; **[verify]** a specific check in [13-verification-checklist.md](13-verification-checklist.md). The values below are exactly what `modmanager/games.py` encodes and `tests/test_games.py` pins. **CK3 and EU5 are marked `verified`** (Play confirmed on a real install). What was read from a real PC for every game is in [22-checked-on-a-real-pc.md](22-checked-on-a-real-pc.md).
 
-## Shared (all three games)
+## Shared (the Paradox games: CK3, EU5, VIC3)
 - User dir: `Documents/Paradox Interactive/<Game>` (Windows, OneDrive-redirected Documents is handled), `~/.local/share/Paradox Interactive/<Game>` (Linux), `~/Library/Application Support/Paradox Interactive/<Game>` (macOS). **[known]**
 - Local mods: `<user dir>/mod/<name>/` plus an optional `<user dir>/mod/<name>.mod` stub with `path="mod/<name>"`. A bare folder with its own metadata also counts. **[known]**
 - Workshop mods: `<steam library>/steamapps/workshop/content/<app id>/<id>/`. Every library in `libraryfolders.vdf`, the Windows registry and common hand-made libraries (`G:\SteamLibrary`) are searched. A `ugc_<id>.mod` stub in `mod/` for a Workshop mod we already found is ignored. **[known]**
@@ -33,11 +33,11 @@ Legend: **[known]** documented or confirmed by the working standalone managers' 
 | Install marker | `game/in_game` |
 | Definition folders | `common/` anywhere in the first two path levels (`in_game/common/...`); events are not scanned |
 | Active playset | **[known]** `<user dir>/playsets.json` (`{"playsets":[{name,isActive,orderedListMods:[{path,isEnabled}],DLC}]}`): the game starts with the playset marked `isActive`. Play writes the mods into the playset there with the same name as the app's playset (adds one if missing) and makes it the only one with `isActive` (backup `playsets.json.bak`). Confirmed: the game's `debug.log` says `Switching to playset ... Name: <that playset>` and loads its mods |
-| Load file | `<user dir>/dlc_load.json` with `"enabled_mods": ["mod/<folder>", "<workshop path>"]` (folder for local, absolute Workshop folder for Workshop) **[assumed]**; the previous standalone manager could not confirm EU5 reads load order from this file **[verify]** |
+| Load file | `<user dir>/dlc_load.json` with `"enabled_mods": ["mod/<folder>", "<workshop path>"]` is still written, but **the game does not read it**: EU5 uses `playsets.json` (row above). Kept so nothing else that reads it breaks. |
 | Base game | `in_game`, `main_menu`, `loading_screen` under `game/` |
 | Metadata | `metadata.json` in `.metadata/` or `metadata/` **[assumed]** |
 
-If the game ignores the file, use this tool for analysis, presets and sharing, and mirror the order in the stock launcher until the load file format is confirmed. The export is isolated in `store.write_load_file` / `store.mod_entry` and driven by `Game.load_style`.
+EU5 has no `launcher` folder, so Play still starts it through Steam. The playset list is written by `store.write_launcher_playset` (`Game.playsets_file`); the log `RoninModManager-eu5.log` shows the file before and after, and again 15 and 90 seconds after Play, which is how the real format was found.
 
 ## Victoria 3 (`vic3`)
 | | |
@@ -49,6 +49,10 @@ If the game ignores the file, use this tool for analysis, presets and sharing, a
 | Workshop entries | the Workshop folder itself; no `.mod` stubs (the real `mod/` folder has none, and the launcher database leaves `gameRegistryId` empty) |
 | Extras | `multiplayer_synchronized` from `game_custom_data` shows an "MP-unsafe" badge |
 | Launch arguments | passed to `binaries/victoria3.exe` after `-gdpr-compliant` |
+| Play | starts `binaries/victoria3.exe` directly with `SteamAppId` set; **not yet confirmed** in a game |
+
+## Mount & Blade II: Bannerlord (`bannerlord`)
+Not a Paradox game: modules with a `SubModule.xml`, started with a module list, no load file, no conflict analysis. Everything is in [17-bannerlord.md](17-bannerlord.md).
 
 ## Changing what is assumed
 Everything above is data (`games.py`) or one function (`store.mod_entry`). When a real-install check disagrees, fix the data, update the pinned values in `tests/test_games.py` / `tests/test_store_games.py`, set `verified=True` for that game, and update this page.

@@ -8,7 +8,8 @@ For whoever is testing a nightly / test build. Not for end users. Everything bel
 | Error log | `Documents\Ronin Mod Manager\RoninModManager-errors.log` | every crash, failed request and page error |
 | Activity log (test builds only) | `Documents\Ronin Mod Manager\RoninModManager-activity.log` (and `.log.1`, the older half) | timestamps and durations of every request, scan and update step; shows what was slow or stuck |
 | "Check this game" report | Settings -> Game -> Check now -> Copy report | what was found and what was looked for (install, folders, mods, launcher) |
-| Version | bottom left of the window, e.g. `v0.8.5 · test 5097204` | which build produced the logs |
+| Game log | `Documents\Ronin Mod Manager\RoninModManager-<game>.log` (one per game, e.g. `-eu5.log`) | what the app did with that game and what the game's files looked like after Play |
+| Version | bottom left of the window, e.g. `v0.9.12 · test 5097204` | which build produced the logs |
 
 The activity log is on automatically for test builds. For a normal release start the app with the environment variable `MODMANAGER_ACTIVITY_LOG=1`. Format: `date time.ms [thread] > label` when a step starts, `< label N ms` when it ends.
 
@@ -49,8 +50,8 @@ Local mods: `<Documents folder>\mod\<mod>\` with a `mod\<mod>.mod` stub (Paradox
 Release page of the rolling test build: https://github.com/Ronin1mil/My-Mod-Manager/releases/tag/test-build
 
 Direct files (always the newest test build):
-- https://github.com/Ronin1mil/My-Mod-Manager/releases/download/test-build/Mod-Manager-windows.exe
-- https://github.com/Ronin1mil/My-Mod-Manager/releases/download/test-build/Mod-Manager-Setup.exe
+- https://github.com/Ronin1mil/My-Mod-Manager/releases/download/test-build/Mod-Manager-python.pyzw (the one to use)
+- https://github.com/Ronin1mil/My-Mod-Manager/releases/download/test-build/Mod-Manager-windows.exe and `Mod-Manager-Setup.exe` (unsigned; Smart App Control may block them)
 
 Inside the app: Settings -> App & updates -> Test builds -> "Check for a test build".
 

@@ -10,8 +10,12 @@ JSON over HTTP on `127.0.0.1` (default port 8765). Everything is same-origin onl
 | `POST /api/custom-games/remove` | (beta) `{id, erase_data?}` forgets a game you added; its saved playsets stay unless `erase_data` |
 | `POST /api/settings` | `{auto_update_check?, dismissed_update?, last_game?}` (validated; unknown keys 400) |
 | `POST /api/update-check` | `{force?}` -> release check result (cached 10 min) |
+| `POST /api/self-update` · `GET /api/self-update` | start the checksum-verified update · its progress |
+| `POST /api/full-rescan` | **Rescan**: start-up's work again for every game |
+| `POST /api/erase-all` | Settings -> Erase all data (needs the typed word) |
+| `POST /api/client-error` | the page reports a script error (goes to the error log) |
 
-## Per game: `/api/<ck3|eu5|vic3>/...`
+## Per game: `/api/<game id>/...` (`ck3`, `eu5`, `vic3`, `bannerlord`, or `cg-<name>` for a game you added)
 | Route | |
 |---|---|
 | `GET state` | mods, playsets, active, folders, game root/version, `has_logo`, `include_vanilla`, `setup_done`, `setup_needed`, steamcmd settings |
@@ -27,6 +31,11 @@ JSON over HTTP on `127.0.0.1` (default port 8765). Everything is same-origin onl
 | `POST playsets` | `{name, mods?}` -> `{id}` |
 | `POST playsets/<id>/` `update` `duplicate` `delete` `activate` `autosort` `enable` `enable_all` `disable_all` `prune` `save-preset` `launch` | playset actions (`update` takes name, mods, disabled, notes, launch_args, auto_sort, separate_saves; with auto-sort on, mods are re-sorted) |
 | `POST import` | a shared playset document (game-checked) -> `{id, missing}` |
+| `GET launcher` · `POST launcher/import` | the game launcher's playsets · import the chosen ones |
+| `POST presets/import-collection` | turn a Steam Workshop collection into a preset |
+| `POST mod-updates` · `POST downloads/retry` | check Workshop mods for updates · retry a failed or rate-limited download |
+| `POST playsets/<id>/merge` · `saves-home` | merge playsets · make this playset the one that keeps the game's own saves |
+| `POST fav-mod` · `POST ui` | favourite mods · remembered view settings |
 | `POST install` | raw `.zip` body, `X-Filename` header (streamed, 1 GB cap) |
 | `POST mods/<id>/uninstall` | move a local mod to backups |
 | `GET diagnose` | (beta) `{game, beta, checks: [{ok, label, detail}]}`: what was found and what was looked for |
