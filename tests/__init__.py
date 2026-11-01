@@ -30,3 +30,6 @@ from modmanager import workshop as _workshop  # noqa: E402
 
 REAL_FIND_STEAMCMD = _workshop.find_steamcmd
 _workshop.find_steamcmd = lambda: None
+
+# The desktop shortcut goes to a throwaway "desktop", never the real one.
+os.environ["MODMANAGER_DESKTOP_DIR"] = os.path.join(_cfg, "Desktop")

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Desktop icon.** At the first start (Windows) the app asks once whether to put a Ronin Mod Manager icon on the desktop; Settings > App & updates can make it later. It starts this copy of the app: the installed exe, the `.pyzw` file with `pythonw`, or a source folder with `pythonw -m modmanager` (no console window), with the app's own icon. Windows writes the shortcut itself; nothing is asked again after either answer
+
 ## 0.9.12 - Saves per playset, faster start-up, Rescan, steamcmd for Bannerlord, Steam rate limits
 Each playset now has its own saves, Play starts Crusader Kings III and Europa Universalis V with your playset's mods (both confirmed on a real PC), Victoria 3 gets the load file format it actually reads, and Bannerlord has eight ready-made presets that steamcmd can now download straight into the game. Start-up is about two and a half times faster, a new **Rescan** button redoes it while the app runs, playsets have a right-click menu, and Steam rate limits show a countdown instead of an error. (0.9.2 was never released; it went out only as test builds.)
 

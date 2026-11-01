@@ -17,7 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from . import APP_NAME, BUILD, __version__, collections, compare, detect, games as gamesmod, install, launch, order, presets, saves, scan, update, updates
-from . import bootworker, customgames, errorlog, gamelog, launcherdb, perflog, selfupdate, workshop
+from . import bootworker, customgames, errorlog, gamelog, launcherdb, perflog, selfupdate, shortcut, workshop
 from .library import Library
 from .paths import LOGO_TYPES, config_dir, fetch_best_logo, find_first, find_logo, game_version, launcher_exe, user_dirs, workshop_dirs
 from .store import GlobalSettings, Store, write_load_file
@@ -908,7 +908,17 @@ class Hub:
         return {"log_file": str(errorlog.log_path()), "can_self_update": selfupdate.can_self_update() or self.updater_forced, "games": [g.public() for g in self.games.values()], "last_game": s["last_game"],
                 "custom_games": self.custom.defs, "game_templates": customgames.TEMPLATES,
                 "version": __version__, "build": BUILD, "mode": os.environ.get("MODMANAGER_MODE", ""), "ready": self.ready, "settings": s, "update": self._update_cache[1] if self._update_cache else None,
-                "update_pending": self.update_pending}
+                "update_pending": self.update_pending, "shortcut": self.shortcut_info()}
+
+    def shortcut_info(self):
+        return {"supported": shortcut.supported(), "exists": shortcut.supported() and shortcut.exists(), "path": str(shortcut.path())}
+
+    def desktop_shortcut(self, make):
+        """The start-up question's answer (or the Settings button): make the shortcut or not; either way it is not asked again."""
+        if make:
+            shortcut.create(config_dir())
+        self.settings.update(shortcut_asked=True)
+        return self.shortcut_info()
 
     def save_custom_game(self, b):
         """Add a game, or replace the one named by b['id'] (beta). -> the page's game list."""
@@ -1276,6 +1286,8 @@ def make_handler(hub):
                     if parts == ["api", "custom-games", "remove"]:
                         b = self._body()
                         return self._send(200, hub.remove_custom_game(b.get("id"), b.get("erase_data") is True))
+                    if parts == ["api", "desktop-shortcut"]:
+                        return self._send(200, hub.desktop_shortcut(self._body().get("make") is True))
                     if parts == ["api", "full-rescan"]:
                         return self._send(200, full_rescan(hub, lambda t: perflog.log("rescan: " + t)))
                     if parts == ["api", "erase-all"]:

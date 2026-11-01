@@ -510,6 +510,11 @@ async function openPaths(first) {
       </div>
     </section>
     <section data-pane="app" hidden>
+      ${GI.shortcut && GI.shortcut.supported ? `<div class="card">
+        <h3>Desktop icon</h3>
+        <p class="desc">${GI.shortcut.exists ? 'There is a Ronin Mod Manager icon on your desktop.' : 'No Ronin Mod Manager icon on your desktop yet.'} Making it again points it at this copy of the app.</p>
+        <div class="acts"><button id="s-shortcut">${GI.shortcut.exists ? 'Make it again' : 'Make desktop icon'}</button></div>
+      </div>` : ''}
       <div class="card">
         <h3>Updates</h3>
         <p class="desc">${GI.can_self_update ? 'This is the downloaded app. When a newer version exists, update from the banner at the top. Your playsets and settings are kept.' : 'This copy runs from source files, so it cannot replace itself. Update it with Git or download the ZIP again. The downloadable app from the Releases page updates itself.'}</p>
@@ -540,6 +545,10 @@ async function openPaths(first) {
     </div>
     </div>
     <div class="st-foot"><span class="mut">Changes on this window are applied when you press Save.</span><span><button id="p-cancel">${first ? 'Skip' : 'Cancel'}</button> <button id="p-save" class="pri">Save</button></span></div>`;
+  if ($('s-shortcut')) $('s-shortcut').onclick = guard(async () => {
+    GI.shortcut = await app('desktop-shortcut', {make: true}); GI.settings.shortcut_asked = true;
+    toast('Made "Ronin Mod Manager" on your desktop.'); $('s-shortcut').textContent = 'Make it again';
+  });
   $('st-tabs').onclick = e => {
     const t = e.target.closest && e.target.closest('[data-st]'), k = t && t.dataset.st; if (!k) return;
     d.querySelectorAll('[data-st]').forEach(b => b.classList.toggle('on', b.dataset.st === k));
@@ -1156,4 +1165,27 @@ setInterval(() => { fetch('/api/ping').catch(() => {}); }, 5000);   // "this pag
   try { want = want || localStorage.getItem('mm-game') || ''; } catch (e) { /* ignore */ }
   want = GI.games.some(g => g.id === want) ? want : (GI.games.some(g => g.id === GI.last_game) ? GI.last_game : GI.games[0].id);
   await useGame(want, true);
+  askShortcut();
 })().catch(e => fail(e, 'startup'));
+
+// Once, at start-up: offer a desktop icon that starts this copy (Windows; not asked again after either answer)
+function askShortcut() {
+  const sc = GI.shortcut;
+  if (!sc || !sc.supported || sc.exists || GI.settings.shortcut_asked) return;
+  const d = $('dlg');
+  if (d.open) { d.addEventListener('close', () => setTimeout(askShortcut, 300), {once: true}); return; }   // after the setup dialog
+  d.className = 'mid';
+  d.innerHTML = `<h2 style="margin-top:0">Desktop icon?</h2>
+    <p>Make an icon for Ronin Mod Manager on your desktop, so you can start it from there? It starts this copy of the app.</p>
+    <p class="mut">You can make it later in Settings &gt; App &amp; updates. This is only asked once.</p>
+    <div class="dlg-btns"><button id="sc-no">No thanks</button><button id="sc-yes" class="pri">Make the desktop icon</button></div>`;
+  d.showModal();
+  const answer = make => guard(async () => {
+    d.close();
+    GI.shortcut = await app('desktop-shortcut', {make});
+    GI.settings.shortcut_asked = true;
+    if (make) toast('Made "Ronin Mod Manager" on your desktop.');
+  });
+  $('sc-yes').onclick = answer(true);
+  $('sc-no').onclick = answer(false);
+}

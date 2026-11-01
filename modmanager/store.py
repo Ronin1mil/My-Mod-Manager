@@ -24,7 +24,7 @@ SETTINGS_DEFAULTS = {"game_dir": "", "user_dir": "", "workshop_dir": "", "includ
 UI_SCHEMES = ("default", "midnight", "parchment", "forest", "slate", "rose", "contrast")
 UI_TEXT = ("small", "normal", "large", "xlarge")
 GLOBAL_DEFAULTS = {"auto_update_check": False, "dismissed_update": "", "last_game": "", "fetch_logos": True,
-                   "auto_import_launcher": True, "show_import_button": True}
+                   "auto_import_launcher": True, "show_import_button": True, "shortcut_asked": False}
 
 
 def _defaults():
