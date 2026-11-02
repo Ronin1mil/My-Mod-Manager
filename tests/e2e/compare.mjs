@@ -167,6 +167,21 @@ try {
     await p4.close();
   }
 
+  // ---- details panel: a mod with a Workshop id has an "Open in Workshop" button that asks the app to open its page
+  {
+    const p5 = await browser.newPage({ viewport: { width: 1200, height: 800 } });
+    await p5.route('**/api/vic3/state', async r => { const x = await r.fetch(); const j = await x.json(); j.mods.forEach(m => { if (m.id === 'local:A') m.remote_id = '3705667883'; }); await r.fulfill({ json: j }); });
+    let asked = null;
+    await p5.route('**/api/vic3/downloads', r => { asked = r.request().postDataJSON(); return r.fulfill({ json: { method: 'steam', opened: 1 } }); });
+    await p5.goto(`${base}/#vic3`); await p5.waitForSelector('#view .row, #view .empty');
+    await p5.click('[data-sel="local:A"]');
+    await p5.click('#drawer [data-dl1="3705667883"]');
+    await p5.waitForFunction(() => /Workshop page/.test(document.getElementById('toast').textContent));
+    assert.deepEqual(asked, { ids: ['3705667883'], method: 'steam' });
+    await p5.click('[data-sel="local:B"]').catch(() => {});
+    await p5.close();
+  }
+
   // ---- Tools > Check for updates: says "up to date", or offers the newest version and asks the app to install it
   {
     const p3 = await browser.newPage({ viewport: { width: 1000, height: 700 } });

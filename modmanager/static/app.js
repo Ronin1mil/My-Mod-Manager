@@ -783,6 +783,7 @@ function drawer() {
     ${m.description ? `<p>${esc(m.description)}</p>` : ''}
     ${m.supported_version ? `<h3>Made for game version</h3><p>${esc(m.supported_version)}</p>` : ''}
     ${m.tags.length ? `<h3>Tags</h3><p>${m.tags.map(t => `<span class="b">${esc(t)}</span>`).join(' ')}</p>` : ''}
+    ${m.remote_id ? `<p><button class="sm" data-dl1="${esc(m.remote_id)}" title="Opens this mod's Steam Workshop page in Steam">Open in Workshop</button></p>` : ''}
     <h3>Dependencies</h3>${deps}
     ${idx >= 0 && note ? `<h3>Why is it here?</h3><p>${esc(note.reason)}</p>` : ''}
     ${issuesOf(m.id).length ? `<h3>Issues</h3>${issuesOf(m.id).map(i => `<p class="${i.severity === 'error' ? 'err' : 'warn'}">${esc(i.message)} ${fixBtn(i)}</p>`).join('')}` : ''}
@@ -827,7 +828,7 @@ document.addEventListener('click', guard(async e => {
     tab = 'presets'; render();
     toast(r.missing.length ? `Playset created. ${r.missing.length} mod(s) still need downloading.` : 'Playset created. Everything is installed.');
   }
-  if (ds.dl1) await api('downloads', {ids: [ds.dl1], method: 'steam'});
+  if (ds.dl1) { await api('downloads', {ids: [ds.dl1], method: 'steam'}); toast('Opening the Workshop page in Steam…'); }
   if (ds.filesof) {
     const r = await api(`tree/${S.active}/${encodeURIComponent(ds.filesof)}`);
     $('d-files').innerHTML = '<div class="mut">' + r.total + ' files' + (r.truncated ? ' (first ' + r.files.length + ')' : '') + '</div><div id="d-ft"></div>';

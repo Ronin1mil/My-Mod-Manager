@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.4 - Open a mod in the Workshop
+Click a mod and the details panel has **Open in Workshop** (for any mod with a Steam Workshop id): it opens that mod's page in Steam, where you can read comments, rate or unsubscribe.
+
 ## 1.0.3 - Says why a Workshop mod is missing
 A Workshop item whose folder exists but was not shown as a mod is now listed at the top of the Library with the reason: **empty** (Steam has not downloaded it; it may be removed or still downloading) or **no descriptor.mod or metadata.json** (with the files it does have). The same lines go in the game's log.
 
