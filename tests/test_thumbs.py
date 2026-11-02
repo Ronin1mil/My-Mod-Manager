@@ -74,3 +74,18 @@ class Served(helpers.GameCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class UnreadFolders(unittest.TestCase):
+    def test_empty_and_unreadable_workshop_folders_are_listed(self):
+        from modmanager import scan
+        root = Path(tempfile.mkdtemp())
+        (root / "111").mkdir()                                      # Steam has not downloaded it
+        (root / "222").mkdir(); (root / "222" / "notes.txt").write_text("x")   # files, but no descriptor or metadata
+        (root / "333" / ".metadata").mkdir(parents=True); (root / "333" / ".metadata" / "metadata.json").write_text('{"name": "ok"}')
+        mods = scan.scan_mods(None, root)
+        self.assertEqual(list(mods), ["ws:333"])
+        got = {u["id"]: u for u in scan.unread_folders(root, mods)}
+        self.assertEqual(set(got), {"111", "222"})
+        self.assertTrue(got["111"]["empty"])
+        self.assertEqual(got["222"]["files"], ["notes.txt"])

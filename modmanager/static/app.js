@@ -38,6 +38,12 @@ const cur = () => (S && S.playsets ? S.playsets.find(p => p.id === S.active) || 
 const nameOf = id => { const m = M(id); return id === '__vanilla__' ? 'Base game' : m ? m.name : id; };
 const KINDS = {file: 'File', definition: 'Definition', patch: 'Patch', replace: 'Replace path', localization: 'Localization', vanilla: 'Base game'};
 let toastT, U = null, T = null, tq = '';
+// Workshop folders that exist on disk but were not read as mods: say so and why, instead of leaving them out silently
+function unreadBox() {
+  const u = (S && S.unread) || []; if (!u.length) return '';
+  return `<div class="warnbox"><b>${u.length} Workshop folder${u.length > 1 ? 's were' : ' was'} found but not shown as a mod.</b> ` +
+    u.map(x => `<div><code>${esc(x.id)}</code>: ${x.empty ? 'empty. Steam has not downloaded this item (it may be removed, or still downloading).' : 'has no descriptor.mod or metadata.json, so it is not a mod this app can read. Files: ' + esc(x.files.join(', '))}</div>`).join('') + '</div>';
+}
 function updPanel() {
   if (!U) return '';
   const up = U.filter(x => x.status === 'update'), unk = U.filter(x => x.status === 'unknown').length;
@@ -342,7 +348,7 @@ function viewLibrary(p) {
   $('view').innerHTML = `<div class="bar"><input type="search" id="q" placeholder="Search name or tag…" value="${esc(q)}">
     <select id="lib-sort" title="Sort the library" aria-label="Sort">${Object.entries(SORTS).map(([k, n]) => `<option value="${k}" ${k === libSort ? 'selected' : ''}>Sort: ${n}</option>`).join('')}</select>
     <select id="lib-tag" title="Show only mods with this tag" aria-label="Tag"><option value="">All tags</option>${tagOpts}</select>
-    <button id="libview" title="Switch between pictures and a plain list">${libView === 'cards' ? '☰ List' : '▦ Pictures'}</button><button id="favonly" class="${favOnly ? 'on' : ''}" title="Show only your favourite mods">★ Favourites only</button><button id="addall">Add all shown</button><button id="modupd" title="Ask Steam which Workshop mods have a newer version">Check mod updates</button></div>${updPanel()}${rem}` +
+    <button id="libview" title="Switch between pictures and a plain list">${libView === 'cards' ? '☰ List' : '▦ Pictures'}</button><button id="favonly" class="${favOnly ? 'on' : ''}" title="Show only your favourite mods">★ Favourites only</button><button id="addall">Add all shown</button><button id="modupd" title="Ask Steam which Workshop mods have a newer version">Check mod updates</button></div>${updPanel()}${unreadBox()}${rem}` +
     (rows || `<div class="empty">No mods found.<br>${S.user_dir ? 'Drop a mod archive (.zip, .tar.gz) here to install one, or check the folders in Settings.' : esc(GNAME()) + ' user folder not found. Set it in Settings → Game folders.'}</div>`);
   $('lib-sort').onchange = () => { libSort = $('lib-sort').value; try { localStorage.setItem('libSort', libSort); } catch (e) { /* only a convenience */ } viewLibrary(cur()); };
   $('libview').onclick = () => { libView = libView === 'cards' ? 'list' : 'cards'; try { localStorage.setItem('libView', libView); } catch (e) { /* only a convenience */ } viewLibrary(cur()); };

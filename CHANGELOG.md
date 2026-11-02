@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.3 - Says why a Workshop mod is missing
+A Workshop item whose folder exists but was not shown as a mod is now listed at the top of the Library with the reason: **empty** (Steam has not downloaded it; it may be removed or still downloading) or **no descriptor.mod or metadata.json** (with the files it does have). The same lines go in the game's log.
+
 ## 1.0.2 - Rescan blocks the window and shows a progress bar
 While **Tools > Rescan** runs, nothing behind it can be clicked or tabbed to, and a card shows what it is doing with a progress bar that follows the real work (each game's mods read, each game's playsets checked). **Refresh** shows the same card. It closes by itself when the work is done.
 

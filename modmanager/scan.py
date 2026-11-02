@@ -19,6 +19,29 @@ MAX_PER_KIND = 500
 VANILLA = "__vanilla__"  # pseudo-mod id for the base game when comparing against it
 
 
+def unread_folders(workshop_dir, mods, limit=40):
+    """Workshop item folders that exist but were not read as a mod -> [{"id", "files": [first names], "empty": bool}].
+    A folder Steam is still downloading (or could not download) is empty; one with files but no descriptor.mod and no
+    metadata.json is not a mod the manager can read."""
+    out = []
+    try:
+        if not workshop_dir or not _isdir(workshop_dir):
+            return out
+        for d in _listdir(workshop_dir):
+            if f"ws:{d.name}" in mods or not _isdir(d):
+                continue
+            try:
+                names = sorted(x.name for x in d.iterdir())[:8]
+            except OSError:
+                names = []
+            out.append({"id": d.name, "files": names, "empty": not names})
+            if len(out) >= limit:
+                break
+    except OSError:
+        pass
+    return out
+
+
 def _isdir(p):
     """is_dir() that says False instead of raising: Windows reports some links and mounts (WinError 448, 'untrusted
     mount point', and similar) as errors, and one such folder must not stop the whole mod list from loading."""

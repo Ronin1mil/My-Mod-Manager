@@ -260,6 +260,11 @@ class GameApp:
         path, an install) forgets the file listings too, so files edited inside a mod are seen."""
         changed = mods != self.mods
         self.mods = mods
+        old = getattr(self, "unread", [])
+        self.unread = scan.unread_folders(self.workshop_dir, mods) if self.game.kind != "modules" else []
+        if [u["id"] for u in self.unread] != [u["id"] for u in old] and self.unread:
+            gamelog.log(self.game.id, f"{len(self.unread)} Workshop folder(s) exist but were not read as a mod", [
+                f"{u['id']}: " + ("empty (Steam has not downloaded it)" if u["empty"] else "no descriptor.mod or metadata.json; files: " + ", ".join(u["files"])) for u in self.unread])
         if changed or not light:
             self.files = {}
             self._results = {}
@@ -467,7 +472,7 @@ class GameApp:
                 "playsets": list(d["playsets"].values()), "no_mods": self.store.no_mods(), "fav_mods": list(self.store.data.get("fav_mods", [])), "active": d["active"],
                 "user_dir": str(self.user_dir or ""), "workshop_dir": str(self.workshop_dir or ""),
                 "game_root": str(self.game_root or ""), "game_version": self.game_version,
-                "game_log": str(gamelog.log_path(self.game.id)), "has_logo": bool(self.logo), "logo_pending": self.logo_pending, "include_vanilla": s["include_vanilla"],
+                "game_log": str(gamelog.log_path(self.game.id)), "unread": getattr(self, "unread", []), "has_logo": bool(self.logo), "logo_pending": self.logo_pending, "include_vanilla": s["include_vanilla"],
                 "ui_scheme": s["ui_scheme"], "ui_text": s["ui_text"], "ui_img": s["ui_img"], "setup_done": s["setup_done"], "save_version_check": s["save_version_check"], "steamcmd": s["steamcmd"], "steam_user": s["steam_user"],
                 "setup_needed": not s["setup_done"] and not (self.game_root and self.user_dir)}
 
