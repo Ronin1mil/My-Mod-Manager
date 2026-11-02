@@ -142,6 +142,7 @@ try {
   await page.click('[data-tab=library]');
   await page.click('[data-add="local:D"]');
   await page.click('[data-tab=order]');
+  await page.waitForFunction(() => [...document.querySelectorAll('#view .nm')].some(n => n.textContent.trim() === 'D'));   // the add is answered asynchronously
   assert.ok((await names()).includes('D'));
 
   // --- details drawer explains position; toggling the row selection closes it
