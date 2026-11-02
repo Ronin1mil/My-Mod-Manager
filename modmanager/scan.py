@@ -27,8 +27,9 @@ def unread_folders(workshop_dir, mods, limit=40):
     try:
         if not workshop_dir or not _isdir(workshop_dir):
             return out
+        roots = {os.path.normcase(os.path.normpath(str(m.get("root") or ""))) for m in mods.values()}   # read through a mod/*.mod file
         for d in _listdir(workshop_dir):
-            if f"ws:{d.name}" in mods or not _isdir(d):
+            if f"ws:{d.name}" in mods or not _isdir(d) or os.path.normcase(os.path.normpath(str(d))) in roots:
                 continue
             try:
                 names = sorted(x.name for x in d.iterdir())[:8]
@@ -77,8 +78,21 @@ def _meta_file(root):
     return None
 
 
+def root_descriptor(d):
+    """The descriptor file in a mod's own folder: descriptor.mod, or (some Workshop mods ship it under their own name)
+    the only *.mod file there. None when there is none."""
+    df = Path(d) / "descriptor.mod"
+    if _isfile(df):
+        return df
+    try:
+        one = [x for x in Path(d).iterdir() if x.suffix.lower() == ".mod" and _isfile(x)]
+    except OSError:
+        return None
+    return one[0] if len(one) == 1 else None
+
+
 def looks_like_mod(d):
-    return _meta_file(d) is not None or _isfile(Path(d) / "descriptor.mod")
+    return _meta_file(d) is not None or root_descriptor(d) is not None
 
 
 def _load_desc(desc_file, root):
@@ -116,8 +130,7 @@ def scan_mods(user_dir=None, workshop_dir=None):
         def workshop_mod(d):
             try:
                 if _isdir(d) and looks_like_mod(d):
-                    df = d / "descriptor.mod"
-                    desc = _load_desc(df if _isfile(df) else None, d)
+                    desc = _load_desc(root_descriptor(d), d)
                     return f"ws:{d.name}", _info(f"ws:{d.name}", desc, d, "workshop", d.name)
             except OSError:
                 pass
@@ -141,9 +154,8 @@ def scan_mods(user_dir=None, workshop_dir=None):
         for d in _listdir(mod_dir):  # bare folders with their own metadata
             try:
                 if _isdir(d) and looks_like_mod(d) and not any(m["root"] == str(d) for m in mods.values()):
-                    df = d / "descriptor.mod"
                     mid = f"local:{d.name}"
-                    mods.setdefault(mid, _info(mid, _load_desc(df if _isfile(df) else None, d), d, "local", None))
+                    mods.setdefault(mid, _info(mid, _load_desc(root_descriptor(d), d), d, "local", None))
             except OSError:
                 continue
     return mods

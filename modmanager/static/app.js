@@ -39,9 +39,12 @@ const nameOf = id => { const m = M(id); return id === '__vanilla__' ? 'Base game
 const KINDS = {file: 'File', definition: 'Definition', patch: 'Patch', replace: 'Replace path', localization: 'Localization', vanilla: 'Base game'};
 let toastT, U = null, T = null, tq = '';
 // Workshop folders that exist on disk but were not read as mods: say so and why, instead of leaving them out silently
+// Notices the user closed with the x stay closed until the app is restarted (not saved anywhere)
+const closedNotes = new Set();
 function unreadBox() {
-  const u = (S && S.unread) || []; if (!u.length) return '';
-  return `<div class="warnbox"><b>${u.length} Workshop folder${u.length > 1 ? 's were' : ' was'} found but not shown as a mod.</b> ` +
+  const u = (S && S.unread) || [], key = 'unread:' + G + ':' + u.map(x => x.id).join(',');
+  if (!u.length || closedNotes.has(key)) return '';
+  return `<div class="warnbox"><button class="sm" data-closenote="${esc(key)}" title="Hide this until the app is restarted" aria-label="Hide this notice" style="float:right">✕</button><b>${u.length} Workshop folder${u.length > 1 ? 's were' : ' was'} found but not shown as a mod.</b> ` +
     u.map(x => `<div><code>${esc(x.id)}</code>: ${x.empty ? 'empty. Steam has not downloaded this item (it may be removed, or still downloading).' : 'has no descriptor.mod or metadata.json, so it is not a mod this app can read. Files: ' + esc(x.files.join(', '))}</div>`).join('') + '</div>';
 }
 function updPanel() {
@@ -795,6 +798,7 @@ function drawer() {
 // ---- actions ----
 document.addEventListener('click', guard(async e => {
   const t = e.target, p = cur(), ds = t.dataset; if (!p) return;
+  const cn = t.closest('[data-closenote]'); if (cn) { closedNotes.add(cn.dataset.closenote); return viewLibrary(cur()); }
   const starPs = t.closest('[data-favps]'), starMod = t.closest('[data-favmod]');
   if (starPs) { const id = starPs.dataset.favps, ps = S.playsets.find(x => x.id === id); await api(`playsets/${id}/update`, {favorite: !(ps && ps.favorite)}); return load(); }
   if (starMod) { const id = starMod.dataset.favmod, on = !(S.fav_mods || []).includes(id); S.fav_mods = (await api('fav-mod', {id, on})).fav_mods; return render(); }

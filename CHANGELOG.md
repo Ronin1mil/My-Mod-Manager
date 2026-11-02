@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.5 - Closable notices, fewer false alarms
+- The "Workshop folders not shown" notice has an **x**; it stays hidden until the app is restarted
+- A folder that is already read through a `mod/*.mod` file is no longer reported as missing
+- A Workshop mod whose descriptor has its own name (for example `Pervasive_Crown_Authority.mod` in its folder) is now read: the only `.mod` file in a mod's folder counts as its descriptor
+
 ## 1.0.4 - Open a mod in the Workshop
 Click a mod and the details panel has **Open in Workshop** (for any mod with a Steam Workshop id): it opens that mod's page in Steam, where you can read comments, rate or unsubscribe.
 

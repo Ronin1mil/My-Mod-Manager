@@ -89,3 +89,20 @@ class UnreadFolders(unittest.TestCase):
         self.assertEqual(set(got), {"111", "222"})
         self.assertTrue(got["111"]["empty"])
         self.assertEqual(got["222"]["files"], ["notes.txt"])
+
+    def test_a_folder_read_through_a_mod_file_is_not_reported(self):
+        from modmanager import scan
+        root = Path(tempfile.mkdtemp())
+        (root / "444").mkdir(); (root / "444" / "common").mkdir()
+        mods = {"local:ugc_444": {"root": str(root / "444")}}
+        self.assertEqual(scan.unread_folders(root, mods), [])
+
+    def test_a_descriptor_with_the_mods_own_name_is_read(self):
+        from modmanager import scan
+        root = Path(tempfile.mkdtemp())
+        d = root / "555"; d.mkdir(); (d / "Cool_Mod.mod").write_text('name="Cool Mod"\nversion="1.0"\n'); (d / "common").mkdir()
+        mods = scan.scan_mods(None, root)
+        self.assertEqual(mods["ws:555"]["name"], "Cool Mod")
+        self.assertEqual(scan.unread_folders(root, mods), [])
+        (root / "666").mkdir(); (root / "666" / "a.mod").write_text('name="A"'); (root / "666" / "b.mod").write_text('name="B"')
+        self.assertNotIn("ws:666", scan.scan_mods(None, root))   # two candidates: not guessed

@@ -182,6 +182,20 @@ try {
     await p5.close();
   }
 
+  // ---- the "Workshop folders not shown" notice has an x that hides it until the app restarts
+  {
+    const p6 = await browser.newPage({ viewport: { width: 1200, height: 800 } });
+    await p6.route('**/api/vic3/state', async r => { const x = await r.fetch(); const j = await x.json(); j.unread = [{ id: '123', files: ['gui'], empty: false }]; await r.fulfill({ json: j }); });
+    await p6.goto(`${base}/#vic3`); await p6.waitForSelector('#view .row, #view .empty');
+    await p6.click('[data-tab=library]');
+    await p6.waitForSelector('.warnbox');
+    await p6.click('.warnbox [data-closenote]');
+    await p6.waitForSelector('.warnbox', { state: 'detached' });
+    await p6.click('[data-tab=order]'); await p6.click('[data-tab=library]');
+    assert.equal(await p6.locator('.warnbox').count(), 0, 'stays closed');
+    await p6.close();
+  }
+
   // ---- Tools > Check for updates: says "up to date", or offers the newest version and asks the app to install it
   {
     const p3 = await browser.newPage({ viewport: { width: 1000, height: 700 } });
