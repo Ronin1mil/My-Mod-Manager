@@ -152,6 +152,21 @@ try {
   await page.reload();
   await page.waitForSelector('#banner:not([hidden])');  // a newer version shows again
 
+  // ---- Rescan: the window is blocked with a progress card while it runs, and free again afterwards
+  {
+    const p4 = await browser.newPage({ viewport: { width: 1000, height: 700 } });
+    await p4.route('**/api/full-rescan', async r => { await new Promise(x => setTimeout(x, 1500)); r.continue(); });
+    await p4.goto(`${base}/#vic3`); await p4.waitForSelector('#view .row, #view .empty');
+    await p4.click('#toolsbtn'); await p4.click('#fullscan');
+    await p4.waitForSelector('#block:not([hidden])');
+    assert.equal(await p4.evaluate(() => document.getElementById('app').inert), true, 'the app behind the card is inert');
+    assert.match(await p4.textContent('#blocktitle'), /Rescanning/);
+    await p4.click('#cfg', { timeout: 500 }).then(() => assert.fail('a click got through'), e => assert.ok(!(e instanceof assert.AssertionError)));
+    await p4.waitForSelector('#block', { state: 'hidden', timeout: 20000 });
+    assert.equal(await p4.evaluate(() => document.getElementById('app').inert), false, 'usable again');
+    await p4.close();
+  }
+
   // ---- Tools > Check for updates: says "up to date", or offers the newest version and asks the app to install it
   {
     const p3 = await browser.newPage({ viewport: { width: 1000, height: 700 } });

@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.2 - Rescan blocks the window and shows a progress bar
+While **Tools > Rescan** runs, nothing behind it can be clicked or tabbed to, and a card shows what it is doing with a progress bar that follows the real work (each game's mods read, each game's playsets checked). **Refresh** shows the same card. It closes by itself when the work is done.
+
 ## 1.0.1 - Bigger pictures, a start file and updates that cannot go backwards
 - **Check for updates** is in the Tools menu: it asks, downloads the newest release, verifies its checksum, replaces itself and restarts. Your playsets and settings are kept
 - **Pictures are about twice as big**, and they (and the rows) now grow with the text size. Settings > UI has a new **Picture size** (Small, Normal, Large, Huge)

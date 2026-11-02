@@ -216,3 +216,12 @@ h1{font-size:22px}
 .th.cover{font-size:calc(40px * var(--imgk,1))}
 .row{padding:calc(8px * var(--rowk,1)) 12px;gap:calc(10px * var(--rowk,1))}
 .row .nm{font-size:calc(1em * var(--rowk,1))}
+
+/* Rescan: the window cannot be used (#app is inert) and a card shows what is happening */
+#block{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.62);backdrop-filter:blur(2px)}
+#block[hidden]{display:none}
+.block-card{width:min(480px,90vw);padding:26px 30px;border:1px solid var(--line);border-radius:14px;background:var(--panel);box-shadow:var(--shadow);text-align:center}
+.block-card h2{margin:0 0 6px;font:600 20px var(--serif);color:var(--acc)}.block-card p{margin:6px 0;color:var(--ink);min-height:1.3em}.block-card p.mut{color:var(--mut);font-size:12px}
+.pbar{height:8px;border-radius:4px;background:var(--line);overflow:hidden;margin:14px 0 6px}
+.pbar i{display:block;height:100%;width:40%;border-radius:4px;background:linear-gradient(90deg,var(--p1),var(--acc));animation:slide 1.1s ease-in-out infinite}
+.pbar.det i{animation:none;transition:width .35s var(--ease)}

@@ -898,6 +898,7 @@ class Hub:
         self._cache_lock = threading.Lock()
         self._update_cache = None
         self.update_pending = False
+        self.rescan_progress = None   # while Rescan runs: {step, of, text} for the page's bar
         self.client_errors = 0
         self.updater = selfupdate.Updater()
         self.ready = True      # False while the start-up pass runs (a copy that was just updated is not yet the one to switch to)
@@ -1251,6 +1252,8 @@ def make_handler(hub):
                 parts, app = self._route()
                 if parts == ["api", "games"]:
                     return self._send(200, hub.index())
+                if parts == ["api", "rescan-progress"]:
+                    return self._send(200, dict(hub.rescan_progress or {"step": 0, "of": 0, "text": ""}))
                 if parts == ["api", "self-update"]:
                     return self._send(200, hub.updater.status())
                 if parts == ["api", "nightly"]:
@@ -1520,11 +1523,22 @@ def full_rescan(hub, say=lambda _t: None):
         raise ValueError("A rescan is already running.")
     try:
         t0, report, apps, paused = time.time(), [], {}, {}
-        for gid in used_games(hub):
+        gids = list(used_games(hub))
+        hub.rescan_progress = {"step": 0, "of": max(1, 2 * len(gids)), "text": "Looking for folders and reading mods…"}   # the page's bar
+        inner_say = say
+
+        def say(t):
+            inner_say(t)
+            if ": ready (" in t:
+                hub.rescan_progress["step"] = min(hub.rescan_progress["of"], hub.rescan_progress["step"] + 1)
+            hub.rescan_progress["text"] = t[:200]
+        for gid in gids:
             with hub.lock:
                 app = hub.app(gid)
                 paused[gid], app.prewarm_lock = app.prewarm_lock, None   # worked out below, side by side, not twice
                 report.append(app.redetect())
+            hub.rescan_progress["step"] = min(hub.rescan_progress["of"], hub.rescan_progress["step"] + 1)
+            hub.rescan_progress["text"] = f"{hub.games[gid].name}: {len(app.mods)} mods read"
             if app.mods:
                 apps[gid] = app
         try:
@@ -1536,6 +1550,7 @@ def full_rescan(hub, say=lambda _t: None):
                     hub.apps[gid].start_prewarm()   # anything changed meanwhile; finds the rest already done
         return {"games": report, "seconds": round(time.time() - t0, 1)}
     finally:
+        hub.rescan_progress = None
         hub.full_rescan_lock.release()
 
 

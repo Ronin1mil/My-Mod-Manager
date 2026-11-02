@@ -65,6 +65,16 @@ function bootDone() {
   setTimeout(() => { b.classList.add('gone'); setTimeout(() => b.remove(), 500); }, Math.max(0, 700 - (Date.now() - bootAt)));
 }
 function bootSay(t) { const m = $('bootmsg'); if (m) m.textContent = t; }
+// A blocking card for a rescan: nothing behind it can be clicked or tabbed to until it is closed. pct = null: no number known
+function block(on, title, msg, pct) {
+  const b = $('block'); if (!b) return;
+  $('app').inert = !!on; b.hidden = !on;
+  if (!on) return;
+  $('blocktitle').textContent = title || 'Working…'; $('blockmsg').textContent = msg || '';
+  const bar = $('blockbar'); bar.classList.toggle('det', pct != null);
+  bar.firstElementChild.style.width = pct == null ? '' : Math.max(3, Math.min(100, pct)) + '%';
+  $('blocknum').textContent = pct == null ? '' : Math.round(pct) + ' %';
+}
 function busy(on, msg, id) {
   const b = $('busy'); if (!b) return;
   if (on) {
@@ -846,22 +856,33 @@ view.addEventListener('dragend', () => { drag = null; render(); });
 
 $('auto').onchange = guard(() => patch({auto_sort: $('auto').checked}));
 $('sortnow').onclick = guard(async () => { Object.assign(cur(), await api(`playsets/${S.active}/autosort`, {})); render(); analyse(); });
-$('rescan').onclick = guard(() => api('rescan', {}).then(r => load(r)));
+$('rescan').onclick = guard(async () => {
+  tools(false); block(true, 'Refreshing', 'Reading this game\'s mod folders again…');
+  try { await load(await api('rescan', {})); } finally { block(false); }
+});
 // Rescan: start-up's work again for every game, while the app keeps running (folders found again on every drive, every
 // mod read again, steamcmd looked for, every playset's conflicts worked out again)
 $('fullscan').onclick = guard(async () => {
   const b = $('fullscan'); if (b.disabled) return;
-  b.disabled = true; b.textContent = 'Rescanning…';
-  toast('Rescanning every game and drive. This takes about as long as starting the app.');
+  b.disabled = true; b.textContent = 'Rescanning…'; tools(false);
+  block(true, 'Rescanning every game', 'Looking for folders and reading every mod. This takes about as long as starting the app.', 0);
+  let alive = true;
+  (async () => {   // the server says how far it is; the bar follows it
+    while (alive) {
+      try { const p = await (await fetch('/api/rescan-progress')).json(); if (alive && p.of) block(true, 'Rescanning every game', p.text || '', 100 * p.step / p.of); } catch (e) { /* keep waiting */ }
+      await new Promise(r => setTimeout(r, 600));
+    }
+  })();
   try {
     const r = await app('full-rescan', {});
+    alive = false; block(true, 'Rescanning every game', 'Reading the result…', 100);
     await load();
     const lines = r.games.map(g => {
       const bits = [g.added && `${g.added} new`, g.updated && `${g.updated} updated`, g.removed && `${g.removed} removed`].filter(Boolean);
       return `${g.game}: ${g.mods} mods${bits.length ? ' (' + bits.join(', ') + ')' : ''}${g.notes.length ? '; ' + g.notes.join('; ') : ''}`;
     });
     toast(`Rescan done in ${r.seconds} s. ` + lines.join(' · '));
-  } finally { b.disabled = false; b.textContent = 'Rescan'; }
+  } finally { alive = false; block(false); b.disabled = false; b.textContent = 'Rescan'; }
 });
 // Tools > Check for updates: the same check as Settings, but one click away; installs the newest release after a yes
 $('updbtn').onclick = guard(async () => {
