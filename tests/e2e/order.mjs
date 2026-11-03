@@ -102,6 +102,27 @@ try {
   await page.locator('#view .row').first().locator('[data-mv$=",-1"]').click();
   await waitOrder(t0);
 
+  // --- dragging shows where the mod will land (a line and a position chip), and the list reorders at once on drop
+  {
+    const t1 = await names(), last = t1[t1.length - 1];
+    const h = await row(last).locator('.h').boundingBox();
+    const first = await page.locator('#view .row').first().boundingBox();
+    await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(first.x + 80, first.y + first.height / 2, { steps: 8 });
+    await page.mouse.move(first.x + 80, first.y + 3, { steps: 4 });   // upper half of the first row: the gap above it
+    await page.waitForSelector('#view .row.dropb');
+    assert.equal(await page.locator('#view .row.dropb').count(), 1, 'one drop line');
+    assert.equal(await page.locator('#view .row.dropb .nm').first().textContent(), t1[0], 'the line is above the first row');
+    assert.match(await page.textContent('#dropchip'), /^Position 1 of 5$/);
+    assert.equal(await page.locator('#view .row.drag').count(), 1, 'the dragged row is marked');
+    await page.mouse.up();
+    await waitOrder([last, ...t1.slice(0, -1)]);
+    assert.equal(await page.locator('#dropchip').count(), 0, 'chip gone after the drop');
+    assert.equal(await page.locator('#view .row.dropb, #view .row.dropa').count(), 0, 'line gone after the drop');
+    await page.click('#sortnow'); await page.waitForTimeout(300);   // back to the valid order for the next steps
+  }
+
   // --- one-click "Sort now" fixes everything
   await page.click('#sortnow');
   await page.waitForTimeout(400);

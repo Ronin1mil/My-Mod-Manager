@@ -23,7 +23,11 @@ h1{font:600 20px var(--serif);margin:0;letter-spacing:.04em}.grow{flex:1}.chk{di
 #view{flex:1;overflow:auto;padding:12px 16px}
 .bar{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}.bar input[type=search]{flex:1;min-width:140px}
 .row{display:flex;gap:8px;align-items:center;padding:7px 10px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);margin-bottom:5px}
-.row.sel{border-color:var(--acc)}.row.drag{opacity:.4}.row.off .nm{text-decoration:line-through;color:var(--mut)}
+.row.sel{border-color:var(--acc)}.row.drag{opacity:.35;border-style:dashed}
+.row.dropb{box-shadow:0 -4px 0 -1px var(--acc);position:relative}.row.dropa{box-shadow:0 4px 0 -1px var(--acc);position:relative}
+.row.dropb::before,.row.dropa::before{content:"";position:absolute;left:-4px;width:9px;height:9px;border-radius:50%;background:var(--acc)}
+.row.dropb::before{top:-7px}.row.dropa::before{bottom:-7px}
+#dropchip{position:fixed;z-index:50;pointer-events:none;background:var(--acc);color:#fff;padding:3px 9px;border-radius:12px;font-size:12px;font-weight:600;box-shadow:0 3px 10px rgba(0,0,0,.4)}.row.off .nm{text-decoration:line-through;color:var(--mut)}
 .row.static{cursor:default}.nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
 .n{color:var(--mut);width:28px;text-align:right}.h{cursor:grab;color:var(--mut);padding:4px 6px;margin:-4px -2px}
 /* the box itself is small (and smaller still on 1440p/4K); the label around it makes the whole 30px square clickable */

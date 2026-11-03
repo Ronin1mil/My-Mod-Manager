@@ -252,7 +252,7 @@ const release = () => {
 document.addEventListener('pointerdown', () => { pressed = true; setTimeout(release, 4000); }, true);   // the timer: never wait forever
 ['pointerup', 'pointercancel', 'dragend'].forEach(t => document.addEventListener(t, release, true));
 function render() {
-  if (pressed) { redrawLater = true; return; }
+  if (pressed || drag !== null) { redrawLater = true; return; }   // not under a button being held, nor in the middle of a drag
   redrawLater = false;
   if (!S || !cur()) return;
   const p = cur(), errs = visIssues().filter(i => i.severity === 'error').length; if (!p) return;
@@ -857,13 +857,63 @@ document.addEventListener('change', guard(async e => {
   if (t.dataset.tog) { const id = t.dataset.tog; await patch(q => ({disabled: t.checked ? q.disabled.filter(x => x !== id) : [...q.disabled, id]})); }
 }));
 const view = $('view');
-view.addEventListener('dragstart', e => { const r = e.target.closest('[data-i]'); if (r) { drag = +r.dataset.i; r.classList.add('drag'); if (e.dataTransfer) e.dataTransfer.setDragImage(r, 10, 10); } });
-view.addEventListener('dragover', e => { if (drag !== null) e.preventDefault(); });
+// Drag to reorder: a line shows the gap the mod will drop into, a chip names the new position, the list scrolls when the
+// pointer nears its edge, and the list is reordered on the spot (the server's answer follows) instead of after a wait.
+let dropSlot = null, dragScroll = 0, dragRaf = 0;
+const dragRows = () => [...view.querySelectorAll('.row[data-i]')];
+function clearDrop() {
+  view.querySelectorAll('.dropb, .dropa').forEach(r => r.classList.remove('dropb', 'dropa'));
+  const c = $('dropchip'); if (c) c.remove();
+  dropSlot = null; dragScroll = 0;
+}
+function slotAt(y) {   // 0..n: the gap before row k; counted from the middles of the rows, so it works anywhere over the list
+  const rows = dragRows(); let s = 0;
+  for (const r of rows) { const b = r.getBoundingClientRect(); if (y > b.top + b.height / 2) s++; else break; }
+  return s;
+}
+function showDrop(slot) {
+  const rows = dragRows(), n = rows.length;
+  const to = slot > drag ? slot - 1 : slot;   // where the mod ends up once it has left its old place
+  if (slot === dropSlot) return;
+  view.querySelectorAll('.dropb, .dropa').forEach(r => r.classList.remove('dropb', 'dropa'));
+  dropSlot = slot;
+  if (to === drag) return;   // dropping it where it already is
+  if (slot < n) rows[slot].classList.add('dropb'); else if (n) rows[n - 1].classList.add('dropa');
+  let c = $('dropchip'); if (!c) { c = document.createElement('div'); c.id = 'dropchip'; document.body.appendChild(c); }
+  c.textContent = `Position ${to + 1} of ${n}`;
+}
+function dragLoop() {   // scroll the list while the pointer is held near its top or bottom edge
+  dragRaf = 0; if (drag === null || !dragScroll) return;
+  view.scrollTop += dragScroll;
+  dragRaf = requestAnimationFrame(dragLoop);
+}
+view.addEventListener('dragstart', e => {
+  const r = e.target.closest('[data-i]'); if (!r) return;
+  drag = +r.dataset.i; dropSlot = null;
+  if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(drag)); e.dataTransfer.setDragImage(r, 10, 10); }
+  setTimeout(() => r.classList.add('drag'), 0);   // after the browser has taken its drag picture, so the picture is not faded
+});
+view.addEventListener('dragover', e => {
+  if (drag === null) return;
+  e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+  showDrop(slotAt(e.clientY));
+  const b = view.getBoundingClientRect(), edge = 60;
+  dragScroll = e.clientY < b.top + edge ? -Math.ceil((b.top + edge - e.clientY) / 4) : e.clientY > b.bottom - edge ? Math.ceil((e.clientY - (b.bottom - edge)) / 4) : 0;
+  if (dragScroll && !dragRaf) dragRaf = requestAnimationFrame(dragLoop);
+  const c = $('dropchip'); if (c) { c.style.left = Math.min(e.clientX + 16, innerWidth - 150) + 'px'; c.style.top = (e.clientY + 18) + 'px'; }
+});
 view.addEventListener('drop', guard(async e => {
-  const r = e.target.closest('[data-i]'), p = cur(); if (!p) return;
-  if (r && drag !== null) { e.preventDefault(); const m = [...p.mods], [x] = m.splice(drag, 1); m.splice(+r.dataset.i, 0, x); drag = null; await patch({mods: m}); }
+  const p = cur(); if (!p || drag === null) return;
+  e.preventDefault();
+  const from = drag, slot = dropSlot === null ? slotAt(e.clientY) : dropSlot, to = slot > from ? slot - 1 : slot;
+  drag = null; clearDrop(); pressed = false;
+  if (to === from) { render(); return; }
+  const m = [...p.mods], [x] = m.splice(from, 1); m.splice(to, 0, x);
+  p.mods = m; render();   // show the new order at once
+  try { await patch({mods: m}); } catch (err) { await load(); throw err; }
 }));
-view.addEventListener('dragend', () => { drag = null; render(); });
+view.addEventListener('dragend', () => { drag = null; clearDrop(); render(); });
+view.addEventListener('dragleave', e => { if (!view.contains(e.relatedTarget)) clearDrop(); });
 
 $('auto').onchange = guard(() => patch({auto_sort: $('auto').checked}));
 $('sortnow').onclick = guard(async () => { Object.assign(cur(), await api(`playsets/${S.active}/autosort`, {})); render(); analyse(); });

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.6 - Drag and drop shows where the mod will land
+- While you drag a mod in the Load order, a line shows the gap it will drop into and a chip names the new position ("Position 3 of 12")
+- The list scrolls by itself when you hold the mod near the top or bottom edge
+- The list reorders the moment you drop; the saved order follows (it is put back if saving fails)
+- Late background updates no longer redraw the list in the middle of a drag
+
 ## 1.0.5 - Closable notices, fewer false alarms
 - The "Workshop folders not shown" notice has an **x**; it stays hidden until the app is restarted
 - A folder that is already read through a `mod/*.mod` file is no longer reported as missing
