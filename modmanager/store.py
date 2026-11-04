@@ -14,7 +14,8 @@ SHARE_FORMAT = "modmanager-playset"
 LEGACY_SHARE = {"vic3mm-playset": "vic3", "eu5mm-playset/1": "eu5"}  # files from the standalone managers
 
 MAX_NAME, MAX_NOTES, MAX_MODS = 60, 2000, 5000
-DEFAULTS = {"notes": "", "launch_args": [], "auto_sort": True, "separate_saves": False, "favorite": False}
+DEFAULTS = {"notes": "", "launch_args": [], "auto_sort": True, "separate_saves": False, "favorite": False,
+            "winners": []}   # [[winner id, loser id]]: "this mod must load after that one" chosen in the Conflicts tab
 
 
 # per-game settings (folders + base-game comparison); app-wide ones live in GlobalSettings
@@ -152,6 +153,13 @@ class Store:
             clean["notes"] = fields["notes"]
         if "launch_args" in fields:
             clean["launch_args"] = validate_launch_args(fields["launch_args"])
+        if "winners" in fields:
+            w = fields["winners"]
+            if not isinstance(w, list) or len(w) > 1000 or not all(
+                    isinstance(x, (list, tuple)) and len(x) == 2 and all(isinstance(i, str) and len(i) < 300 for i in x) and x[0] != x[1] for x in w):
+                raise ValueError("'winners' must be a list of [winner, loser] mod id pairs.")
+            clean["winners"] = list(dict.fromkeys(tuple(x) for x in w))
+            clean["winners"] = [list(x) for x in clean["winners"]]
         for k in ("auto_sort", "separate_saves", "favorite"):
             if k in fields:
                 if not isinstance(fields[k], bool):
@@ -164,7 +172,7 @@ class Store:
     def duplicate(self, pid, name):
         src = self.get(pid)
         return self.create(name, src["mods"], src["disabled"], notes=src["notes"],
-                           launch_args=src["launch_args"], auto_sort=src["auto_sort"])
+                           launch_args=src["launch_args"], auto_sort=src["auto_sort"], winners=src.get("winners", []))
 
     def delete(self, pid):
         if pid == NO_MODS_ID:

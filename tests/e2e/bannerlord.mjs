@@ -43,7 +43,7 @@ try {
   await page.waitForFunction(() => !document.getElementById('dlg').open);
 
   assert.match(await page.textContent('#status'), /Mount & Blade II: Bannerlord 1\.2\.9 · 5 mods active/);   // the official modules are in from the start
-  assert.deepEqual(await page.locator('#tabs button').allTextContents().then(t => t.map(x => x.replace(/ \(\d+\)/, ''))), ['Load order', 'Library', 'Warnings', 'Files', 'Compare', 'Presets']);
+  assert.deepEqual(await page.locator('#tabs button').allTextContents().then(t => t.map(x => x.replace(/ \(\d+\)/, ''))), ['Load order', 'Library', 'Warnings', 'Files', 'Compare', 'Presets', 'Crash help (beta)']);
   assert.deepEqual(await page.locator('#view .nm').allTextContents(), ['Native', 'SandBoxCore', 'CustomBattle', 'Sandbox', 'StoryMode']);
 
   // add the overhaul BEFORE its dependency: auto-sort fixes the order

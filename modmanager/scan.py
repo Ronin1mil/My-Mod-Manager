@@ -562,7 +562,27 @@ def summarize(conflicts):
         k = "vanilla" if c.get("vanilla") else c["kind"]
         counts[k] = counts.get(k, 0) + 1
     cap = MAX_PER_KIND * 4
-    return {"conflicts": conflicts[:cap], "counts": counts, "truncated": len(conflicts) > cap, "pending": False}
+    return {"conflicts": conflicts[:cap], "counts": counts, "truncated": len(conflicts) > cap, "pending": False,
+            "pairs": pair_summary(conflicts)}
+
+
+def pair_summary(conflicts, limit=300):
+    """Which two mods overwrite each other and how often, over ALL conflicts (the page list is capped).
+    -> [{a, b, files, defs, examples}] busiest first; `a` loads before `b`, so `b` currently wins. The base game and
+    intentional REPLACE overrides are left out."""
+    pairs = {}
+    for c in conflicts:
+        if c.get("kind") not in ("file", "definition") or c.get("severity") != "warn" or c.get("vanilla"):
+            continue
+        ids = [i for i in c["mods"] if i != VANILLA][-12:]
+        for x in range(len(ids)):
+            for y in range(x + 1, len(ids)):
+                p = pairs.setdefault((ids[x], ids[y]), {"a": ids[x], "b": ids[y], "files": 0, "defs": 0, "examples": []})
+                p["files" if c["kind"] == "file" else "defs"] += 1
+                if len(p["examples"]) < 3:
+                    p["examples"].append(c["path"])
+    out = sorted(pairs.values(), key=lambda p: -(p["files"] + p["defs"]))
+    return out[:limit]
 
 
 def find_conflicts(mods, order, files_cache=None, def_dirs=DEFAULT_DEF_DIRS, vanilla=None, trusted=None, should_stop=None,

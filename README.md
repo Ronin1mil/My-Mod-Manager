@@ -167,6 +167,7 @@ This project was written with the help of an AI coding assistant (see the note a
 | [docs/20-v0.9-plan.md](docs/20-v0.9-plan.md) | Adding your own games (beta), what was left out |
 | [docs/21-dev-data-locations.md](docs/21-dev-data-locations.md) | Where every file and log is (for testers) |
 | [docs/22-checked-on-a-real-pc.md](docs/22-checked-on-a-real-pc.md) | What a real PC showed, and the fixes |
+| [docs/23-crash-help.md](docs/23-crash-help.md) | Choosing which mod wins a clash, and Crash help (beta) |
 
 ## License
 [MIT](LICENSE) © 2026 Ronin1mil

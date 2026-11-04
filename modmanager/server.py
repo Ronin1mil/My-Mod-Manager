@@ -16,7 +16,7 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import APP_NAME, BUILD, __version__, collections, compare, detect, games as gamesmod, install, launch, order, presets, saves, scan, smartsort, update, updates
+from . import APP_NAME, BUILD, __version__, collections, compare, crash, detect, games as gamesmod, install, launch, order, presets, saves, scan, smartsort, update, updates
 from . import launcher, bootworker, thumbs, customgames, errorlog, gamelog, launcherdb, launchersync, perflog, selfupdate, shortcut, steamshortcut, workshop
 from .library import Library
 from .paths import LOGO_TYPES, config_dir, fetch_best_logo, find_first, find_logo, game_version, launcher_exe, user_dirs, workshop_dirs
@@ -33,7 +33,7 @@ CSP = ("default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline';
 
 MAX_TREE, MAX_RESULT = 5000, 30000
 LIVE_SYNC = ("ck3",)   # games whose own files follow every change to the active playset (others: at Play)
-SYNC_ACTIONS = ("update", "activate", "autosort", "smartsort", "enable", "enable_all", "disable_all", "prune", "delete")
+SYNC_ACTIONS = ("update", "activate", "autosort", "smartsort", "winner", "enable", "enable_all", "disable_all", "prune", "delete")
 RESULT_CACHE = 64   # conflict answers kept per game (one per load order recently looked at)
 
 
@@ -593,7 +593,71 @@ class GameApp:
         if ps["auto_sort"] and {"mods", "disabled", "auto_sort"} & set(fields):
             ps = self.store.update(pid, mods=order.sort_playset(self.mods, ps["mods"], ps["disabled"],
                                                                 self.game_version))
+        if {"mods", "disabled"} & set(fields) and "winners" not in fields:
+            ps = self._prune_winners(pid, ps)
         return ps
+
+    def _prune_winners(self, pid, ps):
+        """Forget "A wins over B" choices that no longer hold: a mod left the playset or was disabled, or the order was
+        changed by hand so that B now loads after A (the user's newer decision stands)."""
+        win = ps.get("winners") or []
+        if not win:
+            return ps
+        pos = {m: i for i, m in enumerate(m for m in ps["mods"] if m not in ps["disabled"])}
+        keep = [x for x in win if x[0] in pos and x[1] in pos and pos[x[0]] > pos[x[1]]]
+        return self.store.update(pid, winners=keep) if len(keep) != len(win) else ps
+
+    def choose_winners(self, pid, pairs, forget=False):
+        """"This mod should win over that one": the winner is moved to load right after the loser (only as far as needed),
+        and the choice is kept, so Sort now keeps honouring it. `forget` removes the choices instead."""
+        if not isinstance(pairs, list) or not all(isinstance(x, list) and len(x) == 2 and all(isinstance(i, str) for i in x) for x in pairs):
+            raise ValueError("Say which mod should win over which.")
+        ps = self.store.get(pid)
+        now = [tuple(x) for x in ps.get("winners", [])]
+        pairs = [(w, l) for w, l in pairs if w != l]
+        if forget:
+            gone = set(pairs)
+            return self.store.update(pid, winners=[list(x) for x in now if x not in gone])
+        enabled = [m for m in ps["mods"] if m not in ps["disabled"]]
+        for w, l in pairs:
+            if w not in enabled or l not in enabled:
+                raise ValueError("Both mods must be enabled in this playset.")
+        opposite = {(l, w) for w, l in pairs}
+        new = list(dict.fromkeys([x for x in now if x not in opposite] + pairs))
+        hard = {}
+        for a, b in order._edges(self.mods, enabled):
+            hard.setdefault(a, set()).add(b)
+        name = lambda i: self.mods[i]["name"] if i in self.mods else i
+        for w, l in pairs:
+            if smartsort._reaches(hard, w, l):
+                raise ValueError(f"{name(l)} needs {name(w)} (a dependency), so {name(w)} has to load first and cannot win.")
+        for w, l in pairs:
+            adj = {a: set(b) for a, b in hard.items()}
+            for w2, l2 in new:
+                if (w2, l2) != (w, l):
+                    adj.setdefault(l2, set()).add(w2)
+            if smartsort._reaches(adj, w, l):
+                raise ValueError(f"{name(w)} cannot win over {name(l)}: it would go against another choice you made. Forget that choice first.")
+        soft = [(l, w, f"you chose {name(w)} to win over {name(l)}") for w, l in new]
+        mods = order.sort_playset(self.mods, ps["mods"], ps["disabled"], self.game_version, soft)
+        return self.store.update(pid, mods=mods, winners=[list(x) for x in new])
+
+    def crash_job(self, pid):
+        """Crash help (beta): read the game's logs and rank the likely culprits (see crash.py). Snapshot here, under the
+        app lock; the returned function reads the log files and runs without it."""
+        ps = self.store.get(pid)
+        enabled = [m for m in ps["mods"] if m not in ps["disabled"] and m in self.mods]
+        issues = order.compute_order(self.mods, enabled, False, self.game_version)["issues"]
+        label = {"new": "added since the app last looked at your mods", "updated": "updated since the app last looked at your mods"}
+        changed = {m: label[c] for m in enabled if (c := self.library.change(m)) in label}
+        mods, game, user_dir, gid = dict(self.mods), self.game, self.user_dir, self.game.id
+
+        def run():
+            res = crash.analyse(game, mods, enabled, issues, changed, crash.log_files(game, user_dir))
+            gamelog.log(gid, f"Crash help: {len(res['logs'])} log files read, {len(res['reasons'])} known causes, suspects: "
+                             + (", ".join(f"{s['name']} ({s['score']})" for s in res["suspects"][:5]) or "none"))
+            return res
+        return run
 
     def smart_sort_job(self, pid):
         """Sort by dependencies AND by who overwrites whom (see smartsort). Snapshot here (quick, under the app lock);
@@ -603,13 +667,14 @@ class GameApp:
         enabled = [m for m in ps["mods"] if m not in ps["disabled"]]
         base = order.compute_order(self.mods, enabled, True, self.game_version)["order"]   # valid by dependencies
         mods, files, defs, trusted, has = dict(self.mods), self.files, self.game.def_dirs, self._trusted, self.game.has_conflicts
+        winners = [list(x) for x in ps.get("winners", [])]
 
         def run():
             if not has:   # Bannerlord modules do not share script folders: nothing to compare
                 return {"enabled": enabled, "edges": [], "report": {"rules": [], "ties": [], "tie_count": 0, "dropped": 0, "no_conflicts": True}}
             conflicts = scan.find_conflicts(mods, base, files, defs, None, trusted=trusted)
             sizes = {m: len(files.get((mods[m]["root"], tuple(mods[m].get("only", ()))), ())) for m in base if m in mods}
-            return {"enabled": enabled, **smartsort.plan(mods, base, conflicts, sizes)}
+            return {"enabled": enabled, **smartsort.plan(mods, base, conflicts, sizes, winners)}
         return run
 
     def smart_sort_apply(self, pid, res):
@@ -618,7 +683,7 @@ class GameApp:
             raise ValueError("The playset changed while it was being sorted. Press Sort now again.")
         before = [m for m in ps["mods"] if m not in ps["disabled"]]
         new = order.sort_playset(self.mods, ps["mods"], ps["disabled"], self.game_version, res["edges"])
-        ps = self.store.update(pid, mods=new)
+        ps = self._prune_winners(pid, self.store.update(pid, mods=new))
         after = [m for m in ps["mods"] if m not in ps["disabled"]]
         rep = dict(res["report"])
         rep["moved"] = sum(1 for a, b in zip(before, after) if a != b)
@@ -1188,7 +1253,7 @@ def make_handler(hub):
 
         def _do_get(self):
             p = self.path.split("?")[0].strip("/").split("/")
-            if len(p) >= 4 and p[0] == "api" and p[2] in ("conflicts", "tree") and p[1] in hub.games:
+            if len(p) >= 4 and p[0] == "api" and p[2] in ("conflicts", "tree", "crash") and p[1] in hub.games:
                 return self._heavy_get(p)
             if p == ["api", "ping"]:   # "this page is still open": no lock, no work
                 if not self._host_ok():
@@ -1262,6 +1327,8 @@ def make_handler(hub):
                     app = hub.app(p[1])
                     if p[2] == "conflicts":
                         job = app.conflicts_job(p[3])
+                    elif p[2] == "crash":
+                        job = app.crash_job(p[3])
                     elif len(p) == 4:
                         job = app.tree_job(p[3])
                     else:
@@ -1472,6 +1539,8 @@ def make_handler(hub):
                         ps = app.store.get(pid)
                         new = order.sort_playset(app.mods, ps["mods"], ps["disabled"], app.game_version)
                         return self._send(200, app.store.update(pid, mods=new))
+                    if act == "winner":   # {pairs: [[winner, loser], ...], forget: bool}
+                        return self._send(200, app.choose_winners(pid, b.get("pairs"), b.get("forget") is True))
                     if act == "smartsort":   # reads the mods' files: not under the lock, like a conflict scan
                         with hub.lock:
                             job = app.smart_sort_job(pid)

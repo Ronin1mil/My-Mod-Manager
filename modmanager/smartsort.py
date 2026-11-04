@@ -3,6 +3,7 @@
 Nothing in the game files says which of two clashing mods should win, so these are rules of thumb the modding
 community uses, applied only where two enabled mods really overlap, and never against a dependency rule:
 
+  your choice   a pair you chose in the Conflicts tab ("this one wins") always comes first
   replace_path  a mod that wipes a folder (replace_path) loads before the mods that add files to that folder,
                 otherwise it deletes them
   built on      a mod whose name contains the other mod's whole name (a patch or add-on made for it) loads after it
@@ -21,7 +22,7 @@ from . import order as order_mod
 from .scan import VANILLA
 
 # priority of each rule (higher is applied first)
-REPLACE, BUILT_ON, PATCH, SIZE = 4, 3, 2, 1
+CHOSEN, REPLACE, BUILT_ON, PATCH, SIZE = 5, 4, 3, 2, 1
 SIZE_RATIO = 1.5      # one mod needs at least this many times the files of the other for "the bigger one first"
 MAX_GROUP = 12        # a file clashed by more mods than this is compared on its 12 loading last
 MAX_EDGES = 2000      # rules worked on per sort (the strongest first)
@@ -77,14 +78,17 @@ def _decide(mods, a, b, sizes):
     return None
 
 
-def plan(mods, nodes, conflicts, sizes):
+def plan(mods, nodes, conflicts, sizes, winners=()):
     """nodes: the enabled mod ids. conflicts: scan.find_conflicts output for them (all of it, not the capped page list).
-    sizes: {mod id: number of files}. -> {"edges": [(first, second, why)], "report": {...}}"""
+    sizes: {mod id: number of files}. winners: [[winner, loser]] chosen by the user. -> {"edges": [(first, second, why)], "report": {...}}"""
     nodeset = set(nodes)
     adj = {}
     for a, b in order_mod._edges(mods, [n for n in nodes if n in mods]):
         adj.setdefault(a, set()).add(b)
     cands = []   # (priority, weight, first, second, why)
+    for w, l in winners:   # the user decided: the winner loads after the loser
+        if w in nodeset and l in nodeset:
+            cands.append((CHOSEN, 10000, l, w, f"you chose {_name(mods, w)} to win over {_name(mods, l)}"))
     for c in conflicts:   # a mod that wipes a folder goes before the mods that add files there
         if c.get("kind") == "replace" and len(c["mods"]) > 1 and c["winner"] in nodeset:
             r = c["winner"]

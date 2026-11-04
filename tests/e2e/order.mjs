@@ -24,6 +24,8 @@ for (const [f, name, deps] of [['Lib', 'Lib', []], ['A', 'A', ['Lib']], ['B', 'B
 // C is a one-file tweak, D an overhaul with many files, and both overwrite common/goods/x.txt
 write(path.join(user, 'mod/C/common/goods/x.txt'), 'g = { }');
 for (const f of ['x.txt', 'a.txt', 'b.txt', 'c.txt', 'd.txt', 'e.txt']) write(path.join(user, 'mod/D/common/goods', f), 'g = { }');
+// a game log that names mod C twice, for Crash help
+write(path.join(user, 'logs/error.log'), '[12:00:01][a.cpp:1]: Error: bad token in file: mod/C/common/goods/x.txt line: 3\n[12:00:02][a.cpp:1]: Error: bad value in file: mod/C/common/goods/y.txt line: 9\n[12:00:03][b.cpp:2]: EXCEPTION_ACCESS_VIOLATION at 0x1\n');
 const server = spawn('python3', ['-m', 'modmanager', '--game', 'vic3', '--user-dir', user, '--workshop-dir', path.join(root, 'none'),
   '--game-version', '1.7.6', '--no-browser', '--port', String(port)],
   { env: { ...process.env, MODMANAGER_FETCH_LOGOS: '0', MODMANAGER_CONFIG_DIR: path.join(root, 'cfg') }, stdio: 'inherit' });
@@ -145,6 +147,21 @@ try {
   await page.click('[data-tab=problems]');
   await page.waitForSelector('text=No problems found', {timeout: 3000}).catch(async e => { console.log('VIEW:', await page.textContent('#view')); throw e; });
 
+  // --- Conflicts tab: pick the winner of a clash and the load order follows (and Sort now keeps the choice)
+  await page.click('[data-tab=conflicts]');
+  await page.waitForSelector('.pair');
+  assert.match(await page.textContent('.pair'), /C\s*wins over\s*D/);
+  await page.click('.pair [data-win]');
+  await page.waitForSelector('.pair:has-text("D wins over C")');
+  assert.equal(await page.locator('.pair .b:has-text("your choice")').count(), 1);
+  await page.click('[data-tab=order]');
+  n = await names();
+  assert.ok(n.indexOf('D') > n.indexOf('C'), `D now loads after C, got ${n}`);
+  await page.click('[data-tab=order]');
+  await sortNow(); await closeReport();
+  n = await names();
+  assert.ok(n.indexOf('D') > n.indexOf('C'), `Sort now keeps the choice against its size rule, got ${n}`);
+
   // --- disabling a dependency raises the one-click enable fix, which also restores a valid order
   await page.click('[data-tab=order]');
   await row('Lib').locator('[data-tog]').uncheck();
@@ -198,6 +215,18 @@ try {
   await page.click('#lp-deps');
   assert.equal(await page.locator('[data-lp]:checked').count(), 3);  // B + A + Lib
   await page.click('#lp-cancel');
+
+  // --- Crash help (beta): the log names C, so C is the first suspect; Disable and Enable again work from the list
+  await page.click('[data-tab=crash]');
+  await page.click('[data-crash=go]');
+  await page.waitForSelector('.crash-s');
+  assert.match(await page.textContent('.crash-s'), /^Most likelyC|Most likely\s*C/);
+  assert.match(await page.textContent('.crash-r'), /access violation/);
+  await page.click('.crash-s [data-crashoff]');
+  await page.waitForFunction(() => document.querySelector('.crash-s [data-crashoff]').textContent === 'Enable again');
+  await page.click('.crash-s [data-crashoff]');
+  await page.waitForFunction(() => document.querySelector('.crash-s [data-crashoff]').textContent === 'Disable');
+  await page.click('[data-tab=order]');
 
   // --- order and disabled state survive a reload
   await row('C').locator('[data-tog]').uncheck();

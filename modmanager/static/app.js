@@ -1,5 +1,5 @@
 'use strict';
-let G = null, GI = null, S = null, A = null, C = null, P = null, cmpWith = null, drag = null, tab = 'order', sel = null, flt = 'all', q = '', lastMissing = [];
+let G = null, GI = null, S = null, A = null, C = null, P = null, CR = null, cmpWith = null, drag = null, tab = 'order', sel = null, flt = 'all', q = '', lastMissing = [];
 const REPO_LINK = 'https://github.com/Ronin1mil/My-Mod-Manager/';
 const STEAMCMD_URL = 'https://developer.valvesoftware.com/wiki/SteamCMD';   // Valve's own page: download and setup
 const $ = i => document.getElementById(i);
@@ -262,12 +262,12 @@ function render() {
   $('title').textContent = p.name;
   $('auto').checked = p.auto_sort;
   const nIss = visIssues().length, nCon = A && !A.pending ? A.conflicts.filter(x => x.severity !== 'info' && !x.vanilla).length : 0;
-  $('tabs').innerHTML = [['order', 'Load order'], ['library', `Library (${S.mods.length})`], ['problems', `Warnings${nIss ? ` (${nIss})` : ''}`], ['conflicts', `Conflicts${A && A.pending ? ' …' : nCon ? ` (${nCon})` : ''}`], ['files', 'Files'], ['compare', 'Compare'], ['presets', 'Presets']].filter(([k]) => k !== 'conflicts' || S.game.has_conflicts)
+  $('tabs').innerHTML = [['order', 'Load order'], ['library', `Library (${S.mods.length})`], ['problems', `Warnings${nIss ? ` (${nIss})` : ''}`], ['conflicts', `Conflicts${A && A.pending ? ' …' : nCon ? ` (${nCon})` : ''}`], ['files', 'Files'], ['compare', 'Compare'], ['presets', 'Presets'], ['crash', 'Crash help (beta)']].filter(([k]) => k !== 'conflicts' || S.game.has_conflicts)
     .map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('');
   const active = p.mods.length - p.disabled.length;
   $('status').innerHTML = `${esc(GNAME())}${S.game_version ? ` ${esc(S.game_version)}` : ''} · ${active} mod${active === 1 ? '' : 's'} active` +
     (errs ? ` · <span class="err">${errs} error${errs === 1 ? '' : 's'}</span>` : A && nIss ? ` · <span class="warn">${nIss} warning${nIss === 1 ? '' : 's'}</span>` : '') + syncNote();
-  ({order: viewOrder, library: viewLibrary, problems: viewProblems, conflicts: viewConflicts, compare: viewCompare, presets: viewPresets, files: viewFiles})[tab](p);
+  ({order: viewOrder, library: viewLibrary, problems: viewProblems, conflicts: viewConflicts, compare: viewCompare, presets: viewPresets, files: viewFiles, crash: viewCrash})[tab](p);
   drawer();
 }
 
@@ -378,6 +378,27 @@ function viewProblems() {
   $('view').innerHTML = head + (vis.map(i => `<div class="row static"><span class="${i.severity === 'error' ? 'err' : 'warn'}">${i.severity === 'error' ? '✖' : '▲'}</span>
     <span class="nm" style="white-space:normal;cursor:default">${esc(i.message)}</span>${fixBtn(i)}</div>`).join('') || '<div class="empty ok">No problems found. Ready to play.</div>');
 }
+// Who should win: every pair of mods that overwrite each other, with the one that wins now and a button to make the other
+// win. The choice moves the winner to load after the loser and is remembered, so Sort now keeps it.
+function pairBox() {
+  const p = cur(), pairs = (A && A.pairs) || [];
+  if (!p || !pairs.length) return '';
+  const pos = new Map(p.mods.filter(id => !p.disabled.includes(id)).map((id, i) => [id, i]));
+  const mine = new Set((p.winners || []).map(x => x[0] + '\u0001' + x[1]));
+  const live = pairs.filter(x => pos.has(x.a) && pos.has(x.b));
+  const rows = live.slice(0, 80).map(x => {
+    const w = pos.get(x.b) > pos.get(x.a) ? x.b : x.a, l = w === x.b ? x.a : x.b, n = x.files + x.defs;
+    const chosen = mine.has(w + '\u0001' + l);
+    const what = [x.files ? `${x.files} file${x.files === 1 ? '' : 's'}` : '', x.defs ? `${x.defs} definition${x.defs === 1 ? '' : 's'}` : ''].filter(Boolean).join(', ');
+    return `<div class="row static pair" title="${esc(x.examples.join('\n'))}"><span class="nm" style="white-space:normal;cursor:default"><b class="ok">${esc(nameOf(w))}</b> <span class="mut">wins over</span> ${esc(nameOf(l))}</span>
+      <span class="mut">${esc(what)}</span>${chosen ? `<span class="b ok" title="You chose this. Sort now keeps it.">your choice <button class="x" data-unwin="${esc(JSON.stringify([w, l]))}" title="Forget this choice" aria-label="Forget this choice">✕</button></span>` : ''}
+      <button class="sm" data-win="${esc(JSON.stringify([l, w]))}" title="Moves ${esc(nameOf(l))} to load after ${esc(nameOf(w))}">Make ${esc(nameOf(l))} win</button></div>`;
+  }).join('');
+  if (!rows) return '';
+  return `<div class="pairs"><h3>Mods that overwrite each other (${live.length})</h3>
+    <p class="mut">Where two mods change the same thing, the one lower in the load order wins. Pick the one you want to win and the load order is changed for you. Hover a line to see example files.</p>${rows}
+    ${live.length > 80 ? `<div class="mut">…and ${live.length - 80} more pairs.</div>` : ''}<h3>Every clash</h3></div>`;
+}
 function viewConflicts() {
   if (!A) return;
   if (A.pending) { $('view').innerHTML = '<div class="empty">Reading mod files to look for conflicts…<br><span class="mut">This can take a little while the first time with many mods.</span></div>'; return; }
@@ -386,9 +407,36 @@ function viewConflicts() {
     .map(([k, l]) => `<button data-f="${k}" class="${flt === k ? 'on' : ''}">${l}</button>`).join('');
   const rows = A.conflicts.filter(x => flt === 'all' || (flt === 'vanilla' ? x.vanilla : flt === x.kind && !x.vanilla)).map(x => `<div class="row static"><span class="${x.severity}">${x.vanilla ? 'Base game' : KINDS[x.kind]}</span>
     <span class="nm" style="white-space:normal;cursor:default"><code>${esc(x.path)}</code> — ${x.mods.map(i => (i === x.winner ? `<b class="ok">${esc(nameOf(i))}</b>` : esc(nameOf(i))) + (x.files && x.files[i] ? ` <span class="mut">(${x.files[i].map(f => esc(f.split('/').pop())).join(', ')})</span>` : '')).join(' → ')}</span></div>`).join('');
-  $('view').innerHTML = `<div class="chips">${chips}</div>` + (rows || `<div class="empty ok">No conflicts.${S.include_vanilla ? '' : '<br><span class="mut">Comparison with the base game is off (Settings → Game folders).</span>'}</div>`) + (A.truncated ? '<div class="mut">List truncated.</div>' : '');
+  $('view').innerHTML = `<div class="chips">${chips}</div>` + (flt === 'all' ? pairBox() : '') + (rows || `<div class="empty ok">No conflicts.${S.include_vanilla ? '' : '<br><span class="mut">Comparison with the base game is off (Settings → Game folders).</span>'}</div>`) + (A.truncated ? '<div class="mut">List truncated.</div>' : '');
 }
 
+// Crash help (beta): the server reads the game's logs and ranks the mods that look responsible (crash.py).
+async function runCrash() {
+  const id = S.active; CR = {pid: id, busy: true}; render();
+  try { const r = await api('crash/' + id); if (S && id === S.active) CR = {...r, pid: id}; } catch (e) { CR = null; render(); throw e; }
+  render();
+}
+const ago = t => { const s = Math.max(0, Date.now() / 1000 - t); return s < 90 ? 'just now' : s < 5400 ? Math.round(s / 60) + ' min ago' : s < 129600 ? Math.round(s / 3600) + ' hours ago' : Math.round(s / 86400) + ' days ago'; };
+function viewCrash(p) {
+  const head = `<div class="crash"><h3>Crash help <span class="b warn">beta</span></h3>
+    <p class="mut">After the game crashes or will not start, press the button. The app reads the game's own logs and crash folder, names the likely cause, and ranks the mods that look responsible. These are clues, not proof: the game does not say which mod broke it. It only reads files; nothing is changed until you press Disable.</p>
+    <p><button class="pri" data-crash="go" ${CR && CR.busy ? 'disabled' : ''}>${CR && CR.busy ? 'Reading the logs…' : 'Diagnose last crash'}</button></p>`;
+  if (!CR || CR.pid !== S.active || CR.busy) { $('view').innerHTML = head + '</div>'; return; }
+  const lvl = {high: ['Most likely', 'err'], medium: ['Possible', 'warn'], low: ['Weak clue', 'mut']};
+  const off = id => p.disabled.includes(id);
+  const reasons = CR.reasons.map(r => `<div class="row static crash-r"><span class="nm" style="white-space:normal;cursor:default"><b>${esc(r.title)}</b><div>${esc(r.advice)}</div><code class="mut">${esc(r.evidence)}</code></span></div>`).join('');
+  const likely = CR.suspects.filter(s => s.level !== 'low' && !off(s.id));
+  const sus = CR.suspects.map(s => `<div class="row static crash-s"><span class="b ${lvl[s.level][1]}">${lvl[s.level][0]}</span>
+      <span class="nm" style="white-space:normal;cursor:default"><b data-sel="${esc(s.id)}" style="cursor:pointer;${off(s.id) ? 'text-decoration:line-through' : ''}">${esc(s.name)}</b>
+      <div class="mut">${s.why.map(esc).join(' · ')}</div>
+      ${s.samples.length ? `<details><summary class="mut">Lines from the logs</summary>${s.samples.map(x => `<code class="mut" style="display:block;white-space:pre-wrap">${esc(x)}</code>`).join('')}</details>` : ''}</span>
+      <button class="sm" data-crashoff="${esc(s.id)}" data-on="${off(s.id) ? 1 : ''}">${off(s.id) ? 'Enable again' : 'Disable'}</button></div>`).join('');
+  const logs = CR.logs.map(l => `<div class="mut" title="${esc(l.where)}">${esc(l.name)} · ${l.kind} · ${ago(l.modified)} · ${l.lines} lines</div>`).join('');
+  $('view').innerHTML = head + CR.notes.map(n => `<div class="row static warn">${esc(n)}</div>`).join('') +
+    (reasons ? '<h3>What the logs say</h3>' + reasons : '') +
+    (sus ? `<h3>Mods to look at (${CR.suspects.length})</h3>` + (likely.length ? `<p><button class="sm" data-crash="offlikely">Disable the ${likely.length} likely mod${likely.length === 1 ? '' : 's'}</button> <span class="mut">then press Play and see if it still crashes; Diagnose again if it does.</span></p>` : '') + sus : '') +
+    (logs ? '<h3>Files read</h3>' + logs : '') + '</div>';
+}
 async function loadCompare() {
   const others = S.playsets.filter(x => x.id !== S.active);
   if (!others.some(x => x.id === cmpWith)) cmpWith = others.length ? others[0].id : null;
@@ -830,6 +878,27 @@ document.addEventListener('click', guard(async e => {
     lastMissing = r.missing; steamQ = null; await api(`playsets/${r.id}/activate`, {}); await load();
     tab = 'presets'; render();
     toast(r.missing.length ? `Playset created. ${r.missing.length} mod(s) still need downloading.` : 'Playset created. Everything is installed.');
+  }
+  const cb = t.closest('[data-crash]'), co = t.closest('[data-crashoff]');
+  if (cb && cb.dataset.crash === 'go') return runCrash();
+  if (cb && cb.dataset.crash === 'offlikely' && CR) {
+    const ids = CR.suspects.filter(s => s.level !== 'low').map(s => s.id);
+    await patch(q => ({disabled: [...new Set([...q.disabled, ...ids])]}));
+    return toast(`Disabled ${ids.length} mod${ids.length === 1 ? '' : 's'}. Press Play to test.`);
+  }
+  if (co) {
+    const id = co.dataset.crashoff, was = !!co.dataset.on;
+    await patch(q => ({disabled: was ? q.disabled.filter(x => x !== id) : [...q.disabled, id]}));
+    return toast(was ? 'Enabled again' : 'Disabled. Press Play to test.');
+  }
+  const win = t.closest('[data-win]'), unwin = t.closest('[data-unwin]');
+  if (win) {
+    const [w, l] = JSON.parse(win.dataset.win);
+    Object.assign(p, await api(`playsets/${p.id}/winner`, {pairs: [[w, l]]})); render(); analyse();
+    return toast(`${nameOf(w)} now loads after ${nameOf(l)}, so it wins`);
+  }
+  if (unwin) {
+    Object.assign(p, await api(`playsets/${p.id}/winner`, {pairs: [JSON.parse(unwin.dataset.unwin)], forget: true})); return render();
   }
   if (ds.dl1) { await api('downloads', {ids: [ds.dl1], method: 'steam'}); toast('Opening the Workshop page in Steam…'); }
   if (ds.filesof) {
@@ -1277,7 +1346,7 @@ function setLogo(id) {
   img.onerror = () => { if (logoTry++ < 2 && box.dataset.k === id) setTimeout(() => { if (box.dataset.k === id) img.src = `/api/${encodeURIComponent(id)}/logo?r=${logoTry}`; }, 1500); };
 }
 async function useGame(id, first) {
-  gen++; G = id; S = A = C = P = null; sel = null; tab = 'order'; cmpWith = null; lastMissing = []; steamQ = null; setupShown = false;
+  gen++; G = id; S = A = C = P = CR = null; sel = null; tab = 'order'; cmpWith = null; lastMissing = []; steamQ = null; setupShown = false;
   try { localStorage.setItem('mm-game', id); } catch (e) { /* storage may be blocked */ }
   if (location.hash.slice(1) !== id) history.replaceState(null, '', '#' + id);
   const g = GI.games.find(x => x.id === id);

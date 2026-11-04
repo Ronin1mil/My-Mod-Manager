@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.8 - Choose who wins a clash, and Crash help (beta)
+- **Conflicts tab:** a new list at the top, **Mods that overwrite each other**: each pair with how many files and definitions clash, which one wins now, and a **Make X win** button. It moves the winner to load after the loser and remembers your choice; **Sort now** keeps it (ahead of every other rule). A choice that would break a dependency is refused with the reason. Reordering by hand the other way, or disabling a mod, cancels the choice.
+- **Crash help (beta):** a new tab. **Diagnose last crash** reads the game's logs and newest crash folder, names known causes (out of memory, access violation, graphics driver, a missing assembly, a module built for another game version ...) and ranks the mods the logs name, together with the app's own findings (missing dependencies, wrong game version) and recently updated mods. Disable one suspect or all likely ones with a click. Clues, not proof: see docs/23-crash-help.md. Where each game writes its logs is not yet confirmed on a real PC, so the tab lists the files it read.
+
 ## 1.0.7 - Sort now also looks at overwrites
 **Sort now** no longer only handles dependencies. After the dependency rules it reads which enabled mods overwrite each other (same file, same definition, or a folder one of them replaces) and orders those by rules of thumb:
 - a mod that replaces a whole folder (`replace_path`) loads before the mods that add files to that folder, so it does not delete them
