@@ -97,6 +97,7 @@ const tools = open => { $('toolsmenu').hidden = !open; $('toolsbtn').setAttribut
 $('toolsbtn').onclick = e => { e.stopPropagation(); tools($('toolsmenu').hidden); };
 document.addEventListener('click', () => tools(false));
 document.addEventListener('keydown', e => { if (e.key === 'Escape') tools(false); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && tab === 'rnw' && RWM && !(($('dlg') || {}).open)) { RWM = null; render(); } });   // Esc closes a map that is open
 // ---- file trees ----
 function mountTree(box, entries) {
   const root = {d: {}, f: []};
@@ -548,7 +549,7 @@ function rnwWorld(w, p, can) {
     <span class="rnw-btn">${w.installed && w.mod_id ? (on ? `<button class="sm" data-rnw="useoff" data-f="${esc(w.folder)}">Turn off</button>` : `<button class="pri sm" data-rnw="use" data-f="${esc(w.folder)}" title="Turns this world on in the current playset, turns the other worlds and the generator itself off, and puts it last">Use this world</button>`) : ''}
       ${!w.installed && can && w.id ? `<button class="sm" data-rnw="add" data-id="${esc(w.id)}" title="Installs it into your mod folder (the generator builds it again from its code if it must)">Add to game</button>` : ''}
       ${w.installed && can && w.id ? `<button class="sm" data-rnw="remove" data-id="${esc(w.id)}" data-f="${esc(w.name)}">Remove from game</button>` : ''}
-      ${w.map ? `<button class="pri sm" data-rnw="openmap" data-key="${esc(w.map)}">Show map</button>` : ''}
+      ${w.map ? (RWM && RWM.key === w.map ? `<button class="sm" data-rnw="closemap">Hide map</button>` : `<button class="pri sm" data-rnw="openmap" data-key="${esc(w.map)}">Show map</button>`) : ''}
       ${!w.installed && can && w.code && w.valid_code ? `<button class="sm" data-rnw="fromcode" data-code="${esc(w.code)}" title="Opens Make a new map with this world code filled in">Make this map</button>` : ''}
       ${w.code ? `<button class="sm" data-rnw="copy" data-code="${esc(w.code)}">Copy code</button>` : ''}</span></div>`;
 }
@@ -593,6 +594,7 @@ function rnwPaintMap() {
 async function rnwOpenMap(key) {
   if (RWM && RWM.key === key) { RWM = null; return render(); }   // pressing it again closes it
   const M = RWM = {key, layer: 'countries', ready: false, error: ''}; render();
+  const box = document.querySelector('.rnw-map'); if (box) box.scrollIntoView({block: 'start'});   // the map opens above the list: bring it into view
   try {
     const [data, blob] = await Promise.all([api(`rnw/map/${key}`), fetch(`/api/${G}/rnw/map/${key}.png`).then(r => { if (!r.ok) throw new Error('The map picture could not be loaded.'); return r.blob(); })]);
     const bmp = await createImageBitmap(blob, {colorSpaceConversion: 'none'});
@@ -620,7 +622,7 @@ async function rnwOpenMap(key) {
 function rnwMapHtml() {
   const M = RWM; if (!M) return '';
   const w = (RW.worlds || []).find(x => x.map === M.key), title = w ? (w.name || w.folder || 'Map') : 'Map';
-  const head = `<div class="rnw-map"><div class="rnw-maphead"><b>${esc(title)}</b><button class="sm" data-rnw="openmap" data-key="${esc(M.key)}">Close the map</button></div>`;
+  const head = `<div class="rnw-map"><div class="rnw-maphead"><b>${esc(title)}</b><button class="pri sm" data-rnw="closemap">✕ Close the map</button></div>`;
   if (M.error) return head + `<div class="row static err">${esc(M.error)}</div></div>`;
   if (!M.ready) return head + '<p class="mut">Loading the map…</p></div>';
   const S = M.data.summary, n = x => (x || 0).toLocaleString(), lay = M.layer, voc = M.data.vocabulary;
@@ -638,7 +640,7 @@ function rnwMapHtml() {
       <div class="rnw-key">${n(S.countries.state)} states and ${n(S.countries.tribe)} tribes</div>
       <div class="rnw-key">Population ${n(S.population)}</div>
       ${legend}${lay === 'countries' ? list('Terrain', S.topography, 'topography') + list('Vegetation', S.vegetation, 'vegetation') + list('Climate', S.climate, 'climate') + list('Most common cultures', S.cultures, 'culture') + list('Most common religions', S.religions, 'religion') : ''}
-    </div></div></div>`;
+    </div></div><p><button class="sm" data-rnw="closemap">Close the map</button></p></div>`;
 }
 function rnwLogHtml() {
   const l = (RW && RW.log) || []; if (!l.length) return '';
@@ -1163,6 +1165,7 @@ document.addEventListener('click', guard(async e => {
   if (rb) {
     const act = rb.dataset.rnw;
     if (act === 'refresh') return RW.step === 'menu' ? loadRnw(false, false) : rnwGo(RW.step);
+    if (act === 'closemap') { RWM = null; return render(); }
     if (act === 'info') { const k = rb.dataset.k; if (RWOPEN.has(k)) RWOPEN.delete(k); else RWOPEN.add(k); return render(); }
     if (act === 'menu') { RW.step = 'menu'; render(); return loadRnw(true); }
     if (act === 'goimport') return rnwGo('import');

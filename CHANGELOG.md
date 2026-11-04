@@ -1,6 +1,7 @@
 # Changelog
 
 ## 1.1.3 - Random New World: a menu first, import your own maps, honest about the Workshop copy
+- **An open map can be closed.** The map opens above the list, so it is scrolled into view; its title bar stays at the top while you scroll and has **✕ Close the map**, there is another **Close the map** at the bottom, the map's button in the list turns into **Hide map**, and **Esc** closes it too.
 - **A map's settings open and close reliably.** The "Settings" line under each map is now a button (▸ / ▾) that opens its settings, keeps them open when the list is redrawn, and has a **Hide settings** button at the bottom to close them again. (The old expander closed by itself on a redraw, so a click seemed to do nothing.)
 - **The menu lists all your maps.** The tab opens on the menu and reads the list of your maps at once (your mod folder and this app's own records, including imported .rnworld files; no program is started), so "Your maps" and Show map are there without choosing anything. (It said "Nothing has been loaded yet" while the maps were in the Import screen.)
 - **The tab opens on a menu.** Choose **Import my maps** (reads your mod folder only; no program is started) or **Make a new map** (finds the generator, then builds). Every step is written in a "What I'm doing" box, so it is clear what the app is doing and what comes next.

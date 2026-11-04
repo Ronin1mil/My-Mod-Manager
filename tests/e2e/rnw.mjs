@@ -129,7 +129,20 @@ try {
   await page.click('[data-rnw=layer][data-l=topography]');
   assert.deepEqual(await px(1, 0), [150, 190, 110, 255]);   // flatland
   assert.match(await page.textContent('.rnw-map'), /flatland/);
-  await page.click('[data-rnw=openmap]');                   // pressing it again closes the map
+  assert.equal(await page.locator('.rnw-w [data-rnw=closemap]').count(), 1);     // while it is open the list offers Hide map
+  await page.click('.rnw-maphead [data-rnw=closemap]');                         // the Close button at the top closes it
+  assert.equal(await page.locator('.rnw-map').count(), 0);
+  await page.click('[data-rnw=openmap]');                                       // open again: the one at the bottom, the list's Hide map, and Esc also close it
+  await page.waitForSelector('.rnw-map #rnwmapcv canvas');
+  await page.click('.rnw-map > p [data-rnw=closemap]');
+  assert.equal(await page.locator('.rnw-map').count(), 0);
+  await page.click('[data-rnw=openmap]');
+  await page.waitForSelector('.rnw-map #rnwmapcv canvas');
+  await page.click('.rnw-w [data-rnw=closemap]');
+  assert.equal(await page.locator('.rnw-map').count(), 0);
+  await page.click('[data-rnw=openmap]');
+  await page.waitForSelector('.rnw-map #rnwmapcv canvas');
+  await page.keyboard.press('Escape');
   assert.equal(await page.locator('.rnw-map').count(), 0);
 
   // 4. back to the menu, then Make a new map: the app does not search, it asks for the folder and reports what it finds there

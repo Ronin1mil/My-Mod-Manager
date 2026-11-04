@@ -243,6 +243,6 @@ h1{font-size:22px}
 
 /* Random New World: the map of an imported .rnworld file */
 .rnw-map{border:1px solid var(--line);border-radius:10px;padding:12px;margin:12px 0;background:var(--panel)}
-.rnw-maphead{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}.rnw-layers{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.rnw-maphead{position:sticky;top:0;z-index:5;background:var(--panel);padding:4px 0;display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}.rnw-layers{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
 .rnw-mapbox{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start}.rnw-canvas{flex:3 1 460px;min-width:0}.rnw-mapside{flex:1 1 260px;min-width:220px;max-height:640px;overflow:auto}
 .rnw-mapside h4{margin:12px 0 4px;color:var(--acc);font-size:13px}.rnw-key{display:flex;align-items:center;gap:6px;font-size:13px;padding:1px 0;flex-wrap:wrap}.rnw-key i{width:12px;height:12px;border-radius:3px;flex:none;border:1px solid #0006}
