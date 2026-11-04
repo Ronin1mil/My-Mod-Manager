@@ -51,7 +51,8 @@ PRESETS = [
     {"id": "wall", "title": "The Wall", "about": "A continent behind a barrier."},
 ]
 PRESET_TITLES = {p["id"]: p["title"] for p in PRESETS}
-KILL_GRACE = 5   # seconds to wait for the output after killing a program that ran out of time
+RUN_OUTPUT_CAP = 8 * 1024 * 1024   # most output kept from one quick command
+KILL_GRACE = 5  # seconds to wait for the output after killing a program that ran out of time
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 ARG_OK = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:\-]{0,299}$")
 OPT_OK = re.compile(r"^--[a-z][a-z\-]{0,30}$")
@@ -289,28 +290,27 @@ def check_args(args):
 def run_safely(argv, timeout, cwd):
     """subprocess.run with a timeout that really ends. On Windows, subprocess.run only kills the first process (cmd.exe) when the
     time is up; the program cmd.exe started keeps the output pipe open, so the second wait never returns and the page loads
-    for ever. This kills the whole process tree, then gives up on the pipes after a few seconds.
+    for ever. This kills the whole process tree. The output goes to temporary files, not pipes, so there is no pipe a stray
+    child could hold open (closing or reading a pipe that another thread is blocked on hangs on Windows), and nothing waits
+    for the output: only for the program itself.
     The program gets no keyboard input (stdin is empty), so it can never wait for someone to type. -> (code, out, err)"""
-    proc = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
-                            encoding="utf-8", errors="replace", cwd=str(cwd), creationflags=NO_WINDOW)
-    try:
-        out, err = proc.communicate(timeout=timeout)
-    except subprocess.TimeoutExpired:
-        _kill_tree(proc)
+    import tempfile
+    with tempfile.TemporaryFile() as fout, tempfile.TemporaryFile() as ferr:
+        proc = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=fout, stderr=ferr, cwd=str(cwd), creationflags=NO_WINDOW)
         try:
-            proc.communicate(timeout=KILL_GRACE)
-        except Exception:   # the pipes are still held by a child that would not die: let go of them
-            for f in (proc.stdout, proc.stderr):
-                try:
-                    f.close()
-                except Exception:
-                    pass
+            proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            _kill_tree(proc)
             try:
-                proc.wait(timeout=2)
+                proc.wait(timeout=KILL_GRACE)
             except Exception:
                 pass
-        raise subprocess.TimeoutExpired(argv, timeout)
-    return proc.returncode, out or "", err or ""
+            raise subprocess.TimeoutExpired(argv, timeout)
+
+        def text(f):
+            f.seek(0)
+            return f.read(RUN_OUTPUT_CAP).decode("utf-8", "replace")
+        return proc.returncode, text(fout), text(ferr)
 
 
 def run_cli(gen, args, timeout=60, runner=None):
