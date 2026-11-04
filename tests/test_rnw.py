@@ -227,12 +227,15 @@ class Finding(unittest.TestCase):
         (self.r / "empty").mkdir()
         self.assertIsNone(rnw.find_generator("", [(self.r / "empty", "x"), (self.r / "missing", "y")]))
 
-    def test_only_the_window_program_still_runs_commands_through_it(self):
+    def test_only_the_window_program_runs_commands_through_it_except_on_windows(self):
         d = self.r / "g"
         d.mkdir()
         (d / "RandomNewWorld.exe").write_text("x")
         g = rnw.find_generator(str(d))
-        self.assertEqual(g.argv(["worlds"]), [str(d / "RandomNewWorld.exe"), "--cli", "worlds"])
+        if os.name == "nt":   # Windows: the window program is never given --cli (see the Windows test below)
+            self.assertFalse(g.can_run)
+        else:   # the Linux package takes --cli on its one program
+            self.assertEqual(g.argv(["worlds"]), [str(d / "RandomNewWorld.exe"), "--cli", "worlds"])
 
     def test_on_windows_the_window_program_alone_cannot_run_commands(self):
         # a real Workshop copy held only "Random New World Generator.exe"; --cli on it sat open for 214 s and printed nothing
