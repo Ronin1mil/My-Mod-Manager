@@ -197,14 +197,17 @@ class Generator:
 
     @property
     def can_run(self):
-        return bool(self.prefix or self.cmd or self.launcher)
+        # On Windows the window program (a windowed .exe) prints nothing to a pipe and can sit open for ever when given
+        # --cli (seen on a real PC: the list took 214 s until the app was closed), so commands need rnw.cmd there.
+        # Only the Linux package takes --cli on its single program.
+        return bool(self.prefix or self.cmd or (self.launcher and os.name != "nt"))
 
     def argv(self, args):
         if self.prefix:
             base = list(self.prefix)
         elif self.cmd:
             base = [str(self.cmd)]
-        elif self.launcher:
+        elif self.launcher and os.name != "nt":
             base = [str(self.launcher), "--cli"]   # the window program also takes --cli (docs/generator-guide.md)
         else:
             raise ValueError("Random New World's command line (rnw.cmd) was not found in " + str(self.folder))
@@ -470,7 +473,7 @@ def merge_worlds(installed, library, records, mod_ids=None):
     for code, rec in records.items():
         e = by_code.get(code)
         if e is None:
-            if rec.get("state") != "done":
+            if rec.get("state") not in ("done", "imported"):
                 continue
             e = add(entry(id=rec.get("id", ""), folder=""))
             apply_code(e, code)
@@ -510,15 +513,42 @@ class Jobs:
         with self.lock:
             return bool(self.job and self.job["state"] == "running")
 
+    def _new(self, kind, label):
+        if self.job and self.job["state"] == "running":
+            raise ValueError("Random New World is already working on something. Wait for it to finish, or cancel it.")
+        self._n += 1
+        job = self.job = {"id": self._n, "kind": kind, "label": label, "state": "running", "percent": 0, "stage": "Starting",
+                          "log": [], "error": "", "result": None, "started": time.time(), "finished": 0, "cancel": False}
+        return job
+
     def start(self, kind, label, argv, cwd, on_done=None):
         with self.lock:
-            if self.job and self.job["state"] == "running":
-                raise ValueError("Random New World is already working on something. Wait for it to finish, or cancel it.")
-            self._n += 1
-            job = self.job = {"id": self._n, "kind": kind, "label": label, "state": "running", "percent": 0, "stage": "Starting",
-                              "log": [], "error": "", "result": None, "started": time.time(), "finished": 0, "cancel": False}
+            job = self._new(kind, label)
         threading.Thread(target=self._run, args=(job, argv, cwd, on_done), daemon=True, name="rnw-job").start()
         return self.public(job)
+
+    def start_func(self, kind, label, fn, on_done=None):
+        """A job that runs a Python function `fn(job)` (copying a world into the mod folder). The function updates
+        job["percent"], job["stage"] and job["log"], stops when job["cancel"] is set, and returns the result."""
+        with self.lock:
+            job = self._new(kind, label)
+        threading.Thread(target=self._run_func, args=(job, fn, on_done), daemon=True, name="rnw-job").start()
+        return self.public(job)
+
+    def _run_func(self, job, fn, on_done):
+        try:
+            job["result"] = fn(job)
+            job["outcome"], job["percent"] = ("cancelled" if job["cancel"] else "done"), (job["percent"] if job["cancel"] else 100)
+        except Exception as e:   # said on the page, in words
+            job["outcome"], job["error"] = "failed", (str(e) if isinstance(e, (ValueError, OSError)) else f"{type(e).__name__}: {e}")[:300]
+        finally:
+            job["finished"] = time.time()
+            if on_done:
+                try:
+                    on_done(job)
+                except Exception as e:
+                    job["error"] = job["error"] or f"The app could not finish: {e}"[:300]
+            job["state"] = job.get("outcome") or "failed"
 
     def _run(self, job, argv, cwd, on_done):
         out, proc = [], None
@@ -636,7 +666,7 @@ class Manager:
         return gen.public() if gen else None
 
     # -- listing --
-    def list_job(self):
+    def list_job(self, use_cli=True):
         """Snapshot what the lock protects, return the function that reads the disk (run it without the lock)."""
         app = self.app
         gen, user_dir = self.generator(), app.user_dir
@@ -662,7 +692,7 @@ class Manager:
                         if e:
                             installed.append(e)
             library, cli = [], {"ok": False, "error": ""}
-            if gen and gen.can_run:
+            if gen and gen.can_run and use_cli:
                 started = time.time()
                 if not self._logged_start:   # LOG-CHECK: a "started" line without a "finished" line after it means the command hung
                     self._logged_start = True
@@ -687,12 +717,17 @@ class Manager:
             if gen is None:
                 notes.append("Random New World was not found on this PC. Subscribe to it on the Steam Workshop (item "
                              f"{WORKSHOP_ID}), or download it from GitHub, then press Find again or choose its folder.")
+            elif not use_cli:
+                pass   # the page asked for the files only: no program is started, nothing is said about the generator's list
             elif not gen.can_run:
-                notes.append("Random New World's folder was found, but not its command line (rnw.cmd).")
+                notes.append("Random New World's window program was found, but not its command line (rnw.cmd), which the Steam "
+                             "Workshop copy may not include. You can still open the generator and import worlds you already have; "
+                             "to make worlds from here, download the standalone Windows package from GitHub (it includes rnw.cmd) "
+                             "and choose its folder.")
             elif not cli["ok"]:
                 notes.append("The generator's own list of worlds could not be read, so only worlds installed in your mod folder "
                              "are shown. " + cli["error"])
-            return {"generator": gen.public() if gen else None, "worlds": worlds, "cli": cli, "notes": notes, "presets": PRESETS,
+            return {"generator": gen.public() if gen else None, "worlds": worlds, "cli": cli, "cli_used": bool(use_cli and gen and gen.can_run), "notes": notes, "presets": PRESETS,
                     "hub": {"installed": bool(hub), "enabled": any(h in enabled for h in hub)}, "playset": pid,
                     "game_version": version, "job": job, "free_gb": _free_gb(user_dir), "user_dir": str(user_dir or "")}
         return run
@@ -706,7 +741,18 @@ class Manager:
             if isinstance(w, dict):
                 places[str(w.get("place"))] = places.get(str(w.get("place")), 0) + 1
         bad = ["%s: %s" % (w["folder"], w["problem"]) for w in worlds if w.get("problem")]
+        listing = []
+        if gen:   # LOG-CHECK: what is in the generator's folder (two levels), to see where rnw.cmd is, if anywhere
+            try:
+                for a in sorted(os.listdir(gen.folder))[:40]:
+                    pa = gen.folder / a
+                    listing.append(a + ("/" if pa.is_dir() else ""))
+                    if pa.is_dir():
+                        listing += ["  " + a + "/" + b for b in sorted(os.listdir(pa))[:12]]
+            except OSError as e:
+                listing.append(f"could not list: {e}")
         lines = [
+            f"generator folder holds: {listing[:80]}",
             # good: a folder that holds rnw.cmd (and a launcher .exe); "how" says where it was found
             f"generator: {gen.public() if gen else None}",
             # good: ok True; library = the number of worlds RNW itself lists; keys should include id, code, preset, seed, place
@@ -796,6 +842,91 @@ class Manager:
             raise ValueError("Random New World could not remove it: " + _error_text(out, err))
         self._rescan()
         return {"removed": wid}
+
+    # -- importing worlds you already have --
+    def import_code(self, code):
+        """Remember a world code (nothing is built): the page then lists the world with the settings decoded from the code."""
+        wc = norm_code(code)
+        specs = decode_code(wc)
+        self.records.put(wc, {"preset": specs["preset"], "seed": str(specs["seed"]), "generator": specs["generator"],
+                              "changes": specs["changes"], "requested_at": int(time.time()), "state": "imported",
+                              "how": "imported by this app"})
+        gamelog.log(self.app.game.id, f"Random New World: imported the code {wc}")
+        return {"code": wc, "preset": specs["preset"], "seed": str(specs["seed"])}
+
+    def import_folder(self, path):
+        """Copy world mod folder(s) into the mod folder. `path` is one world (rnw_exp_world_...) or a folder holding several.
+        Runs in the background (a world is about 1.2 GB) and never overwrites a world that is already there."""
+        path = str(path or "").strip().strip('"')
+        if not path or any(ord(c) < 32 for c in path):
+            raise ValueError("Give the folder of a world (the one named like rnw_exp_world_...).")
+        src = Path(path)
+        mod = Path(self.app.user_dir or "") / "mod"
+        if not self.app.user_dir or not mod.is_dir():
+            raise ValueError("The game's mod folder was not found, so there is nowhere to put the world. Check the folders in Settings.")
+        if src.is_symlink() or not src.is_dir():
+            raise ValueError("That is not a folder on this PC.")
+        if src.resolve() == mod.resolve() or mod.resolve() in src.resolve().parents:
+            raise ValueError("That folder is already inside your mod folder.")
+        worlds = [src] if read_world_folder(src) else []
+        if not worlds:   # a folder that holds several worlds
+            try:
+                worlds = [d for d in sorted(src.iterdir()) if d.is_dir() and not d.is_symlink() and read_world_folder(d)]
+            except OSError as e:
+                raise ValueError(f"That folder could not be read: {e.strerror or e}")
+        if not worlds:
+            raise ValueError("No Random New World map was found there. A map is a folder named like rnw_exp_world_abcde23456 "
+                             "with a .metadata folder inside; pick that folder, or the folder that holds several of them.")
+        todo = [w for w in worlds if not (mod / w.name).exists()]
+        if not todo:
+            raise ValueError("Those worlds are already in your mod folder.")
+        names = [w.name for w in todo]
+
+        def work(job):
+            sizes = {}
+            job["stage"] = "Measuring"
+            for w in todo:
+                files = []
+                for root, dirs, fs in os.walk(w):
+                    dirs[:] = [d for d in dirs if not os.path.islink(os.path.join(root, d))]
+                    files += [os.path.join(root, f) for f in fs if not os.path.islink(os.path.join(root, f))]
+                sizes[w] = files
+            total = sum(os.path.getsize(f) for fl in sizes.values() for f in fl) or 1
+            free = _free_gb(self.app.user_dir)
+            if free is not None and free * 1024 ** 3 < total * 1.05:
+                raise ValueError(f"Not enough free disk space: {total / 1024 ** 3:.1f} GB are needed, {free:.1f} GB are free.")
+            job["log"].append(f"{len(todo)} world(s), {total / 1024 ** 3:.2f} GB, copying into {mod}")
+            done = 0
+            for w in todo:
+                job["stage"] = f"Copying {w.name}"
+                tmp = mod / (w.name + ".importing")   # copied under another name and renamed at the end: no half world is ever seen
+                shutil.rmtree(tmp, ignore_errors=True)
+                try:
+                    for f in sizes[w]:
+                        if job["cancel"]:
+                            raise InterruptedError
+                        dest = tmp / os.path.relpath(f, w)
+                        dest.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copyfile(f, dest)
+                        done += os.path.getsize(f)
+                        job["percent"] = min(99, int(done * 100 / total))
+                    if not sizes[w]:
+                        tmp.mkdir(parents=True, exist_ok=True)
+                    os.replace(tmp, mod / w.name)
+                    job["log"].append("copied " + w.name)
+                except BaseException:
+                    shutil.rmtree(tmp, ignore_errors=True)
+                    if job["cancel"]:
+                        return {"imported": []}
+                    raise
+            return {"imported": names}
+
+        def done(job):
+            if job.get("outcome") == "done":
+                self._rescan()
+            gamelog.log(self.app.game.id, f"Random New World: import of {names} {job.get('outcome')}" + (f" ({job['error']})" if job["error"] else ""))
+        gamelog.log(self.app.game.id, f"Random New World: importing {names} from {src}")
+        return self.jobs.start_func("import", f"Importing {len(todo)} world(s)" if len(todo) > 1 else f"Importing {names[0]}", work, done)
 
     def cancel(self):
         return self.jobs.cancel()

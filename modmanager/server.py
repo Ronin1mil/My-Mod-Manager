@@ -1341,7 +1341,7 @@ def make_handler(hub):
                         mgr = app.rnw_manager()
                         if p[3] == "job":   # polled every second or two while a world is being made
                             return self._send(200, {"job": mgr.jobs.status()})
-                        job = mgr.list_job()
+                        job = mgr.list_job(use_cli=p[3] != "files")   # "files": read the mod folder only, start no program
                     elif len(p) == 4:
                         job = app.tree_job(p[3])
                     else:
@@ -1605,6 +1605,10 @@ def make_handler(hub):
                 return m.add_world(str(b.get("id", "")))
             if act == "remove":
                 return m.remove_world(str(b.get("id", "")))
+            if act == "import":
+                if b.get("code"):
+                    return m.import_code(b.get("code"))
+                return {"job": m.import_folder(b.get("path"))}
             if act == "cancel":
                 return {"job": m.cancel()}
             if act == "use":

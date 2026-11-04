@@ -234,6 +234,22 @@ class Finding(unittest.TestCase):
         g = rnw.find_generator(str(d))
         self.assertEqual(g.argv(["worlds"]), [str(d / "RandomNewWorld.exe"), "--cli", "worlds"])
 
+    def test_on_windows_the_window_program_alone_cannot_run_commands(self):
+        # a real Workshop copy held only "Random New World Generator.exe"; --cli on it sat open for 214 s and printed nothing
+        d = self.r / "g2"
+        d.mkdir()
+        (d / "Random New World Generator.exe").write_text("x")
+        g = rnw.find_generator(str(d))
+        self.assertEqual(g.launcher.name, "Random New World Generator.exe")
+        with mock.patch.object(rnw.os, "name", "nt"):
+            self.assertFalse(g.can_run)
+            with self.assertRaises(ValueError):
+                g.argv(["worlds"])
+        (d / "rnw.cmd").write_text("x")
+        g2 = rnw.find_generator(str(d))
+        with mock.patch.object(rnw.os, "name", "nt"):
+            self.assertEqual((g2.can_run, g2.argv(["worlds"])), (True, [str(d / "rnw.cmd"), "worlds"]))
+
     def test_arguments_that_could_reach_the_shell_are_refused(self):
         for bad in ("&calc", "a b", "%PATH%", "x|y", "..\\x", "", "-x", 'a"b', "a\nb", "--Preset", "--" + "a" * 40, 5):
             with self.assertRaises(ValueError, msg=repr(bad)):
@@ -272,6 +288,62 @@ class Route(GameCase):
                 return job
             time.sleep(0.05)
         self.fail("the job did not finish")
+
+    def test_the_files_listing_starts_no_program_and_reads_the_mod_folder(self):
+        d = self.mods_dir / "rnw_exp_world_aaaaa22222"
+        (d / ".metadata/rnw-library").mkdir(parents=True)
+        (d / ".metadata/metadata.json").write_text(json.dumps({"name": "RNW: Mine", "version": "1"}))
+        (d / ".metadata/rnw-library/world.json").write_text(json.dumps({"schema": 1, "id": "aaaaa22222", "code": CODE, "preset": "continents", "seed": 42}))
+        self.mgr.runner = lambda *a, **k: self.fail("a program was started")
+        res = self.req("GET", "/api/rnw/files")[1]
+        self.assertFalse(res["cli_used"])
+        self.assertEqual([w["folder"] for w in res["worlds"]], ["rnw_exp_world_aaaaa22222"])
+        self.assertEqual(res["notes"], [])
+
+    def make_source(self, name="rnw_exp_world_zzzzz99999", files=3):
+        src = self.r / "elsewhere" / name
+        (src / ".metadata/rnw-library").mkdir(parents=True)
+        (src / ".metadata/metadata.json").write_text(json.dumps({"name": "RNW: Imported", "version": "1"}))
+        (src / ".metadata/rnw-library/world.json").write_text(json.dumps({"schema": 1, "id": name[-10:], "code": CODE, "preset": "continents", "seed": 42}))
+        for i in range(files):
+            (src / "in_game").mkdir(exist_ok=True)
+            (src / "in_game" / f"f{i}.txt").write_text("x" * 100)
+        return src
+
+    def test_importing_a_world_folder_copies_it_into_the_mod_folder(self):
+        src = self.make_source()
+        st, res, _ = self.post("/api/rnw/import", {"path": f'"{src}"'})   # Windows "Copy as path" adds quotes
+        self.assertEqual(st, 200, res)
+        job = self.wait()
+        self.assertEqual(job["state"], "done", job)
+        self.assertTrue((self.mods_dir / "rnw_exp_world_zzzzz99999/in_game/f2.txt").is_file())
+        self.assertFalse(list(self.mods_dir.glob("*.importing")))
+        self.assertTrue(src.is_dir())   # the original stays
+        names = [w["folder"] for w in self.req("GET", "/api/rnw/files")[1]["worlds"]]
+        self.assertIn("rnw_exp_world_zzzzz99999", names)
+        st, res, _ = self.post("/api/rnw/import", {"path": str(src)})   # the same world again is refused, not overwritten
+        self.assertEqual(st, 400)
+        self.assertIn("already", res["error"])
+
+    def test_importing_a_folder_that_holds_several_worlds(self):
+        a, b = self.make_source("rnw_exp_world_aaaaa11111"), self.make_source("rnw_exp_world_bbbbb22222")
+        self.assertEqual(self.post("/api/rnw/import", {"path": str(a.parent)})[0], 200)
+        self.assertEqual(self.wait()["result"]["imported"], ["rnw_exp_world_aaaaa11111", "rnw_exp_world_bbbbb22222"])
+
+    def test_importing_something_that_is_not_a_world_or_is_odd_is_refused(self):
+        plain = self.r / "plain"
+        plain.mkdir()
+        for path in ("", str(self.r / "missing"), str(plain), str(self.mods_dir), "bad\x00path"):
+            st, res, _ = self.post("/api/rnw/import", {"path": path})
+            self.assertEqual(st, 400, path)
+        self.assertEqual(list(self.mods_dir.glob("*.importing")), [])
+
+    def test_importing_a_code_remembers_it_and_lists_the_world_without_building(self):
+        st, res, _ = self.post("/api/rnw/import", {"code": CODE.lower()})
+        self.assertEqual((st, res["preset"], res["seed"]), (200, "continents", "42"))
+        w = self.req("GET", "/api/rnw/files")[1]["worlds"][0]
+        self.assertEqual((w["code"], w["installed"], w["place"]), (CODE, False, "code_only"))
+        self.assertEqual(self.post("/api/rnw/import", {"code": "RNW1-nonsense"})[0], 400)
 
     def test_other_games_have_no_such_page(self):
         for method, path in (("GET", "/api/rnw/list"), ("POST", "/api/rnw/open")):

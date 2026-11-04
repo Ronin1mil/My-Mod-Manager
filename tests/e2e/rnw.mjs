@@ -59,20 +59,47 @@ try {
   await page.reload();
   await page.waitForSelector('#tabs button');
 
+  const rnwCalls = [];
+  page.on('request', r => { if (r.url().includes('/rnw/') && !r.url().endsWith('/rnw/job')) rnwCalls.push(r.url()); });
   await page.click('[data-tab=rnw]');
   await page.waitForSelector('.rnw');
-  assert.match(await page.textContent('.rnw'), /was not found on this PC/);                 // no generator yet
-  assert.match(await page.textContent('.rnw'), /Your worlds \(1\)/);                        // but the installed world is listed from its own files
+  // 1. the tab opens on a menu and loads nothing
+  assert.match(await page.textContent('.rnw'), /What do you want to do\?/);
+  assert.match(await page.textContent('.rnw'), /Nothing has been loaded yet/);
+  assert.deepEqual(rnwCalls, []);
+
+  // 2. Import my maps: says what it does, reads the mod folder only, lists the installed world with its settings
+  await page.click('[data-rnw=goimport]');
+  await page.waitForFunction(() => /Your maps \(1\)/.test(document.querySelector('.rnw').textContent));
+  assert.match(await page.textContent('.rnw-log'), /Reading your mod folder.*found 1 map/);
+  assert.deepEqual(rnwCalls.map(u => u.split('/rnw/')[1]), ['files']);   // no program was started
   assert.match(await page.textContent('.rnw-w'), /RNW: Continents AAAA/);
   assert.match(await page.textContent('.rnw-w'), /Continents · seed 42 · generator 1\.1\.0 · game build 26300913/);
   await page.locator('.rnw-w summary').first().click();
   assert.match(await page.textContent('.rnw-w details'), /World: land\s*35 %/);              // a setting read from the world's code
   assert.match(await page.textContent('.rnw-w details'), /read from the world's own files, the world's code/);
   assert.match(await page.textContent('.rnw-w details'), /settings\.new_world\.land_permille\s*350/);   // and the generator's own record
-  assert.equal(await page.locator('[data-rnw=new]').isDisabled(), true);                    // cannot make worlds without it
 
+  // 3. import a map folder from somewhere else, and a world code
+  const other = path.join(root, 'elsewhere/rnw_exp_world_ccccc33333');
+  write(path.join(other, '.metadata/metadata.json'), meta('RNW: Brought from elsewhere'));
+  write(path.join(other, 'in_game/x.txt'), 'x');
+  await page.fill('[data-rnwf=path]', other);
+  await page.click('[data-rnw=importdir]');
+  await page.waitForFunction(() => /Your maps \(2\)/.test(document.querySelector('.rnw').textContent), null, { timeout: 15000 });
+  assert.equal(fs.existsSync(path.join(user, 'mod/rnw_exp_world_ccccc33333/in_game/x.txt')), true);
+  assert.equal(fs.existsSync(other), true);   // copied, not moved
+  await page.fill('[data-rnwf=code]', code);
+  await page.click('[data-rnw=importcode]');
+  await page.waitForFunction(() => /Remembered the code/.test(document.querySelector('.rnw-log').textContent));
+
+  // 4. back to the menu, then Make a new map: finds nothing at first, then the chosen folder
+  await page.click('[data-rnw=menu]');
+  await page.click('[data-rnw=gomake]');
+  await page.waitForFunction(() => /not found/.test(document.querySelector('.rnw-log').textContent));
+  assert.match(await page.textContent('.rnw'), /was not found on this PC/);
+  assert.equal(await page.locator('[data-rnw=new]').isDisabled(), true);                    // cannot make worlds without it
   await page.click('[data-rnw=folder]');                                                    // prompt answered with the folder
-  await page.waitForSelector('[data-rnw=refresh]');
   await page.waitForFunction(() => /Found in/.test(document.querySelector('.rnw').textContent));
   assert.match(await page.textContent('.rnw'), /Command line: rnw\.cmd/);
 
@@ -80,9 +107,8 @@ try {
   await page.selectOption('[data-rnwf=preset]', 'small_continents');
   await page.fill('[data-rnwf=seed]', '42');
   await page.click('[data-rnw=new]');
-  await page.waitForFunction(() => /Your worlds \(2\)/.test(document.querySelector('.rnw').textContent), null, { timeout: 30000 });
+  await page.waitForFunction(() => /Your maps \(3\)/.test(document.querySelector('.rnw').textContent), null, { timeout: 30000 });
   assert.match(await page.textContent('#rnwjob'), /done/);
-  assert.equal(await page.locator('.rnw-w').count(), 2);
   assert.equal(fs.existsSync(path.join(user, 'mod/rnw_exp_world_abcde23456')), true);
   const made = JSON.parse(fs.readFileSync(path.join(root, 'cfg/eu5/rnw-worlds.json'), 'utf8')).worlds[code];
   assert.equal(made.state, 'done');
@@ -101,7 +127,7 @@ try {
 
   // remove it again
   await page.locator('[data-rnw=remove][data-id=abcde23456]').click();
-  await page.waitForFunction(() => /Your worlds \(1\)/.test(document.querySelector('.rnw').textContent), null, { timeout: 15000 });
+  await page.waitForFunction(() => /Your maps \(2\)/.test(document.querySelector('.rnw').textContent), null, { timeout: 15000 });
   assert.equal(fs.existsSync(path.join(user, 'mod/rnw_exp_world_abcde23456')), false);
   assert.deepEqual(errors, []);
   console.log('rnw ok');

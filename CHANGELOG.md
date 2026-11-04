@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.3 - Random New World: a menu first, import your own maps, honest about the Workshop copy
+- **The tab now opens on a menu and loads nothing.** Choose **Import my maps** (reads your mod folder only; no program is started) or **Make a new map** (finds the generator, then builds). Every step is written in a "What I'm doing" box, so it is clear what the app is doing and what comes next.
+- **Import my maps:** lists the maps in your mod folder with their settings; **copy a map folder in** from anywhere (one map, or a folder that holds several; it is copied in the background with progress, never moved, never overwrites, and a half-copied map is never left behind); **remember a world code** (shows its settings; Add to game rebuilds it); and an optional "ask Random New World for its own list". A .zip of a map can still be dropped on the window; a dropped folder gets an explanation, because a browser cannot give the app a folder's location.
+- **Fixed the real cause of the endless loading.** The Steam Workshop copy holds only `Random New World Generator.exe`, not `rnw.cmd`. On Windows that program, given `--cli`, prints nothing and can stay open for ever (214 seconds in the log, until the app was closed). The app now only runs commands through `rnw.cmd` on Windows, says so when it is missing, and points to the standalone Windows package on GitHub, which includes it.
+- The log now also lists what is in the generator's folder, so where `rnw.cmd` lives (if anywhere) can be seen.
+
 ## 1.1.2 - Random New World: the tab no longer loads for ever
 - Fixed: opening the Random New World tab could hang with nothing shown. The generator's `rnw.cmd worlds` command was started in a way that, on Windows, could not be stopped when it ran over time (the program that cmd.exe starts kept the output open). Commands now get no keyboard input, are stopped with their whole process tree when the time is up (25 seconds for the list), and the tab then shows the worlds found in your mod folder with a note saying what went wrong.
 - The game log (`RoninModManager-eu5.log`) now writes when the worlds command starts and when it finishes (or fails), with its first output, so a hang or an unexpected output can be read from the log.

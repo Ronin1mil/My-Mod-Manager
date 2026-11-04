@@ -1,5 +1,5 @@
 'use strict';
-let G = null, GI = null, S = null, A = null, C = null, P = null, CR = null, RW = null, RWT = null, RWF = {preset: 'continents', seed: '', code: ''}, cmpWith = null, drag = null, tab = 'order', sel = null, flt = 'all', q = '', lastMissing = [];
+let G = null, GI = null, S = null, A = null, C = null, P = null, CR = null, RW = null, RWT = null, RWF = {preset: 'continents', seed: '', code: '', path: ''}, cmpWith = null, drag = null, tab = 'order', sel = null, flt = 'all', q = '', lastMissing = [];
 const REPO_LINK = 'https://github.com/Ronin1mil/My-Mod-Manager/';
 const STEAMCMD_URL = 'https://developer.valvesoftware.com/wiki/SteamCMD';   // Valve's own page: download and setup
 const $ = i => document.getElementById(i);
@@ -439,13 +439,50 @@ function viewCrash(p) {
 }
 // Random New World (beta), Europa Universalis V only (rnw.py). The generator is a separate program: this tab finds it, starts
 // it, lists the worlds you have with their settings, makes new ones through its command line, and turns one on in the playset.
-async function loadRnw(quiet) {
+// The tab starts on a menu and loads NOTHING (no program is started, no folder read) until a choice is made. Every step that
+// follows is written in a "What I'm doing" box, so it is always clear what the app is doing and where it is going.
+function rnwSay(t) { RW.log = [...(RW.log || []), {t, done: false}]; }
+function rnwOk(t) { const l = RW.log || []; if (l.length) { l[l.length - 1].done = true; if (t) l[l.length - 1].t += ' — ' + t; } }
+async function rnwEnter() {
+  if (!RW) {
+    RW = {step: 'menu', log: [], worlds: []};
+    try { const r = await api('rnw/job'); RW.job = r.job; } catch (e) { if (e instanceof Stale) return; }   // only asks whether a job is still running
+    rnwPoll();
+  }
+  render();
+}
+async function loadRnw(quiet, cli) {
   const g = gen;
-  if (!quiet) { RW = {...(RW || {}), busy: true}; render(); }
-  try { const r = await api('rnw/list'); if (g === gen) RW = r; }
-  catch (e) { if (e instanceof Stale) return; RW = {error: e.message, worlds: []}; }
+  if (!RW) RW = {step: 'menu', log: [], worlds: []};
+  const useCli = cli === undefined ? !!RW.cli : cli;
+  if (!quiet) { RW.busy = true; render(); }
+  try {
+    const r = await api(useCli ? 'rnw/list' : 'rnw/files');
+    if (g !== gen) return;
+    Object.assign(RW, r, {busy: false, error: null, cli: useCli});
+  } catch (e) { if (e instanceof Stale) return; Object.assign(RW, {busy: false, error: e.message}); }
   if (g !== gen) return;
   render(); rnwPoll();
+}
+async function rnwGo(step) {
+  RW.step = step; RW.log = []; RW.cli = false; RW.error = null;
+  if (step === 'import') rnwSay('Reading your mod folder for Random New World maps (no program is started)…');
+  else rnwSay('Looking for the Random New World program on this PC (nothing is started yet)…');
+  await loadRnw(false, false);
+  if (RW.error) return;
+  if (step === 'import') rnwOk(`found ${RW.worlds.length} map${RW.worlds.length === 1 ? '' : 's'}`);
+  else rnwOk(RW.generator ? `found in ${RW.generator.folder}` : 'not found');
+  if (step === 'make' && RW.generator && !RW.generator.can_run) rnwSay('This copy has no rnw.cmd, so maps cannot be made from here. You can still open its window.');
+  render();
+}
+async function rnwReadLibrary() {
+  rnwSay('Asking Random New World for its own list of maps (starts its command line, waits up to 25 seconds)…');
+  render();
+  await loadRnw(true, true);
+  if (RW.error) return;
+  if (RW.cli && RW.cli.ok) rnwOk(`it lists ${RW.worlds.length} map${RW.worlds.length === 1 ? '' : 's'} in all`);
+  else rnwOk('no answer: ' + ((RW.cli && RW.cli.error) || (RW.notes[0]) || 'unknown'));
+  render();
 }
 function rnwPoll() {
   if (RWT || !RW || !RW.job || RW.job.state !== 'running') return;
@@ -456,9 +493,10 @@ function rnwPoll() {
     if (RW.job && RW.job.state === 'running') return rnwDrawJob();
     clearInterval(RWT); RWT = null;
     const j = RW.job;
-    toast(j.state === 'done' ? 'The world is made and installed. Press Use this world.' : j.state === 'cancelled' ? 'Cancelled.' : 'Random New World failed: ' + j.error, j.state === 'failed');
+    const what = j.kind === 'import' ? 'import' : 'build';
+    toast(j.state === 'done' ? (j.kind === 'import' ? 'The map was copied into your mod folder. Press Use this world.' : 'The world is made and installed. Press Use this world.') : j.state === 'cancelled' ? 'Cancelled.' : `Random New World ${what} failed: ` + j.error, j.state === 'failed');
     if (j.state === 'done') { try { await load(); } catch (e) { /* the list below still reloads */ } }
-    loadRnw(true);
+    if (RW.step !== 'menu') loadRnw(true);
   }, 2000);
 }
 const rnwTime = s => s < 90 ? s + ' s' : Math.floor(s / 60) + ' min ' + String(s % 60).padStart(2, '0') + ' s';
@@ -477,7 +515,7 @@ function rnwWorld(w, p, can) {
   const st = on ? ['On in this playset', 'ok'] : w.in_playset === 'off' ? ['Off in this playset', 'warn'] : w.installed ? ['Installed', 'new'] :
     w.place === 'kept' ? ['Kept, not installed', ''] : ['Code only', ''];
   const facts = [w.preset_title, w.seed !== '' ? 'seed ' + w.seed : '', w.generator ? 'generator ' + w.generator : '', w.game_build ? 'game build ' + w.game_build : '',
-    w.created ? ago(w.created) : '', w.seconds ? 'took ' + rnwTime(Math.round(w.seconds)) : '', w.made_here ? 'made here' : ''].filter(Boolean).join(' · ');
+    w.created ? ago(w.created) : '', w.seconds ? 'took ' + rnwTime(Math.round(w.seconds)) : '', w.made_here ? (/^imported/.test(w.how || '') ? 'imported here' : 'made here') : ''].filter(Boolean).join(' · ');
   const ch = w.changes.map(c => `<div><span class="mut">${esc(c.label)}</span> ${esc(c.value)}</div>`).join('');
   const dt = w.details.map(c => `<div><span class="mut">${esc(c.key)}</span> ${esc(c.value)}</div>`).join('');
   const specs = `<details><summary class="mut">Settings${w.changes.length ? ` (${w.changes.length} changed from the defaults)` : ' (the defaults of its type)'}${w.specs_from.length ? ' · read from ' + esc(w.specs_from.join(', ')) : ''}</summary>
@@ -491,29 +529,64 @@ function rnwWorld(w, p, can) {
       ${w.installed && can && w.id ? `<button class="sm" data-rnw="remove" data-id="${esc(w.id)}" data-f="${esc(w.name)}">Remove from game</button>` : ''}
       ${w.code ? `<button class="sm" data-rnw="copy" data-code="${esc(w.code)}">Copy code</button>` : ''}</span></div>`;
 }
+function rnwLogHtml() {
+  const l = (RW && RW.log) || []; if (!l.length) return '';
+  return `<div class="rnw-log"><b>What I'm doing</b>${l.map((x, i) => `<div>${x.done ? '✓' : i === l.length - 1 && RW.busy ? '…' : '•'} ${esc(x.t)}</div>`).join('')}</div>`;
+}
+function rnwMenu(head) {
+  const running = RW.job && RW.job.state === 'running';
+  $('view').innerHTML = head + `<h3>What do you want to do?</h3><div class="rnw-menu">
+      <div class="rnw-card"><b>Import my maps</b>
+        <p class="mut">Lists the Random New World maps you already have, with their names and settings. Reads your mod folder only: no program is started and nothing is built. From there you can also copy in a map folder from somewhere else, or paste a world code.</p>
+        <button class="pri" data-rnw="goimport">Import my maps</button></div>
+      <div class="rnw-card"><b>Make a new map</b>
+        <p class="mut">Finds the Random New World program on this PC, then builds a new map with its command line. Takes some minutes, needs about 7.5 GB of free memory and about 1.2 GB of disk. The map is installed into your mod folder when it is done.</p>
+        <button class="pri" data-rnw="gomake">Make a new map</button></div></div>
+    <div id="rnwjob">${rnwJobHtml()}</div>${running ? '' : '<p class="mut">Nothing has been loaded yet.</p>'}</div>`;
+}
 function viewRnw(p) {
   const R = RW;
   const head = `<div class="rnw"><h3>Random New World <span class="b warn">beta</span></h3>
-    <p class="mut">Random New World is a separate program that builds a new map for Europa Universalis V: the Old World stays, the Americas become new continents. Each world it makes is a mod. This page starts the generator, lists your worlds, and turns one on in this playset. Start a <b>new 1337 campaign</b> with it, enable only one world, and restart the game before switching worlds.</p>`;
-  if (!R || (R.busy && !R.worlds)) { $('view').innerHTML = head + '<div class="empty">Looking for Random New World and your worlds…</div></div>'; return; }
-  if (R.error) { $('view').innerHTML = head + `<div class="row static err">${esc(R.error)}</div><p><button class="sm" data-rnw="refresh">Try again</button></p></div>`; return; }
+    <p class="mut">Random New World is a separate program that builds a new map for Europa Universalis V: the Old World stays, the Americas become new continents. Each map it makes is a mod. Start a <b>new 1337 campaign</b> with it, enable only one map, and restart the game before switching maps.</p>`;
+  if (!R) { $('view').innerHTML = head + '</div>'; return; }
+  if (R.step === 'menu') return rnwMenu(head);
+  const back = '<p><button class="sm" data-rnw="menu">← Back to the menu</button></p>';
+  const say = rnwLogHtml();
+  if (R.error) { $('view').innerHTML = head + back + say + `<div class="row static err">${esc(R.error)}</div><p><button class="sm" data-rnw="refresh">Try again</button></p></div>`; return; }
+  if (R.busy && !R.generator && !(R.worlds && R.worlds.length)) { $('view').innerHTML = head + back + say + '</div>'; return; }
   const g = R.generator, can = !!(g && g.can_run), busy = !!(R.job && R.job.state === 'running');
   const gbox = g ? `<div class="row static"><span class="nm" style="white-space:normal;cursor:default">Found in <code>${esc(g.folder)}</code> <span class="mut">(${esc(g.how || 'your PC')})</span>
-        <div class="mut">${g.cmd ? 'Command line: ' + esc(g.cmd.split(/[\\/]/).pop()) : 'No command line (rnw.cmd) found: worlds cannot be made from here.'} · ${g.launcher ? 'Window: ' + esc(g.launcher.split(/[\\/]/).pop()) : 'No window program found.'}</div></span>
-        ${g.can_open ? '<button class="pri sm" data-rnw="open">Open generator</button>' : ''}<button class="sm" data-rnw="folder">Choose folder…</button><button class="sm" data-rnw="refresh">Refresh</button></div>`
-    : `<div class="row static warn"><span class="nm" style="white-space:normal;cursor:default">Random New World was not found on this PC. Subscribe to it on the <a href="https://steamcommunity.com/sharedfiles/filedetails/?id=3829217331" target="_blank" rel="noopener">Steam Workshop</a> (or download it from <a href="https://github.com/Sir-Starch/eu5-random-new-world/releases" target="_blank" rel="noopener">GitHub</a>), then press Refresh. If it is somewhere else, choose its folder.</span>
-        <button class="sm" data-rnw="folder">Choose folder…</button><button class="sm" data-rnw="refresh">Refresh</button></div>`;
-  const notes = R.notes.filter(n => g || !n.startsWith('Random New World was not found')).map(n => `<div class="row static warn">${esc(n)}</div>`).join('');
-  const hub = R.hub.enabled ? '<div class="row static warn">The generator itself is switched on in this playset. Use this world switches it off, as Random New World asks.</div>' : '';
-  const form = `<h3>Make a new world</h3><div class="rnw-form">
-      <label>World type <select data-rnwf="preset">${R.presets.map(x => `<option value="${x.id}" ${RWF.preset === x.id ? 'selected' : ''}>${esc(x.title)} - ${esc(x.about)}</option>`).join('')}</select></label>
+        <div class="mut">${g.cmd ? 'Command line: ' + esc(g.cmd.split(/[\\/]/).pop()) : 'No command line (rnw.cmd) found: maps cannot be made from here.'} · ${g.launcher ? 'Window: ' + esc(g.launcher.split(/[\\/]/).pop()) : 'No window program found.'}</div></span>
+        ${g.can_open ? '<button class="pri sm" data-rnw="open">Open generator</button>' : ''}<button class="sm" data-rnw="folder">Choose folder…</button></div>`
+    : `<div class="row static warn"><span class="nm" style="white-space:normal;cursor:default">Random New World was not found on this PC. Subscribe to it on the <a href="https://steamcommunity.com/sharedfiles/filedetails/?id=3829217331" target="_blank" rel="noopener">Steam Workshop</a> (or download it from <a href="https://github.com/Sir-Starch/eu5-random-new-world/releases" target="_blank" rel="noopener">GitHub</a>), then press Try again. If it is somewhere else, choose its folder.</span>
+        <button class="sm" data-rnw="folder">Choose folder…</button><button class="sm" data-rnw="refresh">Try again</button></div>`;
+  const notes = (R.notes || []).filter(n => g || !n.startsWith('Random New World was not found')).map(n => `<div class="row static warn">${esc(n)}</div>`).join('');
+  const hub = R.hub && R.hub.enabled ? '<div class="row static warn">The generator itself is switched on in this playset. Use this world switches it off, as Random New World asks.</div>' : '';
+  const list = (R.worlds || []).map(w => rnwWorld(w, p, can)).join('');
+  const jobbox = `<div id="rnwjob">${rnwJobHtml()}</div>`;
+  const worlds = `<h3>Your maps (${(R.worlds || []).length})</h3>` + (list || '<div class="empty">No Random New World maps in your mod folder yet.</div>');
+  let body;
+  if (R.step === 'import') {
+    body = `<h3>Import my maps</h3>
+      <div class="rnw-drop" id="rnwdrop"><b>Add a map you have somewhere else</b>
+        <div class="rnw-form">
+          <label>Folder of a map (or a folder that holds several)<input data-rnwf="path" value="${esc(RWF.path || '')}" placeholder="C:\\…\\rnw_exp_world_abcde23456" size="46"></label>
+          <button class="pri" data-rnw="importdir" ${busy ? 'disabled' : ''}>Copy into my mod folder</button></div>
+        <div class="mut">In Explorer, Shift + right-click the folder and choose “Copy as path”, then paste it here. The folder is copied, never moved. A .zip of a map can be dropped anywhere in this window.</div>
+        <div class="rnw-form" style="margin-top:8px">
+          <label>or a world code<input data-rnwf="code" value="${esc(RWF.code)}" placeholder="RNW1-…" size="40"></label>
+          <button class="sm" data-rnw="importcode">Remember this code</button></div>
+        <div class="mut">A code is only the recipe: it shows the map's settings here, and Add to game rebuilds it with the generator.</div></div>
+      ${R.cli && R.cli.ok ? '' : `<p><button class="sm" data-rnw="library" ${busy || R.busy ? 'disabled' : ''}>Also ask Random New World for its own list</button> <span class="mut">(shows maps it keeps that are not installed; starts its command line)</span></p>`}`;
+  } else {
+    body = `${gbox}${notes}${hub}<h3>Make a new map</h3><div class="rnw-form">
+      <label>World type <select data-rnwf="preset">${(R.presets || []).map(x => `<option value="${x.id}" ${RWF.preset === x.id ? 'selected' : ''}>${esc(x.title)} - ${esc(x.about)}</option>`).join('')}</select></label>
       <label>Seed <input data-rnwf="seed" value="${esc(RWF.seed)}" placeholder="empty = random" inputmode="numeric" size="22"></label>
       <label>or a world code <input data-rnwf="code" value="${esc(RWF.code)}" placeholder="RNW1-…" size="30"></label>
-      <button class="pri" data-rnw="new" ${can && !busy ? '' : 'disabled'}>Make world</button></div>
-      <p class="mut">Takes some minutes and about 7.5 GB of free memory; the world needs about 1.2 GB of disk${R.free_gb != null ? ` (${R.free_gb} GB free here)` : ''}. A world code makes the same world again (with the same game and generator version). The world is installed into your mod folder when it is done.</p>`;
-  const list = R.worlds.map(w => rnwWorld(w, p, can)).join('');
-  $('view').innerHTML = head + gbox + notes + hub + form + `<div id="rnwjob">${rnwJobHtml()}</div>` +
-    `<h3>Your worlds (${R.worlds.length})</h3>` + (list || '<div class="empty">No worlds yet. Make one above, or open the generator.</div>') + '</div>';
+      <button class="pri" data-rnw="new" ${can && !busy ? '' : 'disabled'}>Make map</button></div>
+      <p class="mut">Takes some minutes and about 7.5 GB of free memory; the map needs about 1.2 GB of disk${R.free_gb != null ? ` (${R.free_gb} GB free here)` : ''}. A world code makes the same map again (with the same game and generator version).</p>`;
+  }
+  $('view').innerHTML = head + back + say + body + jobbox + worlds + '</div>';
 }
 async function loadCompare() {
   const others = S.playsets.filter(x => x.id !== S.active);
@@ -934,7 +1007,7 @@ document.addEventListener('click', guard(async e => {
     activateQ = activateQ.then(() => api(`playsets/${id}/activate`, {}), () => api(`playsets/${id}/activate`, {}));
     await activateQ; return analyse();
   }
-  if (ds.tab) { tab = ds.tab; render(); if (tab === 'compare') { C = null; render(); await loadCompare(); } if (tab === 'files') await loadFiles(); if (tab === 'rnw') await loadRnw(); }
+  if (ds.tab) { tab = ds.tab; render(); if (tab === 'compare') { C = null; render(); await loadCompare(); } if (tab === 'files') await loadFiles(); if (tab === 'rnw') await rnwEnter(); }
   if (ds.f) { flt = ds.f; render(); }
   const pick = t.closest('[data-sel]');   // a picture's tile holds an image inside it
   if (pick) { const id = pick.dataset.sel; sel = sel === id ? null : id; render(); }
@@ -960,12 +1033,25 @@ document.addEventListener('click', guard(async e => {
   const rb = t.closest('[data-rnw]');
   if (rb) {
     const act = rb.dataset.rnw;
-    if (act === 'refresh') return loadRnw();
+    if (act === 'refresh') return rnwGo(RW.step);
+    if (act === 'menu') { RW.step = 'menu'; return render(); }
+    if (act === 'goimport') return rnwGo('import');
+    if (act === 'gomake') return rnwGo('make');
+    if (act === 'library') return rnwReadLibrary();
+    if (act === 'importdir') {
+      const path = (RWF.path || '').trim(); if (!path) return toast('Paste the folder of a map first.', true);
+      rnwSay('Checking the folder and copying it into your mod folder (the original stays where it is)…'); render();
+      const r = await api('rnw/import', {path}); RW.job = r.job; RWF.path = ''; render(); rnwPoll(); return;
+    }
+    if (act === 'importcode') {
+      const code = RWF.code.trim(); if (!code) return toast('Paste a world code first.', true);
+      const r = await api('rnw/import', {code}); RWF.code = ''; rnwSay('Remembered the code: ' + r.preset + ', seed ' + r.seed); rnwOk(); await loadRnw(true); return toast('Code remembered.');
+    }
     if (act === 'open') { await api('rnw/open', {}); return toast('Opening Random New World…'); }
     if (act === 'folder') {
       const v = prompt('Folder where Random New World is installed (the one with rnw.cmd in it).\nLeave empty to look for it automatically:', RW && RW.generator ? RW.generator.folder : '');
       if (v === null) return;
-      await api('rnw/folder', {path: v.trim()}); return loadRnw();
+      await api('rnw/folder', {path: v.trim()}); return rnwGo(RW.step === 'import' ? 'import' : 'make');
     }
     if (act === 'new') {
       const r = await api('rnw/new', {preset: RWF.preset, seed: RWF.seed.trim(), code: RWF.code.trim()});
@@ -1223,6 +1309,10 @@ window.addEventListener('dragover', e => { if (e.dataTransfer && [...e.dataTrans
 window.addEventListener('dragleave', e => { if (!e.relatedTarget) $('drop').className = ''; });
 window.addEventListener('drop', e => {
   $('drop').className = '';
+  const it = e.dataTransfer && e.dataTransfer.items && e.dataTransfer.items[0], ent = it && it.webkitGetAsEntry && it.webkitGetAsEntry();
+  if (ent && ent.isDirectory) {   // a web page is never told where a dropped folder is on the disk
+    e.preventDefault(); return toast('A browser cannot tell the app where a folder is. In Explorer, Shift + right-click the map folder, choose “Copy as path”, and paste it into the box on the Random New World tab (Import my maps).', true);
+  }
   const f = e.dataTransfer && e.dataTransfer.files[0];
   if (f) { e.preventDefault(); install(f); }
 });

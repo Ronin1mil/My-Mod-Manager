@@ -238,3 +238,5 @@ h1{font-size:22px}
 .rnw-form{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-end}.rnw-form label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--mut)}
 .rnw-form select,.rnw-form input{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:5px 8px}
 .rnw-job{margin:12px 0;padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}.rnw-job.bad{border-color:var(--err)}
+.rnw-menu{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}.rnw-card,.rnw-drop,.rnw-log{padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.rnw-card p{margin:6px 0 10px}.rnw-drop{margin:8px 0}.rnw-log{margin:10px 0;font-size:13px}.rnw-log div{margin-top:3px}.rnw-form input[data-rnwf=path]{min-width:280px}

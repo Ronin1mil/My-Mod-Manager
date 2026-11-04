@@ -73,6 +73,16 @@ exported playsets.
 Please send: the output of `rnw.cmd find-game` and `rnw.cmd worlds` (replace your Windows user name with `<user>`), and the
 error log if the tab shows a problem.
 
+## The tab in 1.1.3: a menu first
+The tab loads nothing when it is opened. It shows two choices: **Import my maps** (`GET /api/eu5/rnw/files`: finds the generator
+by looking at folders and reads `mod\rnw_exp_world_*`, starts no program) and **Make a new map** (finds the generator, then
+`rnw/new`). Importing: `POST /api/eu5/rnw/import` with `{path}` copies a map folder, or a folder holding several, into the mod
+folder as a background job (copied under `<name>.importing`, renamed when complete; symlinks skipped; refuses a world already
+there; checks free disk space) or with `{code}` remembers a world code in `rnw-worlds.json` (state `imported`). The generator's
+own list (`rnw/list`) is only asked for when the user presses the button for it. **Found on a real PC:** the Workshop copy has
+`Random New World Generator.exe` and no `rnw.cmd`; on Windows commands therefore need `rnw.cmd` (the window program is never
+given `--cli`).
+
 ## Reading the log (1.1.1)
 The app log (Tools > Open log folder) gets four `Random New World ...` lines whenever the tab is opened and something changed.
 In the code each line has a `LOG-CHECK` comment saying what a good value looks like (`modmanager/rnw.py`, `Manager._diag`):
