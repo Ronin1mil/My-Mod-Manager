@@ -50,6 +50,7 @@ PRESETS = [
     {"id": "wall", "title": "The Wall", "about": "A continent behind a barrier."},
 ]
 PRESET_TITLES = {p["id"]: p["title"] for p in PRESETS}
+KILL_GRACE = 5   # seconds to wait for the output after killing a program that ran out of time
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 ARG_OK = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:\-]{0,299}$")
 OPT_OK = re.compile(r"^--[a-z][a-z\-]{0,30}$")
@@ -281,10 +282,40 @@ def check_args(args):
     return list(args)
 
 
-def run_cli(gen, args, timeout=60, runner=subprocess.run):
+def run_safely(argv, timeout, cwd):
+    """subprocess.run with a timeout that really ends. On Windows, subprocess.run only kills the first process (cmd.exe) when the
+    time is up; the program cmd.exe started keeps the output pipe open, so the second wait never returns and the page loads
+    for ever. This kills the whole process tree, then gives up on the pipes after a few seconds.
+    The program gets no keyboard input (stdin is empty), so it can never wait for someone to type. -> (code, out, err)"""
+    proc = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                            encoding="utf-8", errors="replace", cwd=str(cwd), creationflags=NO_WINDOW)
+    try:
+        out, err = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        _kill_tree(proc)
+        try:
+            proc.communicate(timeout=KILL_GRACE)
+        except Exception:   # the pipes are still held by a child that would not die: let go of them
+            for f in (proc.stdout, proc.stderr):
+                try:
+                    f.close()
+                except Exception:
+                    pass
+            try:
+                proc.wait(timeout=2)
+            except Exception:
+                pass
+        raise subprocess.TimeoutExpired(argv, timeout)
+    return proc.returncode, out or "", err or ""
+
+
+def run_cli(gen, args, timeout=60, runner=None):
     """One quick command of the generator. Arguments are checked first (a .cmd file runs through cmd.exe), and the
-    command is started from an argument list, never a shell string. -> (exit code, text, error text)"""
+    command is started from an argument list, never a shell string. -> (exit code, text, error text)
+    `runner` is for tests: a function like subprocess.run."""
     argv = gen.argv(check_args(args))
+    if runner is None or runner is subprocess.run:
+        return run_safely(argv, timeout, gen.folder)
     r = runner(argv, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout,
                cwd=str(gen.folder), creationflags=NO_WINDOW)
     return r.returncode, r.stdout or "", r.stderr or ""
@@ -492,7 +523,7 @@ class Jobs:
     def _run(self, job, argv, cwd, on_done):
         out, proc = [], None
         try:
-            proc = self.proc = self.popen(argv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8",
+            proc = self.proc = self.popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8",
                                           errors="replace", cwd=str(cwd), creationflags=NO_WINDOW)
             for raw in proc.stdout:
                 line = raw.rstrip()
@@ -573,11 +604,12 @@ def _kill_tree(proc):
 class Manager:
     """Random New World for one GameApp (Europa Universalis V)."""
 
-    def __init__(self, app, runner=subprocess.run, popen=subprocess.Popen, generator=None):
+    def __init__(self, app, runner=None, popen=subprocess.Popen, generator=None):
         self.app = app
         self.runner, self.popen = runner, popen
         self.jobs = Jobs(popen)
         self._diag_sig = ""
+        self._logged_start = False
         self._generator = generator            # tests hand in a stub; None = look on this PC
         self.records = Records(app.cfg / "rnw-worlds.json")
 
@@ -631,8 +663,14 @@ class Manager:
                             installed.append(e)
             library, cli = [], {"ok": False, "error": ""}
             if gen and gen.can_run:
+                started = time.time()
+                if not self._logged_start:   # LOG-CHECK: a "started" line without a "finished" line after it means the command hung
+                    self._logged_start = True
+                    gamelog.log(self.app.game.id, "Random New World worlds command started: " + " ".join(gen.argv(["worlds"])))
                 try:
-                    rc, out, err = run_cli(gen, ["worlds"], timeout=45, runner=self.runner)
+                    rc, out, err = run_cli(gen, ["worlds"], timeout=25, runner=self.runner)
+                    gamelog.log(self.app.game.id, f"Random New World worlds command finished in {time.time() - started:.1f} s, "
+                                f"exit code {rc}, {len(out)} characters out, first: {out.strip()[:200]!r}, errors: {err.strip()[-200:]!r}")
                     data = parse_json(out) if rc == 0 else None
                     if isinstance(data, list):
                         library, cli["ok"] = data, True
@@ -640,6 +678,7 @@ class Manager:
                         cli["error"] = _error_text(out, err) if rc else "The generator's list of worlds could not be read."
                 except (OSError, subprocess.SubprocessError) as e:
                     cli["error"] = f"{type(e).__name__}: {e}"[:300]
+                    gamelog.log(self.app.game.id, f"Random New World worlds command failed after {time.time() - started:.1f} s: {cli['error']}")
             worlds = merge_worlds(installed, library, self.records.load(), mod_ids)
             self._diag(gen, cli, library, installed, worlds)
             for w in worlds:

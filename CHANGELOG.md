@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.2 - Random New World: the tab no longer loads for ever
+- Fixed: opening the Random New World tab could hang with nothing shown. The generator's `rnw.cmd worlds` command was started in a way that, on Windows, could not be stopped when it ran over time (the program that cmd.exe starts kept the output open). Commands now get no keyboard input, are stopped with their whole process tree when the time is up (25 seconds for the list), and the tab then shows the worlds found in your mod folder with a note saying what went wrong.
+- The game log (`RoninModManager-eu5.log`) now writes when the worlds command starts and when it finishes (or fails), with its first output, so a hang or an unexpected output can be read from the log.
+
 ## 1.1.1 - Random New World: a finished build is in the list at once; a log to check it
 - Fixed: the page could see a build as "done" a moment before the new world was found in the mod folder, so the world only appeared after a refresh. The job now counts as done only after the folder has been read.
 - The app log now records what Random New World showed on this PC (where the generator was found, what its `worlds` command printed, how many worlds were read, and any world code that could not be decoded) once per change, and the generator's last lines when a build fails. This is what is needed to check the beta against a real install.

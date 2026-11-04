@@ -182,6 +182,23 @@ class Reading(unittest.TestCase):
         self.assertIn(f"c{rnw.MAX_RECORDS + 4}", got)
 
 
+@unittest.skipIf(os.name == "nt", "uses a POSIX shell to hold the output pipe open")
+class Hang(unittest.TestCase):
+    def test_a_command_whose_child_keeps_the_pipe_open_still_ends_on_time(self):
+        # on Windows rnw.cmd starts a child program; killing only cmd.exe left the pipe open and the page loaded for ever
+        import subprocess
+        gen = rnw.Generator(Path("."), None, None, ["sh", "-c", "sleep 30 & sleep 30"], "test")
+        start = time.time()
+        with mock.patch.object(rnw, "KILL_GRACE", 1), mock.patch.object(rnw, "_kill_tree", lambda p: p.kill()):
+            with self.assertRaises(subprocess.TimeoutExpired):
+                rnw.run_cli(gen, ["worlds"], timeout=1)
+        self.assertLess(time.time() - start, 8)
+
+    def test_the_program_gets_no_keyboard_input(self):
+        gen = rnw.Generator(Path("."), None, None, ["sh", "-c", "read x; echo got:$x"], "test")
+        self.assertEqual(rnw.run_cli(gen, ["worlds"], timeout=10)[:2], (0, "got:\n"))
+
+
 class Finding(unittest.TestCase):
     def setUp(self):
         import tempfile
