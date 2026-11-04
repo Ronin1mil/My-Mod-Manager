@@ -1261,6 +1261,8 @@ def make_handler(hub):
 
         def _do_get(self):
             p = self.path.split("?")[0].strip("/").split("/")
+            if len(p) == 5 and p[0] == "api" and p[2] == "rnw" and p[3] == "map" and p[1] == "eu5":
+                return self._rnw_map(p[4])
             if len(p) >= 4 and p[0] == "api" and p[2] in ("conflicts", "tree", "crash", "rnw") and p[1] in hub.games:
                 return self._heavy_get(p)
             if p == ["api", "ping"]:   # "this page is still open": no lock, no work
@@ -1325,6 +1327,23 @@ def make_handler(hub):
                 return self._send(200, pic.read_bytes(), thumbs.TYPES[pic.suffix.lower()], head)
             except OSError:
                 return self._send(204, b"", "image/png")
+
+        def _rnw_map(self, name):
+            """The picture (`<key>.png`) or the data (`<key>`) of an imported .rnworld map. Read from the app's own data folder; no lock."""
+            if not self._host_ok():
+                return self._send(403, {"error": "bad host"})
+            try:
+                with hub.lock:
+                    maps = hub.app("eu5").rnw_manager().maps
+                key, png = (name[:-4], True) if name.endswith(".png") else (name, False)
+                if png:
+                    return self._send(200, maps.png(key), "image/png", [("Cache-Control", "max-age=300")])
+                return self._send(200, maps.atlas(key))
+            except ValueError as e:
+                return self._send(404, {"error": str(e)})
+            except Exception as e:
+                errorlog.write_exception("server", e, self.path.split("?")[0])
+                return self._send(500, {"error": f"{type(e).__name__}: {e}", "log_file": str(errorlog.log_path())})
 
         def _heavy_get(self, p):
             """Slow read-only views: snapshot under the lock, compute outside it."""

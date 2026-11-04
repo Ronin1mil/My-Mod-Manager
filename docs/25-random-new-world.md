@@ -97,6 +97,18 @@ notes, game build, time taken, the record as `summary`). `POST rnw/import {path}
 the window accepts a dropped file (the install route hands `.rnworld` to this, EU5 only). The code in the example file decodes (test) to
 the preset, seed and every changed setting that its own record lists: the decoder matches the real program.
 
+### The map inside the file
+`atlas_labels.png` is not a picture to look at: every pixel is the number of its location, `red*65536 + green*256 + blue - 1` (black = open
+sea), and `atlas.json` says what each location and country is. Checked on a real file (2128 x 2048 px, `scale` 4): `locations.centre` is `[row, column]`
+and the pixel there decodes to the location's own index for 1996 of 2000 sampled locations. `atlas.json`: `countries[]` (`name`, `tag`,
+`kind` state/tribe, `color`, `capital`, `culture`, `religion`, `locations`), `locations` as parallel lists (`kind` 0 land, 1 wasteland, 2 sea
+zone, 3 lake; `owner` = index into `countries`, -1 none; `topography`, `vegetation`, `climate`, `culture`, `religion` = indexes into
+`vocabulary`; `population`; `name`, a list `[kind, name]` for wasteland, sea and lake; also `area`, `centre`, `key`, `material`,
+`settlement`, `complexity`), `vocabulary`, `size`, `scale`. On import the file is copied to `rnw-maps/<key>.rnworld` in the app's data folder
+(`key` = first 16 hex of the SHA-256 of the world code; newest 60 kept). `GET rnw/map/<key>` answers the columns, the countries and a summary
+(`MapStore.atlas`); `GET rnw/map/<key>.png` the picture. The page decodes the pixels into location numbers on a canvas and paints one colour per location for
+the chosen layer; hovering reads the location under the pointer. No image library is needed on either side.
+
 ## Reading the log (1.1.1)
 The app log (Tools > Open log folder) gets four `Random New World ...` lines whenever the tab is opened and something changed.
 In the code each line has a `LOG-CHECK` comment saying what a good value looks like (`modmanager/rnw.py`, `Manager._diag`):

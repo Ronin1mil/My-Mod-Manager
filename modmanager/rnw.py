@@ -426,11 +426,135 @@ def read_rnworld(source):
         return world
 
 
+ATLAS_LIMITS = {"atlas.json": 24 * 1024 * 1024, "atlas_labels.png": 48 * 1024 * 1024}
+MAP_KEEP = 60   # most map files kept in the app's data folder (each is about 0.6 MB)
+LOCATION_KINDS = {0: "land", 1: "wasteland", 2: "sea", 3: "lake"}
+
+
+def map_key(code):
+    return hashlib.sha256(str(code).encode("utf-8")).hexdigest()[:16]
+
+
+class MapStore:
+    """The map pictures of imported .rnworld files. A .rnworld holds atlas_labels.png (every pixel is the number of the location it
+    belongs to, as red*65536+green*256+blue, minus 1; black is open sea) and atlas.json (what each location and country is). The
+    page draws the map from those two. The file is copied into the app's data folder (`rnw-maps`, newest 60 kept) when it is
+    imported, so the map is there even when the original file moves. Nothing here starts a program."""
+
+    def __init__(self, folder):
+        self.folder = Path(folder)
+
+    def _path(self, key):
+        if not re.fullmatch(r"[0-9a-f]{16}", str(key or "")):
+            raise ValueError("Unknown map.")
+        return self.folder / (key + RNWORLD_EXT)
+
+    def save(self, code, src):
+        key = map_key(code)
+        self.folder.mkdir(parents=True, exist_ok=True)
+        tmp = self.folder / (key + ".tmp")
+        shutil.copyfile(src, tmp)
+        os.replace(tmp, self._path(key))
+        files = sorted(self.folder.glob("*" + RNWORLD_EXT), key=lambda f: f.stat().st_mtime, reverse=True)
+        for old in files[MAP_KEEP:]:
+            try:
+                old.unlink()
+            except OSError:
+                pass
+        return key
+
+    def has(self, key):
+        try:
+            return self._path(key).is_file()
+        except ValueError:
+            return False
+
+    def _member(self, key, name):
+        import zipfile
+        f = self._path(key)
+        if not f.is_file():
+            raise ValueError("That map file is no longer in the app's data folder. Import it again.")
+        try:
+            with zipfile.ZipFile(f) as z:
+                i = z.getinfo(name)
+                if i.file_size > ATLAS_LIMITS[name]:
+                    raise ValueError(f"{name} is far larger than expected, so it was not opened.")
+                with z.open(i) as h:
+                    data = h.read(ATLAS_LIMITS[name] + 1)
+        except KeyError:
+            raise ValueError(f"The map file has no {name}.")
+        except (zipfile.BadZipFile, OSError):
+            raise ValueError("The saved map file could not be read.")
+        if len(data) > ATLAS_LIMITS[name]:
+            raise ValueError(f"{name} is far larger than expected, so it was not opened.")
+        return data
+
+    def png(self, key):
+        data = self._member(key, "atlas_labels.png")
+        if not data.startswith(b"\x89PNG\r\n\x1a\n"):
+            raise ValueError("The map picture in that file is not a PNG.")
+        return data
+
+    def atlas(self, key):
+        """What the page needs to draw the map and list what is on it: per-location columns, the countries, and a summary."""
+        try:
+            a = json.loads(self._member(key, "atlas.json").decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            raise ValueError("The map data in that file could not be read.")
+        L = a.get("locations") if isinstance(a, dict) else None
+        if not isinstance(L, dict) or not isinstance(L.get("kind"), list):
+            raise ValueError("The map data in that file has a layout this app does not know.")
+        n = len(L["kind"])
+        cols = {}
+        for k in ("kind", "owner", "topography", "vegetation", "climate", "culture", "religion", "population", "name"):
+            v = L.get(k)
+            if not isinstance(v, list) or len(v) != n:
+                raise ValueError("The map data in that file has a layout this app does not know.")
+            cols[k] = v
+        cols["name"] = [(x[-1] if isinstance(x, list) and x else x) if isinstance(x, (str, list)) else "" for x in cols["name"]]
+        countries = [{"name": str(c.get("name", ""))[:60], "tag": str(c.get("tag", ""))[:8], "kind": str(c.get("kind", "")),
+                      "color": [int(x) & 255 for x in (c.get("color") or [128, 128, 128])[:3]], "locations": int(c.get("locations") or 0),
+                      "culture": c.get("culture", -1), "religion": c.get("religion", -1)}
+                     for c in (a.get("countries") or []) if isinstance(c, dict)]
+        vocab = a.get("vocabulary") if isinstance(a.get("vocabulary"), dict) else {}
+        return {"size": a.get("size"), "scale": a.get("scale"), "vocabulary": vocab, "countries": countries, "locations": cols,
+                "summary": self._summary(cols, countries, vocab)}
+
+    @staticmethod
+    def _summary(cols, countries, vocab):
+        """The characteristics of the map in numbers, for the list beside it."""
+        kinds, pop = {}, [0] * len(countries)
+        land = [i for i, k in enumerate(cols["kind"]) if k == 0]
+        for k in cols["kind"]:
+            kinds[LOCATION_KINDS.get(k, "other")] = kinds.get(LOCATION_KINDS.get(k, "other"), 0) + 1
+        for i in land:
+            o = cols["owner"][i]
+            if isinstance(o, int) and 0 <= o < len(pop):
+                pop[o] += int(cols["population"][i] or 0)
+
+        def count(col, vname, only=land):
+            names = vocab.get(vname) or []
+            c = {}
+            for i in only:
+                v = cols[col][i]
+                if isinstance(v, int) and 0 <= v < len(names):
+                    c[names[v]] = c.get(names[v], 0) + 1
+            return sorted(c.items(), key=lambda kv: -kv[1])
+        settled = [i for i in land if cols["owner"][i] >= 0]
+        by_size = sorted(range(len(countries)), key=lambda i: (-countries[i]["locations"], i))[:10]
+        return {"locations": kinds, "countries": {"state": sum(1 for c in countries if c["kind"] == "state"), "tribe": sum(1 for c in countries if c["kind"] == "tribe")},
+                "population": sum(int(cols["population"][i] or 0) for i in land), "settled_locations": len(settled),
+                "topography": count("topography", "topography"), "vegetation": count("vegetation", "vegetation"), "climate": count("climate", "climate"),
+                "cultures": count("culture", "culture", settled)[:12], "religions": count("religion", "religion", settled)[:12],
+                "largest": [{"name": countries[i]["name"], "tag": countries[i]["tag"], "kind": countries[i]["kind"], "locations": countries[i]["locations"],
+                             "population": pop[i]} for i in by_size]}
+
+
 def entry(**kw):
     e = {"folder": "", "path": "", "installed": False, "id": "", "mod_id": "", "name": "", "tag": "", "code": "", "valid_code": False,
          "preset": "", "preset_title": "", "seed": "", "generator": "", "game_build": "", "created": 0, "seconds": 0,
          "changes": [], "details": [], "place": "", "notes": "", "starred": False, "parent": "", "part": "",
-         "made_here": False, "how": "", "specs_from": [], "in_playset": "none", "problem": ""}
+         "made_here": False, "how": "", "specs_from": [], "in_playset": "none", "problem": "", "map": ""}
     e.update(kw)
     return e
 
@@ -533,6 +657,8 @@ def merge_worlds(installed, library, records, mod_ids=None):
         for k, f in (("game_build", "game_version"), ("seconds", "seconds")):
             if rec.get(f) and not e[k]:
                 e[k] = rec[f]
+        if rec.get("map"):
+            e["map"] = str(rec["map"])[:16]
         for k in ("name", "tag", "notes"):   # a map imported from a .rnworld file brings these with it
             if rec.get(k) and not e[k]:
                 e[k] = str(rec[k])[:300 if k == "notes" else 80 if k == "name" else 8]
@@ -693,6 +819,7 @@ class Manager:
         self._logged_start = False
         self._generator = generator            # tests hand in a stub; None = look on this PC
         self.records = Records(app.cfg / "rnw-worlds.json")
+        self.maps = MapStore(app.cfg / "rnw-maps")
 
     # -- finding it --
     def generator(self):
@@ -966,6 +1093,10 @@ class Manager:
             rec["seconds"] = w["seconds"]
         if isinstance(w.get("record"), dict):
             rec["summary"] = w["record"]
+        try:   # the map's picture and data are kept so the page can draw the map
+            rec["map"] = self.maps.save(wc, src)
+        except OSError as e:
+            gamelog.log(self.app.game.id, f"Random New World: could not keep the map picture of {label or src.name}: {e}")
         self.records.put(wc, rec)
         gamelog.log(self.app.game.id, f"Random New World: imported the map file {label or src.name} ({wc[:20]}…, {specs['preset']}, seed {specs['seed']})")
         return {"code": wc, "preset": specs["preset"], "seed": str(specs["seed"]), "file": label or src.name}

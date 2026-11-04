@@ -542,8 +542,95 @@ function rnwWorld(w, p, can) {
     <span class="rnw-btn">${w.installed && w.mod_id ? (on ? `<button class="sm" data-rnw="useoff" data-f="${esc(w.folder)}">Turn off</button>` : `<button class="pri sm" data-rnw="use" data-f="${esc(w.folder)}" title="Turns this world on in the current playset, turns the other worlds and the generator itself off, and puts it last">Use this world</button>`) : ''}
       ${!w.installed && can && w.id ? `<button class="sm" data-rnw="add" data-id="${esc(w.id)}" title="Installs it into your mod folder (the generator builds it again from its code if it must)">Add to game</button>` : ''}
       ${w.installed && can && w.id ? `<button class="sm" data-rnw="remove" data-id="${esc(w.id)}" data-f="${esc(w.name)}">Remove from game</button>` : ''}
+      ${w.map ? `<button class="pri sm" data-rnw="openmap" data-key="${esc(w.map)}">Show map</button>` : ''}
       ${!w.installed && can && w.code && w.valid_code ? `<button class="sm" data-rnw="fromcode" data-code="${esc(w.code)}" title="Opens Make a new map with this world code filled in">Make this map</button>` : ''}
       ${w.code ? `<button class="sm" data-rnw="copy" data-code="${esc(w.code)}">Copy code</button>` : ''}</span></div>`;
+}
+// The map of an imported .rnworld file. The file holds a picture in which every pixel is the number of its location (red*65536 +
+// green*256 + blue, minus 1; black = open sea) and a table of what each location and country is. The picture is never shown as it
+// is (it looks like noise); the browser paints a real map from it: each location gets the colour of its country, terrain, vegetation,
+// climate, culture or religion. The data comes from the app's own data folder (rnw/map/<key>), never from outside.
+let RWM = null;   // the map being looked at: {key, layer, ready, error, data, canvas, ids, w, h}
+const RWM_LAYERS = [['countries', 'Countries'], ['topography', 'Terrain'], ['vegetation', 'Vegetation'], ['climate', 'Climate'], ['culture', 'Cultures'], ['religion', 'Religions']];
+const RWM_FIXED = {flatland: [150, 190, 110], hills: [170, 160, 100], plateau: [205, 150, 90], mountains: [140, 140, 150], wetlands: [90, 150, 140], hills_wasteland: [120, 115, 100], mountain_wasteland: [105, 105, 110], plateau_wasteland: [130, 115, 95],
+  desert: [226, 200, 130], forest: [50, 120, 60], woods: [100, 160, 80], grasslands: [160, 200, 90], jungle: [20, 100, 50], sparse: [190, 175, 130]};
+function rnwHsl(name) {   // a steady colour for a name (cultures and religions have hundreds)
+  let h = 0; for (const c of String(name)) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  const hh = (h % 360) / 360, ss = 0.55, l = 0.55 + ((h >>> 9) % 20) / 100 - 0.1, q = l < 0.5 ? l * (1 + ss) : l + ss - l * ss, pp = 2 * l - q;
+  const f = t => { t = (t + 1) % 1; return Math.round(255 * (t < 1 / 6 ? pp + (q - pp) * 6 * t : t < 0.5 ? q : t < 2 / 3 ? pp + (q - pp) * (2 / 3 - t) * 6 : pp)); };
+  return [f(hh + 1 / 3), f(hh), f(hh - 1 / 3)];
+}
+function rnwLayerColour(layer, name) { return RWM_FIXED[name] || rnwHsl(layer + name); }
+function rnwMapColours(layer) {   // one colour per location for the chosen layer
+  const D = RWM.data, L = D.locations, n = L.kind.length, out = new Uint8Array(n * 3), voc = D.vocabulary[layer] || [];
+  for (let i = 0; i < n; i++) {
+    let c; const k = L.kind[i];
+    if (k === 2) c = [30, 70, 130]; else if (k === 3) c = [90, 140, 190];
+    else if (layer === 'countries') c = L.owner[i] >= 0 && D.countries[L.owner[i]] ? D.countries[L.owner[i]].color : k === 1 ? [110, 100, 90] : [150, 150, 140];
+    else { const v = L[layer][i]; c = v >= 0 && voc[v] ? rnwLayerColour(layer, voc[v]) : [120, 120, 120]; }
+    out[i * 3] = c[0]; out[i * 3 + 1] = c[1]; out[i * 3 + 2] = c[2];
+  }
+  return out;
+}
+function rnwPaintMap() {
+  const M = RWM; if (!M || !M.ready) return;
+  const col = rnwMapColours(M.layer), ctx = M.canvas.getContext('2d'), img = ctx.createImageData(M.w, M.h), d = img.data, ids = M.ids;
+  for (let p = 0, n = ids.length; p < n; p++) {
+    const id = ids[p], q = p * 4;
+    if (id < 0) { d[q] = 20; d[q + 1] = 40; d[q + 2] = 70; } else { d[q] = col[id * 3]; d[q + 1] = col[id * 3 + 1]; d[q + 2] = col[id * 3 + 2]; }
+    d[q + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+async function rnwOpenMap(key) {
+  if (RWM && RWM.key === key) { RWM = null; return render(); }   // pressing it again closes it
+  const M = RWM = {key, layer: 'countries', ready: false, error: ''}; render();
+  try {
+    const [data, blob] = await Promise.all([api(`rnw/map/${key}`), fetch(`/api/${G}/rnw/map/${key}.png`).then(r => { if (!r.ok) throw new Error('The map picture could not be loaded.'); return r.blob(); })]);
+    const bmp = await createImageBitmap(blob, {colorSpaceConversion: 'none'});
+    if (bmp.width * bmp.height > 40e6) throw new Error('The map picture is larger than expected.');
+    const cv = document.createElement('canvas'); cv.width = bmp.width; cv.height = bmp.height;
+    const cx = cv.getContext('2d', {willReadFrequently: true}); cx.drawImage(bmp, 0, 0);
+    const src = cx.getImageData(0, 0, cv.width, cv.height).data, ids = new Int32Array(cv.width * cv.height);
+    for (let p = 0; p < ids.length; p++) ids[p] = ((src[p * 4] << 16) | (src[p * 4 + 1] << 8) | src[p * 4 + 2]) - 1;
+    if (RWM !== M) return;
+    Object.assign(M, {data, canvas: cv, ids, w: cv.width, h: cv.height, ready: true});
+    cv.style.cssText = 'width:100%;max-width:920px;height:auto;display:block;border-radius:6px;cursor:crosshair';
+    cv.onmousemove = e => {
+      const r = cv.getBoundingClientRect(), x = Math.floor((e.clientX - r.left) * M.w / r.width), y = Math.floor((e.clientY - r.top) * M.h / r.height), tip = $('rnwmaptip');
+      if (!tip || x < 0 || y < 0 || x >= M.w || y >= M.h) return;
+      const i = ids[y * M.w + x], L = data.locations, V = data.vocabulary;
+      if (i < 0) { tip.textContent = 'Open sea'; return; }
+      const nm = L.name[i], k = L.kind[i], o = L.owner[i] >= 0 ? data.countries[L.owner[i]] : null, bits = [nm || '(unnamed)', ['', 'wasteland', 'sea zone', 'lake'][k] || ''];
+      if (k === 0) { if (o) bits.push(`${o.name} (${o.tag}, ${o.kind})`); if (L.culture[i] >= 0) bits.push((V.culture || [])[L.culture[i]]); if (L.religion[i] >= 0) bits.push((V.religion || [])[L.religion[i]]); bits.push('population ' + (L.population[i] || 0).toLocaleString()); }
+      tip.textContent = bits.filter(Boolean).join(' · ');
+    };
+    rnwPaintMap();
+  } catch (e) { if (RWM === M) M.error = e.message || 'The map could not be shown.'; }
+  if (RWM === M) render();
+}
+function rnwMapHtml() {
+  const M = RWM; if (!M) return '';
+  const w = (RW.worlds || []).find(x => x.map === M.key), title = w ? (w.name || w.folder || 'Map') : 'Map';
+  const head = `<div class="rnw-map"><div class="rnw-maphead"><b>${esc(title)}</b><button class="sm" data-rnw="openmap" data-key="${esc(M.key)}">Close the map</button></div>`;
+  if (M.error) return head + `<div class="row static err">${esc(M.error)}</div></div>`;
+  if (!M.ready) return head + '<p class="mut">Loading the map…</p></div>';
+  const S = M.data.summary, n = x => (x || 0).toLocaleString(), lay = M.layer, voc = M.data.vocabulary;
+  const chip = (layer, name, count) => `<div class="rnw-key"><i style="background:rgb(${rnwLayerColour(layer, name).join(',')})"></i>${esc(name.replace(/_/g, ' '))} <span class="mut">${n(count)}</span></div>`;
+  const list = (title2, arr, layer) => arr && arr.length ? `<h4>${title2}</h4>${arr.map(([a, b]) => chip(layer, a, b)).join('')}` : '';
+  const legend = lay === 'countries' ? `<h4>Largest countries</h4>${S.largest.map(c => `<div class="rnw-key">${esc(c.name)} <span class="mut">${esc(c.tag)} · ${c.kind} · ${n(c.locations)} locations · ${n(c.population)} people</span></div>`).join('')}`
+    : list(RWM_LAYERS.find(x => x[0] === lay)[1], lay === 'culture' ? S.cultures : lay === 'religion' ? S.religions : S[lay], lay);
+  const loc = S.locations;
+  return head + `<div class="rnw-layers">${RWM_LAYERS.map(([k, t]) => `<button class="sm ${k === lay ? 'pri' : ''}" data-rnw="layer" data-l="${k}">${t}</button>`).join('')}</div>
+    <div class="rnw-mapbox"><div class="rnw-canvas" id="rnwmapcv"></div><div class="rnw-mapside">
+      <div class="mut" id="rnwmaptip">Move over the map to see a place.</div>
+      <h4>What this map contains</h4>
+      <div class="rnw-key">${n(loc.land)} land locations, ${n(S.settled_locations)} of them settled</div>
+      <div class="rnw-key">${n(loc.wasteland)} wasteland, ${n(loc.sea)} sea zones, ${n(loc.lake)} lakes</div>
+      <div class="rnw-key">${n(S.countries.state)} states and ${n(S.countries.tribe)} tribes</div>
+      <div class="rnw-key">Population ${n(S.population)}</div>
+      ${legend}${lay === 'countries' ? list('Terrain', S.topography, 'topography') + list('Vegetation', S.vegetation, 'vegetation') + list('Climate', S.climate, 'climate') + list('Most common cultures', S.cultures, 'culture') + list('Most common religions', S.religions, 'religion') : ''}
+    </div></div></div>`;
 }
 function rnwLogHtml() {
   const l = (RW && RW.log) || []; if (!l.length) return '';
@@ -609,7 +696,8 @@ function viewRnw(p) {
       <button class="pri" data-rnw="new" ${can && !busy ? '' : 'disabled'}>Make map</button></div>
       <p class="mut">Takes some minutes and about 7.5 GB of free memory; the map needs about 1.2 GB of disk${R.free_gb != null ? ` (${R.free_gb} GB free here)` : ''}. A world code makes the same map again (with the same game and generator version).</p>`;
   }
-  $('view').innerHTML = head + back + say + body + jobbox + worlds + '</div>';
+  $('view').innerHTML = head + back + say + body + jobbox + rnwMapHtml() + worlds + '</div>';
+  if (RWM && RWM.ready && $('rnwmapcv')) $('rnwmapcv').appendChild(RWM.canvas);   // the painted map is kept between redraws
 }
 async function loadCompare() {
   const others = S.playsets.filter(x => x.id !== S.active);
@@ -1095,6 +1183,8 @@ document.addEventListener('click', guard(async e => {
       if (what === 'generator') { RWF.gpath = r.path; return rnwCheck(r.path); }   // pointing to the folder is the question: answer at once
       return render();
     }
+    if (act === 'openmap') return rnwOpenMap(rb.dataset.key);
+    if (act === 'layer') { if (RWM) { RWM.layer = rb.dataset.l; rnwPaintMap(); render(); } return; }
     if (act === 'fromcode') { RWF.code = rb.dataset.code; RW.step = 'make'; return render(); }
     if (act === 'keep') { RW.pick = false; return render(); }
     if (act === 'usehint') { e.preventDefault && e.preventDefault(); RWF.gpath = rb.dataset.path; return render(); }
@@ -1597,7 +1687,7 @@ function setLogo(id) {
   img.onerror = () => { if (logoTry++ < 2 && box.dataset.k === id) setTimeout(() => { if (box.dataset.k === id) img.src = `/api/${encodeURIComponent(id)}/logo?r=${logoTry}`; }, 1500); };
 }
 async function useGame(id, first) {
-  gen++; G = id; S = A = C = P = CR = RW = null; clearInterval(RWT); RWT = null; sel = null; tab = 'order'; cmpWith = null; lastMissing = []; steamQ = null; setupShown = false;
+  gen++; G = id; S = A = C = P = CR = RW = RWM = null; clearInterval(RWT); RWT = null; sel = null; tab = 'order'; cmpWith = null; lastMissing = []; steamQ = null; setupShown = false;
   try { localStorage.setItem('mm-game', id); } catch (e) { /* storage may be blocked */ }
   if (location.hash.slice(1) !== id) history.replaceState(null, '', '#' + id);
   const g = GI.games.find(x => x.id === id);

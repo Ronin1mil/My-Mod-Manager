@@ -100,6 +100,25 @@ try {
   await page.waitForFunction(() => /Your maps \(3\)/.test(document.querySelector('.rnw').textContent));
   assert.match(await page.textContent('.rnw-log'), /Remembered island\.rnworld/);
   assert.match(await page.textContent('.rnw'), /My island/);
+  // Show map: the picture in the file is a table of location numbers; the page paints a real map from it and lists what it contains
+  await page.click('[data-rnw=openmap]');
+  await page.waitForSelector('#rnwmapcv canvas');
+  const px = (x, y) => page.evaluate(([x, y]) => [...document.querySelector('#rnwmapcv canvas').getContext('2d').getImageData(x, y, 1, 1).data], [x, y]);
+  assert.deepEqual(await px(1, 0), [200, 30, 30, 255]);     // land of the country Aland: its colour
+  assert.deepEqual(await px(0, 0), [20, 40, 70, 255]);      // open sea
+  assert.deepEqual(await px(3, 0), [150, 150, 140, 255]);   // land nobody owns
+  assert.match(await page.textContent('.rnw-map'), /2 land locations, 1 of them settled/);
+  assert.match(await page.textContent('.rnw-map'), /1 states and 0 tribes/);
+  assert.match(await page.textContent('.rnw-map'), /Aland\s*ALA/);
+  await page.locator('#rnwmapcv canvas').scrollIntoViewIfNeeded();
+  const box = await page.locator('#rnwmapcv canvas').boundingBox();
+  await page.mouse.move(box.x + box.width * 1.5 / 6, box.y + box.height * 0.5 / 4);
+  assert.match(await page.textContent('#rnwmaptip'), /Aland town.*Aland \(ALA, state\).*population 1,000/);
+  await page.click('[data-rnw=layer][data-l=topography]');
+  assert.deepEqual(await px(1, 0), [150, 190, 110, 255]);   // flatland
+  assert.match(await page.textContent('.rnw-map'), /flatland/);
+  await page.click('[data-rnw=openmap]');                   // pressing it again closes the map
+  assert.equal(await page.locator('.rnw-map').count(), 0);
 
   // 4. back to the menu, then Make a new map: the app does not search, it asks for the folder and reports what it finds there
   await page.click('[data-rnw=menu]');

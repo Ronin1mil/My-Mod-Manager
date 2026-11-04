@@ -48,6 +48,27 @@ def make_code(preset=1, seed=42, ver=(1, 1, 0), changes=None, fmt=2):
 CODE = make_code(1, 42, changes={"new_world.land_permille": 350, "natives.state_locations": 7, "rolls.peoples": 2})
 
 
+# A tiny map like the one inside a .rnworld: 6 x 4 pixels, each the number of a location + 1 as red*65536+green*256+blue (0 = open sea).
+#   0 sea | 1 land (Aland, owned) | 2 land (unowned) | 3 wasteland | 4 sea zone | 5 lake
+TINY_ROWS = [[0, 1, 1, 2, 2, 0], [0, 1, 1, 2, 3, 0], [0, 1, 1, 3, 3, 0], [4, 4, 5, 5, 0, 0]]
+TINY_ATLAS = {"format": 2, "scale": 4, "size": [4, 6],
+              "countries": [{"capital": 0, "color": [200, 30, 30], "culture": 0, "kind": "state", "locations": 1, "name": "Aland", "religion": 0, "tag": "ALA"}],
+              "vocabulary": {"topography": ["flatland", "hills"], "vegetation": ["forest"], "climate": ["oceanic"], "culture": ["a_culture"], "religion": ["a_religion"]},
+              "locations": {"kind": [0, 0, 1, 2, 3], "owner": [0, -1, -1, -1, -1], "topography": [0, 1, 1, -1, -1], "vegetation": [0, 0, 0, -1, -1], "climate": [0, 0, 0, -1, -1],
+                            "culture": [0, -1, -1, -1, -1], "religion": [0, -1, -1, -1, -1], "population": [1000, 0, 0, 0, 0],
+                            "name": ["Aland town", "Plain", ["highlands", "Waste"], ["reference", "North sea"], ["lake", "Lake"]]}}
+
+
+def tiny_png():
+    import struct
+    import zlib
+    raw = b"".join(b"\x00" + b"".join(bytes(((v >> 16) & 255, (v >> 8) & 255, v & 255)) for v in row) for row in TINY_ROWS)
+
+    def chunk(tag, data):
+        return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xffffffff)
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 6, 4, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b"")
+
+
 def make_rnworld(path, code=None, **over):
     """A .rnworld file like the one Random New World exports for one map: a zip with rnworld.json, world.json, atlas.json, a picture."""
     import hashlib
@@ -61,8 +82,8 @@ def make_rnworld(path, code=None, **over):
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
         z.writestr("rnworld.json", json.dumps(head))
         z.writestr("world.json", over.pop("body", body))
-        z.writestr("atlas.json", "{}")
-        z.writestr("atlas_labels.png", b"\x89PNG")
+        z.writestr("atlas.json", json.dumps(TINY_ATLAS))
+        z.writestr("atlas_labels.png", tiny_png())
     return Path(path)
 
 
@@ -239,6 +260,22 @@ class Rnworld(unittest.TestCase):
             z.writestr("x.txt", "x")
         with self.assertRaises(ValueError):
             rnw.read_rnworld(self.f)
+
+    def test_the_map_data_and_picture_can_be_read_and_summarised(self):
+        store = rnw.MapStore(Path(self.td.name) / "maps")
+        key = store.save(CODE, make_rnworld(self.f))
+        self.assertTrue(store.has(key))
+        a = store.atlas(key)
+        self.assertEqual(a["locations"]["name"][2:], ["Waste", "North sea", "Lake"])      # wasteland, sea and lake names come as [kind, name]
+        sm = a["summary"]
+        self.assertEqual(sm["locations"], {"land": 2, "wasteland": 1, "sea": 1, "lake": 1})
+        self.assertEqual((sm["countries"], sm["population"], sm["settled_locations"]), ({"state": 1, "tribe": 0}, 1000, 1))
+        self.assertEqual(sm["topography"], [("flatland", 1), ("hills", 1)])
+        self.assertEqual(sm["largest"][0]["name"], "Aland")
+        self.assertTrue(store.png(key).startswith(b"\x89PNG"))
+        for bad in ("", "../x", "zz" * 8, "0" * 16):
+            with self.assertRaises(ValueError):
+                store.atlas(bad)
 
     def test_a_huge_description_is_not_opened(self):
         make_rnworld(self.f, body=b" " * (rnw.RNWORLD_LIMITS["world.json"] + 10), head={"files": {}})
@@ -456,6 +493,20 @@ class Route(GameCase):
         self.assertEqual((w["name"], w["tag"], w["code"], w["installed"], w["game_build"]), ("My island", "ISL", CODE, False, "26377361"))
         self.assertTrue(any("land_permille" in str(d) for d in w["details"]))          # the generator's own record is shown
         self.assertEqual(self.post("/api/rnw/import", {"path": str(self.r / "nope.rnworld")})[0], 400)
+
+    def test_an_imported_map_file_can_be_drawn_from_the_apps_own_copy(self):
+        f = make_rnworld(self.r / "island.rnworld")
+        self.post("/api/rnw/import", {"path": str(f)})
+        w = self.req("GET", "/api/rnw/files")[1]["worlds"][0]
+        self.assertRegex(w["map"], r"^[0-9a-f]{16}$")
+        f.unlink()                                                  # the original may move: the app keeps its own copy
+        st, a, _ = self.req("GET", f"/api/rnw/map/{w['map']}")
+        self.assertEqual((st, a["summary"]["countries"]["state"]), (200, 1))
+        st, png, r = self.req("GET", f"/api/rnw/map/{w['map']}.png")
+        self.assertEqual((st, r.getheader("Content-Type")), (200, "image/png"))
+        self.assertTrue(png.startswith(b"\x89PNG"))
+        self.assertEqual(self.req("GET", "/api/rnw/map/0000000000000000")[0], 404)
+        self.assertEqual(self.req("GET", "/api/rnw/map/..%2Fx")[0], 404)
 
     def test_a_folder_of_rnworld_files_and_a_dropped_file(self):
         folder = self.r / "exports"
