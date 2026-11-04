@@ -10,6 +10,9 @@
 - **Settings > App has an "Open the GitHub page" button** that opens the project's page (downloads, changelog, problem reports) in your browser.
 - **Make a new map always shows the folder box with Browse…** (it opens the file explorer), also when a folder is already remembered; before, a remembered folder hid the box behind "Use another folder…". The menu card says where it is.
 - **Clicking the dark background no longer closes Settings** (and the other windows): they close only with their buttons or Esc, so changes are not lost by a stray click.
+- **Browse… uses Windows' current folder window** (the Explorer-style one, with address bar, search and Quick access) instead of the old small tree of folders. The old one is only a fallback if the new one cannot be built on a PC.
+- **Map files (.rnworld) can be imported.** A .rnworld file is what Random New World exports for one map. Choose it with **Choose a .rnworld file…**, paste its path, point to a folder that holds several, or drop it on the window: the app remembers the map (name, tag, world code, settings, the generator's own record) and lists it; nothing is built or copied. **Make this map** on such a map opens Make a new map with its world code filled in. Only the two small description files in the archive are read, with size limits and a checksum check.
+- A real world code from the generator now decodes in a test to exactly what its own record says (world type, seed, generator version and every changed setting), so the decoder is checked against the real program, not only against the documented format.
 - A generator command that is out of time is now ended for good on Windows too: its output goes to temporary files instead of pipes, so a program left running by `rnw.cmd` can no longer keep the app waiting (the Windows test run showed 30 seconds instead of a few).
 
 ## 1.1.2 - Random New World: the tab no longer loads for ever

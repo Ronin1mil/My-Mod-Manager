@@ -542,6 +542,7 @@ function rnwWorld(w, p, can) {
     <span class="rnw-btn">${w.installed && w.mod_id ? (on ? `<button class="sm" data-rnw="useoff" data-f="${esc(w.folder)}">Turn off</button>` : `<button class="pri sm" data-rnw="use" data-f="${esc(w.folder)}" title="Turns this world on in the current playset, turns the other worlds and the generator itself off, and puts it last">Use this world</button>`) : ''}
       ${!w.installed && can && w.id ? `<button class="sm" data-rnw="add" data-id="${esc(w.id)}" title="Installs it into your mod folder (the generator builds it again from its code if it must)">Add to game</button>` : ''}
       ${w.installed && can && w.id ? `<button class="sm" data-rnw="remove" data-id="${esc(w.id)}" data-f="${esc(w.name)}">Remove from game</button>` : ''}
+      ${!w.installed && can && w.code && w.valid_code ? `<button class="sm" data-rnw="fromcode" data-code="${esc(w.code)}" title="Opens Make a new map with this world code filled in">Make this map</button>` : ''}
       ${w.code ? `<button class="sm" data-rnw="copy" data-code="${esc(w.code)}">Copy code</button>` : ''}</span></div>`;
 }
 function rnwLogHtml() {
@@ -591,9 +592,10 @@ function viewRnw(p) {
     body = `<h3>Import my maps</h3>
       <div class="rnw-drop" id="rnwdrop"><b>Add a map you have somewhere else</b>
         <div class="rnw-form">
-          <label>Folder of a map (or a folder that holds several)<input data-rnwf="path" value="${esc(RWF.path || '')}" placeholder="C:\\…\\rnw_exp_world_abcde23456" size="46"></label>
-          <button class="sm" data-rnw="browse" data-what="map">Browse…</button><button class="pri" data-rnw="importdir" ${busy ? 'disabled' : ''}>Copy into my mod folder</button></div>
-        <div class="mut">Browse to the map folder (or paste its path), then press Copy. The folder is copied, never moved. A .zip of a map can be dropped anywhere in this window.</div>
+          <label>Map file (.rnworld), or the folder of a map<input data-rnwf="path" value="${esc(RWF.path || '')}" placeholder="C:\\…\\world.rnworld" size="46"></label>
+          <button class="pri" data-rnw="browse" data-what="file">Choose a .rnworld file…</button><button class="sm" data-rnw="browse" data-what="map">Choose a folder…</button>
+          <button class="pri" data-rnw="importdir" ${busy ? 'disabled' : ''}>Import</button></div>
+        <div class="mut">A <b>.rnworld</b> file is a map exported from Random New World: the app remembers the map and shows its settings (nothing is built). A map <b>folder</b> (rnw_exp_world_…) is copied into your mod folder, never moved. You can also drop a .rnworld file anywhere in this window.</div>
         <div class="rnw-form" style="margin-top:8px">
           <label>or a world code<input data-rnwf="code" value="${esc(RWF.code)}" placeholder="RNW1-…" size="40"></label>
           <button class="sm" data-rnw="importcode">Remember this code</button></div>
@@ -1067,9 +1069,14 @@ document.addEventListener('click', guard(async e => {
     if (act === 'gomake') return rnwGo('make');
     if (act === 'library') return rnwReadLibrary();
     if (act === 'importdir') {
-      const path = (RWF.path || '').trim(); if (!path) return toast('Paste the folder of a map first.', true);
-      rnwSay('Checking the folder and copying it into your mod folder (the original stays where it is)…'); render();
-      const r = await api('rnw/import', {path}); RW.job = r.job; RWF.path = ''; render(); rnwPoll(); return;
+      const path = (RWF.path || '').trim(); if (!path) return toast('Choose a .rnworld file or a map folder first.', true);
+      rnwSay('Checking it and importing (a map file is remembered; a map folder is copied into your mod folder and the original stays where it is)…'); render();
+      const r = await api('rnw/import', {path}); RWF.path = '';
+      if (r.worlds) {   // map files: done at once
+        rnwOk(); for (const w of r.worlds) rnwSay(`Remembered ${w.file}: ${w.preset}, seed ${w.seed}. It is listed below with its settings.`);
+        RW.log[RW.log.length - 1].done = true; await loadRnw(true); return toast(r.worlds.length === 1 ? 'Map file imported.' : r.worlds.length + ' map files imported.');
+      }
+      RW.job = r.job; render(); rnwPoll(); return;
     }
     if (act === 'importcode') {
       const code = RWF.code.trim(); if (!code) return toast('Paste a world code first.', true);
@@ -1078,8 +1085,8 @@ document.addEventListener('click', guard(async e => {
     if (act === 'open') { await api('rnw/open', {}); return toast('Opening Random New World…'); }
     if (act === 'folder') { RW.pick = true; return render(); }
     if (act === 'browse') {
-      const what = rb.dataset.what === 'generator' ? 'generator' : 'map', key = what === 'generator' ? 'gpath' : 'path';
-      rnwSay('Opening the folder window. It can be behind this window: look for it in the taskbar…'); RW.busy = true; render();
+      const what = ['generator', 'file'].includes(rb.dataset.what) ? rb.dataset.what : 'map', key = what === 'generator' ? 'gpath' : 'path';
+      rnwSay(what === 'file' ? 'Opening the file window.' : 'Opening the folder window. It can be behind this window: look for it in the taskbar…'); RW.busy = true; render();
       let r;
       try { r = await api('rnw/pick', {what, start: RWF[key] || ''}); } finally { RW.busy = false; }
       if (r.error) { rnwOk(); rnwSay(r.error, true); return render(); }
@@ -1088,6 +1095,7 @@ document.addEventListener('click', guard(async e => {
       if (what === 'generator') { RWF.gpath = r.path; return rnwCheck(r.path); }   // pointing to the folder is the question: answer at once
       return render();
     }
+    if (act === 'fromcode') { RWF.code = rb.dataset.code; RW.step = 'make'; return render(); }
     if (act === 'keep') { RW.pick = false; return render(); }
     if (act === 'usehint') { e.preventDefault && e.preventDefault(); RWF.gpath = rb.dataset.path; return render(); }
     if (act === 'check') return rnwCheck((RWF.gpath || '').trim());
@@ -1340,6 +1348,11 @@ const install = guard(async f => {
   toast(`Installing ${f.name}…`);
   const r = await fetch(`/api/${G}/install`, {method: 'POST', headers: {'X-Filename': f.name}, body: f});
   const j = await r.json(); if (!r.ok) throw new Error(j.error);
+  if (j.rnworld) {   // a Random New World map file, not a mod
+    toast(`Remembered the map in ${f.name}: ${j.worlds[0].preset}, seed ${j.worlds[0].seed}. Open the Random New World tab (Import my maps) to see it.`);
+    if (RW && tab === 'rnw' && RW.step !== 'menu') loadRnw(true);
+    return;
+  }
   await load();
   toast('Installed: ' + j.installed.map(i => i.name + (i.upgraded ? ' (upgraded, old version backed up)' : '')).join(', '));
 });

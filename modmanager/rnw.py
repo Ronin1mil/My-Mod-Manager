@@ -379,6 +379,53 @@ def read_world_folder(folder):
     return e
 
 
+RNWORLD_EXT = ".rnworld"
+RNWORLD_LIMITS = {"rnworld.json": 64 * 1024, "world.json": 2 * 1024 * 1024}   # the pictures and the map atlas in the file are never read
+
+
+def read_rnworld(source):
+    """The world described by a .rnworld file. -> the dict stored in the file's world.json.
+    A .rnworld file is what Random New World exports for one map ("the pure world"): a zip holding rnworld.json (kind "world",
+    format 1, a hash of each file), world.json (code, preset, seed, generator, game build, the settings record, name, notes),
+    atlas.json and atlas_labels.png (the map's picture data). It holds the recipe and a preview, not the 1.2 GB mod.
+    Only the two small JSON files are read, each with a size limit; nothing is extracted to disk. Raises ValueError."""
+    import zipfile
+    try:
+        z = zipfile.ZipFile(source)
+    except (zipfile.BadZipFile, OSError):
+        raise ValueError("That is not a Random New World map file: it is not a .rnworld archive.")
+    with z:
+        infos = {i.filename: i for i in z.infolist()}
+
+        def read(name):
+            i = infos.get(name)
+            if i is None:
+                raise ValueError(f"That file has no {name}, so it is not a map file from Random New World.")
+            if i.file_size > RNWORLD_LIMITS[name]:
+                raise ValueError(f"{name} in that file is far larger than a map file's, so it was not opened.")
+            with z.open(i) as f:
+                data = f.read(RNWORLD_LIMITS[name] + 1)
+            if len(data) > RNWORLD_LIMITS[name]:
+                raise ValueError(f"{name} in that file is far larger than a map file's, so it was not opened.")
+            return data
+
+        head_raw, body_raw = read("rnworld.json"), read("world.json")
+        try:
+            head, world = json.loads(head_raw.decode("utf-8")), json.loads(body_raw.decode("utf-8"))
+        except ValueError:   # includes bad JSON and bad UTF-8
+            raise ValueError("That map file is damaged: its description could not be read.")
+        if not isinstance(head, dict) or head.get("kind") != "world":
+            raise ValueError("That is a Random New World file, but not a single map (it says " + repr(str((head or {}).get("kind", "?")))[:40] + ").")
+        if head.get("format") != 1:
+            raise ValueError("That map file uses a newer format than this app knows. Update the app, or paste the map's world code instead.")
+        want = (head.get("files") or {}).get("world.json") if isinstance(head.get("files"), dict) else None
+        if want and want != hashlib.sha256(body_raw).hexdigest():
+            raise ValueError("That map file is damaged (its checksum does not match).")
+        if not isinstance(world, dict) or not world.get("code"):
+            raise ValueError("That map file has no world code in it.")
+        return world
+
+
 def entry(**kw):
     e = {"folder": "", "path": "", "installed": False, "id": "", "mod_id": "", "name": "", "tag": "", "code": "", "valid_code": False,
          "preset": "", "preset_title": "", "seed": "", "generator": "", "game_build": "", "created": 0, "seconds": 0,
@@ -486,6 +533,9 @@ def merge_worlds(installed, library, records, mod_ids=None):
         for k, f in (("game_build", "game_version"), ("seconds", "seconds")):
             if rec.get(f) and not e[k]:
                 e[k] = rec[f]
+        for k in ("name", "tag", "notes"):   # a map imported from a .rnworld file brings these with it
+            if rec.get(k) and not e[k]:
+                e[k] = str(rec[k])[:300 if k == "notes" else 80 if k == "name" else 8]
         if rec.get("requested_at") and not e["created"]:
             e["created"] = int(rec["requested_at"])
         if rec.get("summary") and not e["details"]:
@@ -655,6 +705,8 @@ class Manager:
     def pick_folder(self, what, start=""):
         """Open the system's folder window for the user. what: 'generator' | 'map'. Waits for the choice, so the request
         that calls this must not hold the data lock."""
+        if what == "file":
+            return self.picker("Choose a Random New World map file (.rnworld)", start, kind="file")
         title = "Choose the folder where Random New World is installed (the one with rnw.cmd)" if what == "generator" \
             else "Choose the folder of a Random New World map (rnw_exp_world_…), or a folder that holds several"
         if not start and what == "generator":
@@ -890,6 +942,52 @@ class Manager:
                               "how": "imported by this app"})
         gamelog.log(self.app.game.id, f"Random New World: imported the code {wc}")
         return {"code": wc, "preset": specs["preset"], "seed": str(specs["seed"])}
+
+    def import_rnworld(self, path, label=None):
+        """Import one .rnworld file: remember the map's world code with everything the file says about it (nothing is built
+        and nothing is copied into the mod folder). The page then lists it with its settings."""
+        src = Path(str(path))
+        if src.is_symlink() or not src.is_file():
+            raise ValueError("That is not a file on this PC.")
+        w = read_rnworld(src)
+        try:
+            wc = norm_code(w["code"])
+            specs = decode_code(wc)
+        except CodeError as e:
+            raise ValueError("The world code in that file is not valid: " + str(e))
+        created = w.get("created")
+        rec = {"state": "imported", "preset": specs["preset"], "seed": str(specs["seed"]), "generator": specs["generator"],
+               "changes": specs["changes"], "requested_at": int(created) if isinstance(created, (int, float)) and created > 0 else int(time.time()),
+               "how": "imported from a .rnworld file", "name": str(w.get("name") or "")[:80], "tag": str(w.get("user_tag") or w.get("tag") or "")[:8],
+               "notes": str(w.get("notes") or "")[:300]}
+        if w.get("game_build"):
+            rec["game_version"] = str(w["game_build"])[:40]
+        if isinstance(w.get("seconds"), (int, float)):
+            rec["seconds"] = w["seconds"]
+        if isinstance(w.get("record"), dict):
+            rec["summary"] = w["record"]
+        self.records.put(wc, rec)
+        gamelog.log(self.app.game.id, f"Random New World: imported the map file {label or src.name} ({wc[:20]}…, {specs['preset']}, seed {specs['seed']})")
+        return {"code": wc, "preset": specs["preset"], "seed": str(specs["seed"]), "file": label or src.name}
+
+    def import_any(self, path):
+        """What the user typed or chose in the import box: a .rnworld file, a folder holding .rnworld files, or a map folder
+        (or a folder of map folders). -> {"worlds": [...]} done at once, or {"job": ...} for a copy that runs in the background."""
+        p = str(path or "").strip().strip('"')
+        if not p or any(ord(c) < 32 for c in p):
+            raise ValueError("Give a map file (.rnworld) or the folder of a map (the one named like rnw_exp_world_...).")
+        src = Path(p)
+        if src.suffix.lower() == RNWORLD_EXT:
+            return {"worlds": [self.import_rnworld(src)]}
+        try:
+            if src.is_dir() and not src.is_symlink() and not read_world_folder(src):
+                kids = sorted(src.iterdir())
+                files = [f for f in kids if f.suffix.lower() == RNWORLD_EXT and f.is_file() and not f.is_symlink()]
+                if files and not any(d.is_dir() and not d.is_symlink() and read_world_folder(d) for d in kids):
+                    return {"worlds": [self.import_rnworld(f) for f in files[:200]]}
+        except OSError:
+            pass   # import_folder says what is wrong with the folder
+        return {"job": self.import_folder(p)}
 
     def import_folder(self, path):
         """Copy world mod folder(s) into the mod folder. `path` is one world (rnw_exp_world_...) or a folder holding several.

@@ -48,6 +48,24 @@ def make_code(preset=1, seed=42, ver=(1, 1, 0), changes=None, fmt=2):
 CODE = make_code(1, 42, changes={"new_world.land_permille": 350, "natives.state_locations": 7, "rolls.peoples": 2})
 
 
+def make_rnworld(path, code=None, **over):
+    """A .rnworld file like the one Random New World exports for one map: a zip with rnworld.json, world.json, atlas.json, a picture."""
+    import hashlib
+    import zipfile
+    world = {"code": code or CODE, "created": 1793819884, "game_build": "26377361", "generator": "1.1.0", "id": "nfnoplzpxt", "name": "My island", "notes": "n",
+             "preset": "continents", "seed": 42, "seconds": 218.1, "user_tag": "ISL", "schema": 1, "record": {"settings": {"new_world": {"land_permille": 350}}}}
+    world.update(over.pop("world", {}))
+    body = json.dumps(world).encode()
+    head = {"format": 1, "kind": "world", "exported_by": "1.1.0", "files": {"world.json": hashlib.sha256(body).hexdigest()}}
+    head.update(over.pop("head", {}))
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("rnworld.json", json.dumps(head))
+        z.writestr("world.json", over.pop("body", body))
+        z.writestr("atlas.json", "{}")
+        z.writestr("atlas_labels.png", b"\x89PNG")
+    return Path(path)
+
+
 class Codes(unittest.TestCase):
     def test_decodes_preset_seed_generator_and_changes(self):
         d = rnw.decode_code(CODE)
@@ -183,6 +201,51 @@ class Reading(unittest.TestCase):
 
 
 @unittest.skipIf(os.name == "nt", "uses a POSIX shell to hold the output pipe open")
+class Rnworld(unittest.TestCase):
+    """The .rnworld file: what Random New World exports for one map."""
+    def setUp(self):
+        import tempfile
+        self.td = tempfile.TemporaryDirectory()
+        self.addCleanup(self.td.cleanup)
+        self.f = Path(self.td.name) / "world.rnworld"
+
+    def test_reads_the_world_record(self):
+        w = rnw.read_rnworld(make_rnworld(self.f))
+        self.assertEqual((w["code"], w["name"], w["user_tag"]), (CODE, "My island", "ISL"))
+
+    def test_a_real_world_code_from_the_generator_decodes_to_what_its_own_record_says(self):
+        # taken from a file exported by Random New World 1.1.0: the code and the record in the same file must agree
+        code = "RNW1-082FS-VXRMG-SRB1P-2040G-00870-2Z042-1M1Z8-0Y448-1R8GJ-4XR0C-DA01J-HJAC0"
+        d = rnw.decode_code(code)
+        self.assertEqual((d["preset"], d["seed"], d["generator"]), ("small_continents", 18225989232370222786, "1.1.0"))
+        self.assertEqual(d["changes"]["new_world"], {"land_permille": 318, "location_px": 52, "precious_permille": 2000})
+        self.assertEqual(d["changes"]["natives"], {"population_permille": 1800, "hearths_per_10k": 9, "state_share_permille": 440, "empire_permille": 800})
+
+    def test_damaged_odd_and_wrong_files_are_refused_with_a_reason(self):
+        import zipfile
+        cases = {
+            "not a zip": lambda: self.f.write_bytes(b"hello"),
+            "wrong kind": lambda: make_rnworld(self.f, head={"kind": "library"}),
+            "newer format": lambda: make_rnworld(self.f, head={"format": 2}),
+            "checksum": lambda: make_rnworld(self.f, head={"files": {"world.json": "0" * 64}}),
+            "no code": lambda: make_rnworld(self.f, world={"code": ""}),
+            "bad json": lambda: make_rnworld(self.f, body=b"{nope", head={"files": {}}),
+        }
+        for name, build in cases.items():
+            build()
+            with self.assertRaises(ValueError, msg=name):
+                rnw.read_rnworld(self.f)
+        with zipfile.ZipFile(self.f, "w") as z:   # a zip without the two description files
+            z.writestr("x.txt", "x")
+        with self.assertRaises(ValueError):
+            rnw.read_rnworld(self.f)
+
+    def test_a_huge_description_is_not_opened(self):
+        make_rnworld(self.f, body=b" " * (rnw.RNWORLD_LIMITS["world.json"] + 10), head={"files": {}})
+        with self.assertRaises(ValueError):
+            rnw.read_rnworld(self.f)
+
+
 class Pick(unittest.TestCase):
     """The system's folder window (pickfolder.py), with a fake program instead of a window."""
 
@@ -205,6 +268,23 @@ class Pick(unittest.TestCase):
             self.assertEqual(res, {"path": d, "cancelled": False, "error": ""})
             self.assertEqual(seen["env"]["RMM_PICK_START"], d)       # the title and start folder travel in the environment,
             self.assertNotIn(d, " ".join(seen["argv"]))             # never inside the script text
+
+    def test_windows_gets_the_explorer_style_window_with_the_old_one_only_as_a_fallback(self):
+        import base64
+        from types import SimpleNamespace
+        from modmanager import pickfolder
+        seen = {}
+
+        def fake(argv, **kw):
+            seen["argv"] = argv
+            return SimpleNamespace(stdout="", returncode=0)
+        with mock.patch.object(pickfolder, "_powershell", return_value="powershell.exe"):
+            pickfolder.pick_folder("Choose", "", runner=fake)
+        self.assertIn("-EncodedCommand", seen["argv"])
+        script = base64.b64decode(seen["argv"][seen["argv"].index("-EncodedCommand") + 1]).decode("utf-16-le")
+        self.assertIn("IRmmFileDialog", pickfolder.CSHARP)
+        self.assertIn("0x20", pickfolder.CSHARP)                                  # FOS_PICKFOLDERS: Explorer's window in "choose a folder" mode
+        self.assertLess(script.index("RmmFolder]::Pick"), script.index("FolderBrowserDialog"))   # the old tree window comes second
 
     def test_cancel_and_a_missing_window_are_told_apart(self):
         self.assertTrue(self.run_with("")[0]["cancelled"])           # Cancel: nothing printed, exit 0
@@ -367,6 +447,37 @@ class Route(GameCase):
         w = self.req("GET", "/api/rnw/files")[1]["worlds"][0]
         self.assertEqual((w["code"], w["installed"], w["place"]), (CODE, False, "code_only"))
         self.assertEqual(self.post("/api/rnw/import", {"code": "RNW1-nonsense"})[0], 400)
+
+    def test_importing_a_rnworld_file_remembers_the_map_with_its_settings(self):
+        f = make_rnworld(self.r / "island.rnworld")
+        st, res, _ = self.post("/api/rnw/import", {"path": f'"{f}"'})
+        self.assertEqual((st, res["worlds"][0]["preset"], res["worlds"][0]["seed"]), (200, "continents", "42"), res)
+        w = self.req("GET", "/api/rnw/files")[1]["worlds"][0]
+        self.assertEqual((w["name"], w["tag"], w["code"], w["installed"], w["game_build"]), ("My island", "ISL", CODE, False, "26377361"))
+        self.assertTrue(any("land_permille" in str(d) for d in w["details"]))          # the generator's own record is shown
+        self.assertEqual(self.post("/api/rnw/import", {"path": str(self.r / "nope.rnworld")})[0], 400)
+
+    def test_a_folder_of_rnworld_files_and_a_dropped_file(self):
+        folder = self.r / "exports"
+        folder.mkdir()
+        make_rnworld(folder / "a.rnworld")
+        make_rnworld(folder / "b.rnworld", code=make_code(2, 7))
+        st, res, _ = self.post("/api/rnw/import", {"path": str(folder)})
+        self.assertEqual((st, len(res["worlds"])), (200, 2), res)
+        self.assertEqual(len(self.req("GET", "/api/rnw/files")[1]["worlds"]), 2)
+        # dropped on the window: the page posts the file to the install route, which hands it to Random New World, not to the mod installer
+        raw = (self.r / "drop.rnworld")
+        make_rnworld(raw, code=make_code(3, 9))
+        st, res, _ = self.req("POST", "/api/install", raw=raw.read_bytes(), headers={"X-Filename": "drop.rnworld"})
+        self.assertEqual((st, res.get("rnworld")), (200, True), res)
+        self.assertEqual(len(self.req("GET", "/api/rnw/files")[1]["worlds"]), 3)
+
+    def test_the_file_window_asks_for_a_file(self):
+        seen = {}
+        self.mgr.picker = lambda title, start, **kw: seen.update(title=title, kw=kw) or {"path": "x", "cancelled": False, "error": ""}
+        self.post("/api/rnw/pick", {"what": "file"})
+        self.assertEqual(seen["kw"], {"kind": "file"})
+        self.assertIn(".rnworld", seen["title"])
 
     def test_other_games_have_no_such_page(self):
         for method, path in (("GET", "/api/rnw/list"), ("POST", "/api/rnw/open")):

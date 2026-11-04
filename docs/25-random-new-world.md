@@ -23,7 +23,7 @@ window program. The manager:
   and/or a program named like `Random New World*.exe` / `RandomNewWorld*.exe` / `rnw*.exe` (uninstallers and crash handlers
   skipped). The answer is a report the page writes into its "What I'm doing" box: what was looked at, whether `rnw.cmd` and the
   window program were found, and whether maps can be made from there. A folder that holds the generator is remembered (setting
-  `rnw_dir`); an empty answer forgets it. **Browse…** (`POST rnw/pick {what: generator|map, start?}` -> `{path, cancelled, error}`) opens the system's folder window through `modmanager/pickfolder.py` (PowerShell `FolderBrowserDialog` on Windows, tkinter elsewhere; the title and start folder are passed in environment variables, never in the script text); choosing the generator's folder runs the check at once, choosing a map folder only fills the box. On the Make screen the folder box and **Browse…** are always on screen, also when a folder is remembered. A folder that fails the check does not make the app forget the one that works. The Steam Workshop folder is only *suggested* (`hint`), never used on its own.
+  `rnw_dir`); an empty answer forgets it. **Browse…** (`POST rnw/pick {what: generator|map, start?}` -> `{path, cancelled, error}`) opens the system's folder window through `modmanager/pickfolder.py` (on Windows PowerShell opens Explorer's own folder window, `IFileOpenDialog` with `FOS_PICKFOLDERS`, built with a small C# `Add-Type`, and falls back to the old `FolderBrowserDialog` only if that fails; for files `OpenFileDialog`; tkinter elsewhere; the title and start folder are passed in environment variables, never in the script text); choosing the generator's folder runs the check at once, choosing a map folder only fills the box. On the Make screen the folder box and **Browse…** are always on screen, also when a folder is remembered. A folder that fails the check does not make the app forget the one that works. The Steam Workshop folder is only *suggested* (`hint`), never used on its own.
 - **runs commands** from an argument list, never a shell string. Because a `.cmd` file runs through `cmd.exe`, every word is
   checked first: values are letters, digits and `. _ : -` only; options are `--lowercase-words`; the only path passed
   (`--game-dir`) must not contain `% ^ & | < > " !` or control characters (otherwise it is left out and RNW finds the game itself).
@@ -85,6 +85,17 @@ there; checks free disk space) or with `{code}` remembers a world code in `rnw-w
 own list (`rnw/list`) is only asked for when the user presses the button for it. **Found on a real PC:** the Workshop copy has
 `Random New World Generator.exe` and no `rnw.cmd`; on Windows commands therefore need `rnw.cmd` (the window program is never
 given `--cli`).
+
+## The .rnworld map file (1.1.3)
+Seen on a real PC: Random New World exports one map as `name.rnworld`, a **zip** holding `rnworld.json` (`kind: "world"`, `format: 1`,
+`exported_by`, a SHA-256 of each file), `world.json` (the library record: `code`, `preset`, `seed` as a number, `generator`, `game_build`,
+`created`, `seconds`, `name`, `notes`, `user_tag`, `id`, `mod_folder`, and `record` = the resolved settings, `algorithm`, the game
+fingerprint), `atlas.json` (the map's country and province data for a preview, about 1 MB) and `atlas_labels.png`. It is the recipe and a
+preview, not the 1.2 GB mod. `rnw.read_rnworld` reads only `rnworld.json` and `world.json` (64 KB and 2 MB limits, never extracted), checks
+`kind`, `format` and the checksum of `world.json`; `Manager.import_rnworld` stores the map in `rnw-worlds.json` as state `imported` (name, tag,
+notes, game build, time taken, the record as `summary`). `POST rnw/import {path}` takes a `.rnworld` file, a folder of them, or a map folder;
+the window accepts a dropped file (the install route hands `.rnworld` to this, EU5 only). The code in the example file decodes (test) to
+the preset, seed and every changed setting that its own record lists: the decoder matches the real program.
 
 ## Reading the log (1.1.1)
 The app log (Tools > Open log folder) gets four `Random New World ...` lines whenever the tab is opened and something changed.

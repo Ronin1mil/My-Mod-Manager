@@ -15,6 +15,8 @@ const root = fs.mkdtempSync(path.join(os.tmpdir(), 'modmanager-rnw-'));
 const write = (p, t) => { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, t); };
 const code = execFileSync('python3', ['-c', 'from tests.test_rnw import CODE; print(CODE)'], { encoding: 'utf8' }).trim();
 const stub = path.resolve('tests/rnwstub.py');
+const rnworld = path.join(root, 'island.rnworld');   // a map file like the one Random New World exports
+execFileSync('python3', ['-c', 'import sys; from tests.test_rnw import make_rnworld, make_code; make_rnworld(sys.argv[1], code=make_code(5, 11))', rnworld]);
 
 const game = path.join(root, 'game'), user = path.join(root, 'user'), ws = path.join(root, 'ws');
 write(path.join(game, 'game/in_game/x.txt'), 'x');
@@ -92,6 +94,12 @@ try {
   await page.fill('[data-rnwf=code]', code);
   await page.click('[data-rnw=importcode]');
   await page.waitForFunction(() => /Remembered the code/.test(document.querySelector('.rnw-log').textContent));
+  // a .rnworld file: remembered at once with its name, tag and settings; nothing is copied or built
+  await page.fill('[data-rnwf=path]', rnworld);
+  await page.click('[data-rnw=importdir]');
+  await page.waitForFunction(() => /Your maps \(3\)/.test(document.querySelector('.rnw').textContent));
+  assert.match(await page.textContent('.rnw-log'), /Remembered island\.rnworld/);
+  assert.match(await page.textContent('.rnw'), /My island/);
 
   // 4. back to the menu, then Make a new map: the app does not search, it asks for the folder and reports what it finds there
   await page.click('[data-rnw=menu]');
@@ -120,7 +128,7 @@ try {
   await page.selectOption('[data-rnwf=preset]', 'small_continents');
   await page.fill('[data-rnwf=seed]', '42');
   await page.click('[data-rnw=new]');
-  await page.waitForFunction(() => /Your maps \(3\)/.test(document.querySelector('.rnw').textContent), null, { timeout: 30000 });
+  await page.waitForFunction(() => /Your maps \(4\)/.test(document.querySelector('.rnw').textContent), null, { timeout: 30000 });
   assert.match(await page.textContent('#rnwjob'), /done/);
   assert.equal(fs.existsSync(path.join(user, 'mod/rnw_exp_world_abcde23456')), true);
   const made = JSON.parse(fs.readFileSync(path.join(root, 'cfg/eu5/rnw-worlds.json'), 'utf8')).worlds[code];
@@ -140,7 +148,7 @@ try {
 
   // remove it again
   await page.locator('[data-rnw=remove][data-id=abcde23456]').click();
-  await page.waitForFunction(() => /Your maps \(2\)/.test(document.querySelector('.rnw').textContent), null, { timeout: 15000 });
+  await page.waitForFunction(() => /Your maps \(3\)/.test(document.querySelector('.rnw').textContent), null, { timeout: 15000 });
   assert.equal(fs.existsSync(path.join(user, 'mod/rnw_exp_world_abcde23456')), false);
   assert.deepEqual(errors, []);
   console.log('rnw ok');

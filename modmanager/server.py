@@ -1598,7 +1598,7 @@ def make_handler(hub):
             if act == "open":
                 return m.open_generator()
             if act == "pick":   # the system's folder window; waits for the user
-                what = "generator" if b.get("what") == "generator" else "map"
+                what = b.get("what") if b.get("what") in ("generator", "file") else "map"
                 return m.pick_folder(what, str(b.get("start") or ""))
             if act == "folder":
                 return m.check_folder(b.get("path"))
@@ -1611,7 +1611,7 @@ def make_handler(hub):
             if act == "import":
                 if b.get("code"):
                     return m.import_code(b.get("code"))
-                return {"job": m.import_folder(b.get("path"))}
+                return m.import_any(b.get("path"))
             if act == "cancel":
                 return {"job": m.cancel()}
             if act == "use":
@@ -1621,6 +1621,8 @@ def make_handler(hub):
         def _install(self, app):
             n = self._length(MAX_UPLOAD)
             name = os.path.basename(self.headers.get("X-Filename", "mod.zip"))
+            if name.lower().endswith(rnw.RNWORLD_EXT) and n > 64 * 1024 * 1024:
+                raise ValueError("That file is much larger than a Random New World map file.")
             stage = app.cfg / "staging"
             stage.mkdir(parents=True, exist_ok=True)
             fd, tmp = tempfile.mkstemp(dir=stage, suffix=".upload")
@@ -1634,6 +1636,10 @@ def make_handler(hub):
                         f.write(chunk)
                         left -= len(chunk)
                 with hub.lock:
+                    if name.lower().endswith(rnw.RNWORLD_EXT):   # a dropped map file is not a mod: it goes to Random New World
+                        if app.game.id != "eu5":
+                            raise ValueError("Random New World map files are for Europa Universalis V. Switch to that game first.")
+                        return {"worlds": [app.rnw_manager().import_rnworld(tmp, name)], "rnworld": True}
                     return app.install_zip(tmp, name)
             finally:
                 os.unlink(tmp)
