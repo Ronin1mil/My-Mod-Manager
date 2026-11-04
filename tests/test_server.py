@@ -351,14 +351,14 @@ def fake_both(release_tag="v0.9.1", build="def5678", counter=None):
         if url.endswith("/releases/tags/test-build"):
             if counter is not None:
                 counter.append(url)
-            return 200, {"body": f"Test build.\n\nbuild: {build}\n", "published_at": "2026-10-30T01:00:00Z", "prerelease": True,
+            return 200, {"body": f"Nightly build.\n\nbuild: {build}\n", "published_at": "2026-10-30T01:00:00Z", "prerelease": True,
                          "assets": [{"id": 1, "name": "Mod-Manager-python.pyzw", "size": 3, "browser_download_url": base + "download/test-build/Mod-Manager-python.pyzw"}]}
         return rel(url)
     return fetch
 
 
 class Updates(Base):
-    def test_a_test_build_is_offered_newer_test_builds_before_any_release(self):
+    def test_a_nightly_build_is_offered_newer_nightly_builds_when_no_newer_release_exists(self):
         from unittest import mock
         from modmanager import __version__
         self.hub.update_fetch = fake_both(release_tag="v" + __version__)   # the release of its own version is out
@@ -368,6 +368,14 @@ class Updates(Base):
         with mock.patch("modmanager.server.BUILD", "def5678"):   # on the newest build: nothing to offer, not the release either
             r = self.hub.check_update(True)
         self.assertEqual((r["status"], r["update_available"]), ("current", False))
+
+    def test_a_nightly_build_is_offered_a_newer_official_release_as_a_version(self):
+        from unittest import mock
+        self.hub.update_fetch = fake_both(release_tag="v9.0.0", build="def5678")   # a newer nightly build exists too
+        with mock.patch("modmanager.server.BUILD", "abc1234"):
+            r = self.hub.check_update(True)
+        self.assertEqual((r["latest"], r.get("build"), r["update_available"]), ("9.0.0", None, True))
+        self.assertNotIn("nightly", (r["message"] or "").lower())
 
     def test_a_normal_copy_only_follows_releases(self):
         from unittest import mock

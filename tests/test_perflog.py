@@ -51,7 +51,7 @@ class Log(unittest.TestCase):
         perflog.log("> stuck")
         self.assertNotIn("< stuck", self.text())
 
-    def test_off_by_default_in_a_release_and_on_for_test_builds(self):
+    def test_off_by_default_in_a_release_and_on_for_nightly_builds(self):
         with mock.patch.dict(os.environ, {"MODMANAGER_ACTIVITY_LOG": ""}):
             with mock.patch.object(perflog, "BUILD", ""):
                 self.assertFalse(perflog.enabled())

@@ -5,7 +5,7 @@ RoninModManager-activity.log (next to the error log; ~2 MB, one rotated copy). O
 write a `>` line when they start and a `<` line with their duration when they end, so a hang shows as a `>` with no
 matching `<`.
 
-On for test builds (nightly) and whenever MODMANAGER_ACTIVITY_LOG=1; off in releases (MODMANAGER_ACTIVITY_LOG=0 forces
+On for nightly builds and whenever MODMANAGER_ACTIVITY_LOG=1; off in releases (MODMANAGER_ACTIVITY_LOG=0 forces
 it off). Never raises and never records mod contents: only operation names, counts and timings.
 """
 import os

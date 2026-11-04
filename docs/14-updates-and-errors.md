@@ -1,7 +1,7 @@
 # Self-update and the error log
 
 ## Self-update (downloaded app only)
-- **Releases carry only the Python edition**, `Mod-Manager-python.pyzw`. **Tools > Check for updates** (or the banner, or Settings) then **Update now** replaces that file (same checksum rules as below) and restarts it; it is the only update path most users see. The rest of this section describes the exe, which test builds still carry.
+- **Releases carry only the Python edition**, `Mod-Manager-python.pyzw`. **Tools > Check for updates** (or the banner, or Settings) then **Update now** replaces that file (same checksum rules as below) and restarts it; it is the only update path most users see. The rest of this section describes the exe, which nightly builds still carry.
 - Built by CI (`build` job): currently Windows only: `Mod-Manager-windows.exe` and the installer. The `Mod-Manager-macos` / `Mod-Manager-linux` builds are saved for later (the updater still knows those names). Pushing a tag `vX.Y.Z` (must equal `modmanager.__version__`) publishes them with `SHA256SUMS.txt`.
 - Windows also gets `Mod-Manager-Setup.exe` (Inno Setup, `installer/ModManager.iss`): per-user install to `%LOCALAPPDATA%\\Programs\\Mod Manager`, Start-menu entry, optional desktop shortcut, uninstaller. Per-user so the in-app update can replace the program without administrator rights. CI installs it silently, starts the installed app and uninstalls it. Not code-signed.
 - **Update now** (banner, only when `can_self_update` is true, i.e. running the packaged app):
@@ -15,7 +15,7 @@
 - Status: the update logic is unit-tested (checksum mismatch, missing hash, redirects, swap/rollback, restart call) and the Linux build was started and served the page in testing. A full download-and-replace against a real published release has to be done once a second release exists.
 
 ## Logs
-Three files in `Documents\Ronin Mod Manager\`: `RoninModManager-errors.log` (below), `RoninModManager-<game>.log` (what the app did with that game: see docs/21) and, in test builds, `RoninModManager-activity.log` (docs/19).
+Three files in `Documents\Ronin Mod Manager\`: `RoninModManager-errors.log` (below), `RoninModManager-<game>.log` (what the app did with that game: see docs/21) and, in nightly builds, `RoninModManager-activity.log` (docs/19).
 
 ## Error log
 - File: `RoninModManager-errors.log` in the folder `Ronin Mod Manager` inside the real Documents folder (older versions wrote it straight into Documents; the file is moved into the folder on first write; the same error repeated within 30 s is written once) (Windows: asked from the shell, so OneDrive-redirected Documents works; else `~/Documents`; else home). Override with `MODMANAGER_LOG_DIR`. ~1 MB cap, one rotated copy `.log.1`.

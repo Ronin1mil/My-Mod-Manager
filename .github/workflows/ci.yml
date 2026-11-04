@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, nightly]  # `nightly` is the branch the test builds are made from
+    branches: [main, nightly]  # `nightly` is the branch the nightly builds are made from
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
@@ -96,7 +96,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Stamp test builds (only the nightly branch gets a build id; releases from main have none)
+      - name: Stamp nightly builds (only the nightly branch gets a build id; releases from main have none)
         shell: bash
         run: |
           if [ "$GITHUB_REF" = "refs/heads/$NIGHTLY_BRANCH" ]; then printf 'BUILD = "%s"\n' "${GITHUB_SHA::7}" > modmanager/_build.py; cat modmanager/_build.py; fi
@@ -145,7 +145,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.8"   # the oldest version the app supports: if it starts here it starts on newer ones
-      - name: Stamp test builds
+      - name: Stamp nightly builds
         shell: bash
         run: |
           if [ "$GITHUB_REF" = "refs/heads/$NIGHTLY_BRANCH" ]; then printf 'BUILD = "%s"\n' "${GITHUB_SHA::7}" > modmanager/_build.py; cat modmanager/_build.py; fi
@@ -225,13 +225,13 @@ jobs:
           V="v$(python3 -c 'import modmanager; print(modmanager.__version__)')"
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then test "$V" = "$GITHUB_REF_NAME"; fi
           echo "TAG=$V" >> "$GITHUB_ENV"
-      - name: Was this exact commit tried as a test build first?
+      - name: Was this exact commit tried as a nightly build first?
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           built=$(gh release view test-build --repo "$GITHUB_REPOSITORY" --json body --jq .body 2>/dev/null | sed -n 's/^build: *//p' | head -1 || true)
-          if [ "$built" = "${GITHUB_SHA::7}" ]; then echo "The nightly test build was made from this same commit ($built)."
-          else echo "::warning::This release is commit ${GITHUB_SHA::7}, but the last test build was ${built:-missing}. Releases should contain what was tested."; fi
+          if [ "$built" = "${GITHUB_SHA::7}" ]; then echo "The nightly build was made from this same commit ($built)."
+          else echo "::warning::This release is commit ${GITHUB_SHA::7}, but the last nightly build was ${built:-missing}. Releases should contain what was tested."; fi
       - name: Release notes come from CHANGELOG.md (the job fails if this version has none)
         run: |
           .github/scripts/release-notes.sh "${TAG#v}" > notes.md
@@ -253,7 +253,7 @@ jobs:
         run: gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TAG - $(cat title.txt)" --notes-file notes.md
 
   nightly:
-    name: Publish the test build (nightly prerelease)
+    name: Publish the nightly build (nightly prerelease)
     if: github.event_name == 'push' && github.ref == 'refs/heads/nightly'
     needs: [unit, e2e, build, installer, pyz]
     runs-on: ubuntu-24.04
@@ -274,9 +274,9 @@ jobs:
         run: |
           SHORT="${GITHUB_SHA::7}"
           VER=$(python -c "import re;print(re.search(r'__version__\s*=\s*\"([^\"]+)\"',open('modmanager/__init__.py').read()).group(1))")
-          printf 'Test build of the branch being worked on. It may contain bugs; install it from Settings -> App & updates -> Test builds.\n\nbuild: %s\nversion: %s\n\nLatest change: %s\n' "$SHORT" "$VER" "$(git log -1 --format=%s)" > notes.md
+          printf 'Nightly build of the branch being worked on. It may contain bugs; install it from Settings -> App & updates -> Nightly builds.\n\nbuild: %s\nversion: %s\n\nLatest change: %s\n' "$SHORT" "$VER" "$(git log -1 --format=%s)" > notes.md
           gh release delete test-build --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || true
-          gh release create test-build dist/* --repo "$GITHUB_REPOSITORY" --prerelease --target "$GITHUB_SHA" --title "Test build $SHORT" --notes-file notes.md
+          gh release create test-build dist/* --repo "$GITHUB_REPOSITORY" --prerelease --target "$GITHUB_SHA" --title "Nightly build $SHORT" --notes-file notes.md
 
   refresh_notes:
     name: Refresh release notes (manual run with "refresh_notes")

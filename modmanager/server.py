@@ -1128,7 +1128,7 @@ class Hub:
                 return self._update_cache[1]
         with perflog.timed("check GitHub for a new version"):
             res = update.check_for_update(update.stable_current(), self.update_fetch)
-            if BUILD:   # a test build follows the test builds: they carry the newest features, so they come before any release
+            if BUILD and res["status"] != "update":   # a nightly build follows the nightly builds, unless an official release with a higher version number exists: that is always offered, as "Version X"
                 nightly = update.check_nightly(BUILD, self.update_fetch)
                 if nightly["status"] in ("update", "current"):
                     res = nightly
@@ -1783,7 +1783,7 @@ def serve(port=8765, open_browser=True, overrides=None, initial_game=None, windo
     otherwise it opens in the default browser and runs until Ctrl+C. The slow work (see boot) is done before the page opens."""
     import webbrowser
     from . import window as windowmod
-    perflog.log(f"=== {APP_NAME} {__version__}{' test build ' + BUILD if BUILD else ''} starting (pid {os.getpid()}, "
+    perflog.log(f"=== {APP_NAME} {__version__}{' nightly build ' + BUILD if BUILD else ''} starting (pid {os.getpid()}, "
                 f"{'packaged' if selfupdate.frozen() else 'python edition' if selfupdate.pyz_path() else 'from source'}, port {port})")
     hub = Hub(overrides=overrides)
     hub.check_on_launch()  # no-op unless the user enabled "check for updates on launch"

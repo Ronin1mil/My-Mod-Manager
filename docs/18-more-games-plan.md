@@ -7,7 +7,7 @@ Not built as built-in games yet. Stellaris and Imperator: Rome exist only as unc
 2. In the app: **Add a game (beta)** with the template, then **Settings -> Game -> Check this game**. It says what was found and what was looked for. Correct the field it points at until every check passes.
 3. Press Play on a small playset, then send or read `RoninModManager-<game id>.log`: it holds the game's files before and after, and again 15 and 90 seconds later. If the game rewrites its own file, that is where it shows (this is how EU5's real format was found).
 4. Move what you learned into `modmanager/games.py` as a built-in `Game` with `verified=False`, pin it in `tests/test_games.py`, add fake-install tests (copy the Bannerlord or EU5 ones), a section in `docs/02-game-notes.md`, and a CHANGELOG entry.
-5. Run `python -m unittest discover -s tests -t .`, push to `nightly`, and use the test build. Only after a confirmed Play does the game become `verified=True`.
+5. Run `python -m unittest discover -s tests -t .`, push to `nightly`, and use the nightly build. Only after a confirmed Play does the game become `verified=True`.
 
 ## Order of work
 1. **Stellaris** and **Imperator: Rome** (Paradox engine, small changes)

@@ -1,17 +1,17 @@
-# Developer notes: where the data is (test builds)
+# Developer notes: where the data is (nightly builds)
 
-For whoever is testing a nightly / test build. Not for end users. Everything below is on the Windows PC running the app; `%USERPROFILE%\Documents` may be redirected (OneDrive), so open it from File Explorer's "Documents" rather than typing the path.
+For whoever is testing a nightly / nightly build. Not for end users. Everything below is on the Windows PC running the app; `%USERPROFILE%\Documents` may be redirected (OneDrive), so open it from File Explorer's "Documents" rather than typing the path.
 
 ## Send these when something goes wrong
 | What | Where | Why |
 |---|---|---|
 | Error log | `Documents\Ronin Mod Manager\RoninModManager-errors.log` | every crash, failed request and page error |
-| Activity log (test builds only) | `Documents\Ronin Mod Manager\RoninModManager-activity.log` (and `.log.1`, the older half) | timestamps and durations of every request, scan and update step; shows what was slow or stuck |
+| Activity log (nightly builds only) | `Documents\Ronin Mod Manager\RoninModManager-activity.log` (and `.log.1`, the older half) | timestamps and durations of every request, scan and update step; shows what was slow or stuck |
 | "Check this game" report | Settings -> Game -> Check now -> Copy report | what was found and what was looked for (install, folders, mods, launcher) |
 | Game log | `Documents\Ronin Mod Manager\RoninModManager-<game>.log` (one per game, e.g. `-eu5.log`) | what the app did with that game and what the game's files looked like after Play |
 | Version | bottom left of the window, e.g. `v0.9.12 · test 5097204` | which build produced the logs |
 
-The activity log is on automatically for test builds. For a normal release start the app with the environment variable `MODMANAGER_ACTIVITY_LOG=1`. Format: `date time.ms [thread] > label` when a step starts, `< label N ms` when it ends.
+The activity log is on automatically for nightly builds. For a normal release start the app with the environment variable `MODMANAGER_ACTIVITY_LOG=1`. Format: `date time.ms [thread] > label` when a step starts, `< label N ms` when it ends.
 
 ## The app's own data
 Folder: `%APPDATA%\Ronin Mod Manager\` (that is `C:\Users\<you>\AppData\Roaming\Ronin Mod Manager\`)
@@ -52,17 +52,17 @@ Local mods: `<Documents folder>\mod\<mod>\` with a `mod\<mod>.mod` stub (Paradox
 | Workshop mods | `<Steam library>\steamapps\workshop\content\<app id>\<workshop id>\` |
 | App ids | CK3 `1158310`, EU5 `3450310`, VIC3 `529340`, Bannerlord `261550` |
 
-## Test build download
-Release page of the rolling test build: https://github.com/Ronin1mil/My-Mod-Manager/releases/tag/test-build
+## Nightly build download
+Release page of the rolling nightly build: https://github.com/Ronin1mil/My-Mod-Manager/releases/tag/test-build
 
-Direct files (always the newest test build):
+Direct files (always the newest nightly build):
 - https://github.com/Ronin1mil/My-Mod-Manager/releases/download/test-build/Mod-Manager-python.pyzw (the one to use)
 - https://github.com/Ronin1mil/My-Mod-Manager/releases/download/test-build/Mod-Manager-windows.exe and `Mod-Manager-Setup.exe` (unsigned; Smart App Control may block them)
 
-Inside the app: Settings -> App & updates -> Test builds -> "Check for a test build".
+Inside the app: Settings -> App & updates -> Nightly builds -> "Check for a nightly build".
 
 ## Start-up pass
-Before the window opens, `serve()` runs `boot()` (server.py): for each game that was used (the last one, the one asked for with `--game`, and any with a folder in the app data folder) it reads the mod folders, loads `parse-cache.json.gz`, and works out the conflicts of every playset, printing each step to the terminal when there is one. The comparing runs in up to 6 worker processes (`modmanager/bootworker.py`: started as `python -I -c ...` with the package folder or the .pyzw on `sys.path`, a pickled job on stdin, the pickled answer on stdout, progress on stderr); they only read, and the app keeps their answers as if it had worked them out itself. `MODMANAGER_BOOT_PROCS=0` checks everything in the app's own process instead. `MODMANAGER_BOOT=0` skips it, `MODMANAGER_PREWARM=0` also stops the background work after it. The same lines go to the activity log (prefix `boot:`) on test builds.
+Before the window opens, `serve()` runs `boot()` (server.py): for each game that was used (the last one, the one asked for with `--game`, and any with a folder in the app data folder) it reads the mod folders, loads `parse-cache.json.gz`, and works out the conflicts of every playset, printing each step to the terminal when there is one. The comparing runs in up to 6 worker processes (`modmanager/bootworker.py`: started as `python -I -c ...` with the package folder or the .pyzw on `sys.path`, a pickled job on stdin, the pickled answer on stdout, progress on stderr); they only read, and the app keeps their answers as if it had worked them out itself. `MODMANAGER_BOOT_PROCS=0` checks everything in the app's own process instead. `MODMANAGER_BOOT=0` skips it, `MODMANAGER_PREWARM=0` also stops the background work after it. The same lines go to the activity log (prefix `boot:`) on nightly builds.
 
 `Documents\Ronin Mod Manager\RoninModManager-<game id>.log` (one per game, always on, ~1 MB, one `.1` copy): what the app found when the game opened, every Play (playset, mods in order, the game's files before/after writing, and again after 15 s and 90 s), failures. The Windows user name is replaced by `<user>`. `MODMANAGER_FOLLOW_UP=0` turns the 15/90 s look-again off (tests).
 

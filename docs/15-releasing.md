@@ -1,5 +1,7 @@
 # Releasing
 
+Naming: a release is **Version X.Y.Z**; the in-between versions are **nightly builds** named by their build id. Do not call anything a "test build" (docs/19). Release titles, notes and the changelog follow this.
+
 1. Bump `__version__` in `modmanager/__init__.py`.
 2. Add a section at the top of `CHANGELOG.md`: `## X.Y.Z - short title`, then **a short summary for people reading the Releases page**, then the details as bullets.
    - A feature release (X.Y.0): one to three sentences on what changed most.
@@ -9,7 +11,7 @@
 
 The release title and the notes shown on the Releases page are taken from that CHANGELOG section by `.github/scripts/release-notes.sh`. **The release job fails if the version has no section**, so a release cannot go out without notes.
 
-**Python edition.** Every release and test build also carries `Mod-Manager-python.pyzw` (built by the `pyz` job with `tools/build_pyz.py`, tested on Windows with Python 3.8). To publish a release with only that file (no exe, no installer, because Smart App Control blocks unsigned programs), tick **python_only** as well as **publish**. The updater of a Python edition copy looks for that file name; copies of the exe look for `Mod-Manager-windows.exe`, so a python-only release shows them the "no exe in this release" message with a link to the release page.
+**Python edition.** Every release and nightly build also carries `Mod-Manager-python.pyzw` (built by the `pyz` job with `tools/build_pyz.py`, tested on Windows with Python 3.8). To publish a release with only that file (no exe, no installer, because Smart App Control blocks unsigned programs), tick **python_only** as well as **publish**. The updater of a Python edition copy looks for that file name; copies of the exe look for `Mod-Manager-windows.exe`, so a python-only release shows them the "no exe in this release" message with a link to the release page.
 
 To fix wording of releases that already exist, edit `CHANGELOG.md`, push, and run the workflow with **refresh_notes** ticked: it rewrites the title and notes of every release that has a changelog section.
 

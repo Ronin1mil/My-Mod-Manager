@@ -13,7 +13,7 @@ Python standard library only (3.8+), no exe: it runs a small local server and sh
 
 Later versions: press **Tools ▾ > Check for updates** in the app. It downloads the new file, checks its SHA-256 against the release's `SHA256SUMS.txt`, replaces itself and restarts. Your playsets and settings are kept.
 
-There is no exe because Smart App Control blocks unsigned programs, so releases carry only this file. (Test builds still include an unsigned exe and installer for PCs that allow them.)
+There is no exe because Smart App Control blocks unsigned programs, so releases carry only this file. (Nightly builds still include an unsigned exe and installer for PCs that allow them.)
 
 **Start it from the desktop or from Steam.** The first start asks once whether to put a Ronin Mod Manager icon on the desktop. Settings → App & updates can also make it later, and has **Add to Steam** (Steam must be closed), which lists the app in your Steam library as a non-Steam game. Windows only.
 
@@ -47,7 +47,7 @@ Send the file, not a description. Everything is in `Documents\Ronin Mod Manager\
 |---|---|
 | `RoninModManager-<game>.log` (for example `-eu5.log`) | what the app did with that game: what it found, every Play (playset, mods in order, the game's files before and after, and again 15 and 90 seconds later) |
 | `RoninModManager-errors.log` | crashes, failed requests, page errors |
-| `RoninModManager-activity.log` | test builds only: timing of every step |
+| `RoninModManager-activity.log` | nightly builds only: timing of every step |
 
 Your Windows user name is replaced by `<user>` in these files. Settings → Problems shows the exact paths (that is the Settings section, not the *Warnings* tab). Settings → Game → **Check this game** reports what was found and what was looked for.
 
@@ -66,7 +66,7 @@ Your Windows user name is replaced by `<user>` in these files. Settings → Prob
 - **Desktop icon and Add to Steam** (Windows): start the app from the desktop or your Steam library.
 - **Saves per playset**: a playset made now gets its own save folder, so the game's save list shows only that playset's saves.
 - **Add your own game** (beta, Stellaris and Imperator: Rome templates included, unchecked): [docs/20](docs/20-v0.9-plan.md).
-- **Updates** from this repository's Releases, and an optional test channel ([docs/19](docs/19-test-builds-and-releases.md)). Checks are manual unless you turn on "check when the manager starts".
+- **Updates** from this repository's Releases, and an optional test channel ([docs/19](docs/19-nightly-builds-and-releases.md)). Checks are manual unless you turn on "check when the manager starts".
 
 ## What differs per game
 | | Crusader Kings III | Europa Universalis V | Victoria 3 | Bannerlord |
@@ -112,7 +112,7 @@ node tests/e2e/ui.mjs                               # browser end-to-end (one sc
 GAME=ck3 node tests/e2e/ui.mjs                      # the same flow on CK3
 python tools/build_pyz.py dist/Mod-Manager-python.pyzw
 ```
-Branches: work happens on `nightly`; every push builds the test build. `main` is releases only ([docs/15-releasing.md](docs/15-releasing.md), [docs/19-test-builds-and-releases.md](docs/19-test-builds-and-releases.md)). Add a game: [docs/03-architecture.md](docs/03-architecture.md).
+Branches: work happens on `nightly`; every push builds the nightly build. `main` is releases only ([docs/15-releasing.md](docs/15-releasing.md), [docs/19-nightly-builds-and-releases.md](docs/19-nightly-builds-and-releases.md)). Add a game: [docs/03-architecture.md](docs/03-architecture.md).
 
 ## Sources and credits
 Where facts in this project come from. Nothing here is copied code; the open-source projects were read to learn file layouts.
@@ -163,7 +163,7 @@ This project was written with the help of an AI coding assistant (see the note a
 | [docs/16-launcher-import.md](docs/16-launcher-import.md) | Importing the launcher's playsets |
 | [docs/17-bannerlord.md](docs/17-bannerlord.md) | Bannerlord: modules, order, launching |
 | [docs/18-more-games-plan.md](docs/18-more-games-plan.md) | Plan for Stellaris, Imperator, Civ VI, Cities: Skylines |
-| [docs/19-test-builds-and-releases.md](docs/19-test-builds-and-releases.md) | Test builds (nightly) and releases |
+| [docs/19-nightly-builds-and-releases.md](docs/19-nightly-builds-and-releases.md) | Nightly builds and releases |
 | [docs/20-v0.9-plan.md](docs/20-v0.9-plan.md) | Adding your own games (beta), what was left out |
 | [docs/21-dev-data-locations.md](docs/21-dev-data-locations.md) | Where every file and log is (for testers) |
 | [docs/22-checked-on-a-real-pc.md](docs/22-checked-on-a-real-pc.md) | What a real PC showed, and the fixes |

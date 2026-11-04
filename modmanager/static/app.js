@@ -502,7 +502,7 @@ document.addEventListener('click', guard(async e => {
 // Replace this app with the newest release (downloaded app only), then reload once the new copy answers.
 async function selfUpdate(say, ask = true, channel = 'stable') {
   say = say || toast;
-  if (ask && !confirm(channel === 'nightly' ? 'Install the newest TEST build and restart Ronin Mod Manager? It may contain bugs. Your playsets and settings are kept.' : 'Download the newest version and restart Ronin Mod Manager? Your playsets and settings are kept.')) return;
+  if (ask && !confirm(channel === 'nightly' ? 'Install the newest NIGHTLY build and restart Ronin Mod Manager? It may contain bugs. Your playsets and settings are kept.' : 'Download the newest version and restart Ronin Mod Manager? Your playsets and settings are kept.')) return;
   let st = await app('self-update', {channel});
   for (let i = 0; i < 600 && ['working', 'restarting'].includes(st.status); i++) {
     say(st.message || 'Updating…');
@@ -533,8 +533,8 @@ function banner() {
   if (!u || !u.update_available || GI.settings.dismissed_update === u.latest) { b.hidden = true; b.innerHTML = ''; return; }
   const link = u.url.startsWith(REPO_LINK) ? u.url : REPO_LINK + 'releases';
   b.hidden = false;
-  b.innerHTML = `<span class="grow">${u.build ? `<b>Test build ${esc(u.build)} is available</b> <span class="mut">(you have ${GI.build ? 'test build ' + esc(GI.build) : esc(GI.version)})</span>`
-      : `<b>Version ${esc(u.latest)} is available</b> <span class="mut">(you have ${esc(GI.version)}${GI.build ? ', test build ' + esc(GI.build) : ''})</span>`}</span>
+  b.innerHTML = `<span class="grow">${u.build ? `<b>Nightly build ${esc(u.build)} is available</b> <span class="mut">(you have ${GI.build ? 'nightly build ' + esc(GI.build) : esc(GI.version)})</span>`
+      : `<b>Version ${esc(u.latest)} is available</b> <span class="mut">(you have ${esc(GI.version)}${GI.build ? ', nightly build ' + esc(GI.build) : ''})</span>`}</span>
     ${GI.can_self_update ? '<button class="sm pri" id="bn-now">Update now</button>' : ''}
     <a href="${esc(link)}" target="_blank" rel="noopener noreferrer">View release</a><button class="sm" id="bn-dismiss">Dismiss</button>`;
   if ($('bn-now')) $('bn-now').onclick = guard(() => selfUpdate(undefined, true, u.build ? 'nightly' : 'stable'));
@@ -555,7 +555,7 @@ async function openPaths(first) {
   const d = $('dlg'), st = GI.settings;
   d.className = 'wide';
   d.innerHTML = `<div class="st-head"><h2>${first ? 'Set up ' + esc(GNAME()) : 'Settings'}</h2>
-      <span class="mut">Ronin Mod Manager v${esc(GI.version)}${GI.build ? ' (test build ' + esc(GI.build) + ')' : ''}${S.game.verified ? '' : ' · launching is <b>not yet verified</b> on a real ' + esc(GNAME()) + ' install'}</span>
+      <span class="mut">Ronin Mod Manager v${esc(GI.version)}${GI.build ? ' (nightly build ' + esc(GI.build) + ')' : ''}${S.game.verified ? '' : ' · launching is <b>not yet verified</b> on a real ' + esc(GNAME()) + ' install'}</span>
     </div>
     <div class="st-body">
     <nav class="st-tabs" id="st-tabs"><button data-st="game" class="on"><i>🎮</i>Game</button><button data-st="store"><i>📁</i>Storage</button><button data-st="play"><i>▶</i>Playing</button><button data-st="ui"><i>🎨</i>UI</button><button data-st="dl"><i>⬇</i>Downloads</button><button data-st="app"><i>⟳</i>App &amp; updates</button></nav>
@@ -665,10 +665,10 @@ async function openPaths(first) {
         <label class="srow"><span class="rt"><b>Download missing logos</b><span class="hint">Fetches a missing game logo once from Steam's public art server, only when none is found on this PC</span></span><input type="checkbox" class="sw" id="s-logos" ${st.fetch_logos ? 'checked' : ''}></label>
       </div>
       <div class="card">
-        <h3>Test builds (nightly) <span class="b warn">experimental</span></h3>
-        <p class="desc">Builds made automatically from the version being worked on, before it becomes a release. They may contain bugs; your playsets and settings are kept. A release only contains what was tried here first. You have: <b>v${esc(GI.version)}${GI.build ? ' · test build ' + esc(GI.build) : ' (a normal release)'}</b>. ${GI.build ? 'A copy running a test build is offered newer test builds first, before any release. To go back to the newest release anyway, press "Go back to the release".' : ''}</p>
+        <h3>Nightly builds <span class="b warn">experimental</span></h3>
+        <p class="desc">Builds made automatically from the version being worked on, before it becomes a release. They may contain bugs; your playsets and settings are kept. A release only contains what was tried here first. You have: <b>v${esc(GI.version)}${GI.build ? ' · nightly build ' + esc(GI.build) : ' (a normal release)'}</b>. ${GI.build ? 'A copy running a nightly build is offered newer nightly builds first, before any release. To go back to the newest release anyway, press "Go back to the release".' : ''}</p>
         <p class="mut" id="nt-status"></p>
-        <div class="acts"><button id="nt-check">Check for a test build</button><button id="nt-go" class="danger" disabled>Install the test build</button>${GI.build && GI.can_self_update ? '<button id="nt-back">Go back to the release</button>' : ''}</div>
+        <div class="acts"><button id="nt-check">Check for a nightly build</button><button id="nt-go" class="danger" disabled>Install the nightly build</button>${GI.build && GI.can_self_update ? '<button id="nt-back">Go back to the release</button>' : ''}</div>
       </div>
       <div class="card">
         <h3>Erase all data <span class="b warn">experimental</span></h3>
@@ -739,7 +739,7 @@ async function openPaths(first) {
     $('nt-go').disabled = !(r.update_available && GI.can_self_update);
   });
   if ($('nt-back')) $('nt-back').onclick = guard(async () => {
-    if (!confirm('Replace this test build with the newest release and restart Ronin Mod Manager? Your playsets and settings are kept.')) return;
+    if (!confirm('Replace this nightly build with the newest release and restart Ronin Mod Manager? Your playsets and settings are kept.')) return;
     $('nt-back').disabled = true;
     try { await selfUpdate(m => { $('nt-status').textContent = m; }, false, 'release'); } finally { $('nt-back').disabled = false; }
   });
@@ -1353,7 +1353,7 @@ async function useGame(id, first) {
   applyTheme(g);
   $('game').value = id;
   setLogo(g.id);
-  document.title = g.name + ' · Ronin Mod Manager' + (GI.build ? ' (test build)' : '');
+  document.title = g.name + ' · Ronin Mod Manager' + (GI.build ? ' (nightly build)' : '');
   busy(true, `Opening ${g.name}…`, g.id);
   $('view').innerHTML = ''; $('pslist').innerHTML = ''; $('psfixed').innerHTML = ''; $('title').textContent = g.name; $('drawer').className = '';   // nothing of the game just left stays on screen
   try { await load(first); } finally { busy(false); }
@@ -1437,7 +1437,7 @@ setInterval(() => { fetch('/api/ping').catch(() => {}); }, 5000);   // "this pag
   bootSay('Finding your games…');
   GI = await app('games');
   bootSay('Reading your mods…');
-  $('ver').innerHTML = 'v' + esc(GI.version) + (GI.build ? `<br><b class="testbuild" title="A test build of the next version. Settings > App &amp; updates shows how to go back to a release.">TEST BUILD ${esc(GI.build)}</b>` : '');
+  $('ver').innerHTML = 'v' + esc(GI.version) + (GI.build ? `<br><b class="nightlybuild" title="A nightly build of the next version. Settings > App &amp; updates shows how to go back to a release.">NIGHTLY BUILD ${esc(GI.build)}</b>` : '');
   fillGames();
   let want = location.hash.slice(1);
   try { want = want || localStorage.getItem('mm-game') || ''; } catch (e) { /* ignore */ }

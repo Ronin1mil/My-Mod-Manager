@@ -63,13 +63,13 @@ def default_fetch(url, token=None, timeout=10):
 
 
 def stable_current():
-    """What the stable update check compares with. A test build is at least as new as the release of its own version
-    (releases are made from test builds), so only a release with a higher version number is ever offered to it."""
+    """What the stable update check compares with. A nightly build is at least as new as the release of its own version
+    (releases are made from nightly builds), so only a release with a higher version number is ever offered to it."""
     return __version__
 
 
 def check_nightly(current_build=BUILD, fetch=None, repo=REPO):
-    """The newest test build: the release tagged 'test-build' (rebuilt by CI from the branch being worked on, marked as a
+    """The newest nightly build: the release tagged 'test-build' (rebuilt by CI from the branch being worked on, marked as a
     prerelease). Same result shape as check_for_update so the self-updater can install it. Never raises."""
     token = os.environ.get("MODMANAGER_GITHUB_TOKEN") or None
     fetch = fetch or (lambda u: default_fetch(u, token))
@@ -78,26 +78,26 @@ def check_nightly(current_build=BUILD, fetch=None, repo=REPO):
     try:
         status, rel = fetch(f"{API}/repos/{repo}/releases/tags/test-build")
         if status == 404:
-            return {**base, "status": "no_releases", "message": "No test build has been published yet."}
+            return {**base, "status": "no_releases", "message": "No nightly build has been published yet."}
         if status != 200 or not isinstance(rel, dict):
-            return {**base, "status": "unreachable", "message": f"GitHub answered HTTP {status} when asking for the test build."}
+            return {**base, "status": "unreachable", "message": f"GitHub answered HTTP {status} when asking for the nightly build."}
         m = re.search(r"^build:\s*([0-9a-f]{7,40})\s*$", str(rel.get("body") or ""), re.M)
         if not m:
-            return {**base, "message": "The test build has no build id, so it cannot be compared."}
+            return {**base, "message": "The nightly build has no build id, so it cannot be compared."}
         latest = m.group(1)
         v = re.search(r"^version:\s*(\S+)\s*$", str(rel.get("body") or ""), re.M)
         built = parse_version(v.group(1)) if v else None
-        if built and _key(built) < _key(parse_version(__version__)):   # the test build is of an OLDER version than this copy
-            return {**base, "latest": f"test build {latest}", "build": latest, "status": "current",
-                    "message": f"The newest test build is from version {v.group(1)}, older than the {__version__} you have, so it is not offered."}
+        if built and _key(built) < _key(parse_version(__version__)):   # the nightly build is of an OLDER version than this copy
+            return {**base, "latest": f"nightly build {latest}", "build": latest, "status": "current",
+                    "message": f"The newest nightly build is from version {v.group(1)}, older than the {__version__} you have, so it is not offered."}
         assets = [{"name": a["name"][:100], "url": a["browser_download_url"], "size": int(a.get("size") or 0),
                    "api_url": f"{API}/repos/{repo}/releases/assets/{int(a['id'])}" if str(a.get("id", "")).isdigit() else ""}
                   for a in rel.get("assets") or []
                   if isinstance(a, dict) and isinstance(a.get("name"), str)
                   and str(a.get("browser_download_url", "")).startswith(LINK_PREFIX)]
         newer = latest != current_build
-        return {**base, "latest": f"test build {latest}", "build": latest, "update_available": newer, "status": "update" if newer else "current",
-                "message": f"Test build {latest} is available." if newer else "You already have the newest test build.",
+        return {**base, "latest": f"nightly build {latest}", "build": latest, "update_available": newer, "status": "update" if newer else "current",
+                "message": f"Nightly build {latest} is available." if newer else "You already have the newest nightly build.",
                 "published": str(rel.get("published_at") or "")[:10], "published_at": str(rel.get("published_at") or ""), "assets": assets}
     except (urllib.error.URLError, OSError, TimeoutError):
         return {**base, "status": "unreachable", "message": "Could not reach GitHub. Check your internet connection."}

@@ -16,8 +16,8 @@ Legend: [x] done and tested against fake installs; [ ] not done. "Confirmed" mea
 - [x] Saves per playset (link-based, backup-first)
 - [x] Play: writes what the game reads (CK3 `dlc_load.json`, EU5 `playsets.json`, VIC3 `content_load.json`, Bannerlord module list) and starts the game
 - [x] Import the playsets the game's own launcher has (`launcher-v2.sqlite`, `playsets.json`, `LauncherData.xml`), read-only
-- [x] Update check and self-update (Python edition `.pyzw`), test builds channel
-- [x] Logs: errors, activity (test builds), and one log per game of what Play did
+- [x] Update check and self-update (Python edition `.pyzw`), nightly builds channel
+- [x] Logs: errors, activity (nightly builds), and one log per game of what Play did
 - [x] Compare two playsets
 
 ## Next

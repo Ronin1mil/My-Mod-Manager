@@ -41,7 +41,7 @@ class TestBuildVersion(unittest.TestCase):
     def fetch_for(self, body):
         return lambda url: (200, {"body": body, "published_at": "2026-11-02T00:00:00Z", "assets": []})
 
-    def test_a_test_build_of_an_older_version_is_not_offered(self):
+    def test_a_nightly_build_of_an_older_version_is_not_offered(self):
         r = update.check_nightly("aaaaaaa", fetch=self.fetch_for("build: bbbbbbb\nversion: 0.0.9\n"))
         self.assertFalse(r["update_available"])
         self.assertIn("older", r["message"])

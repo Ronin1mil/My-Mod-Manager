@@ -18,5 +18,6 @@
 | 14 | Definition scope | Keys clash only inside the same script folder (`common/traits`), not across folders. Finer than the old CK3 rule (whole `common/`) to avoid false positives. |
 | 15 | Presets | Plain JSON, validated; shipped ids are labelled `unverified` until checked. No ids are invented: the draft RICE preset only contains ids read from Workshop page text. |
 | 16 | Downloads | "Open in Steam" needs nothing; `steamcmd` is optional and never receives a password from this app. |
-| 17 | Python edition | Releases carry only `Mod-Manager-python.pyzw` (run by the signed `py.exe`): Smart App Control blocks every unsigned exe and the files cannot be signed. Test builds still carry the exe and installer. |
+| 17 | Python edition | Releases carry only `Mod-Manager-python.pyzw` (run by the signed `py.exe`): Smart App Control blocks every unsigned exe and the files cannot be signed. Nightly builds still carry the exe and installer. |
 | 18 | CK3 Tauri/Rust plan | The earlier CK3 plan (Tauri 2 + Rust + React) was never approved and is superseded by this app; its goals (conflict viewer, profiles, safety rules, security plan) are all covered here. |
+| 19 | Names | Official versions are called **Version X.Y.Z** and nothing else. In-between versions are **nightly builds**, named only by their build id. The words "test build" are never used: releases are not tests, and no other names are invented (docs/19). A nightly copy is offered a newer official release before any newer nightly build. |

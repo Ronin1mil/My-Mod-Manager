@@ -171,15 +171,15 @@ class Flow(unittest.TestCase):
         self.assertEqual((self.d / "app.old1").read_text(), "old-version")
         self.assertEqual((self.d / "app.old").read_text(), "still running")   # untouched
 
-    def test_the_test_build_channel_uses_its_own_check(self):
+    def test_the_nightly_build_channel_uses_its_own_check(self):
         calls = []
-        nightly = self.info(latest="test build abc1234")
+        nightly = self.info(latest="nightly build abc1234")
         u = su.Updater(check=lambda: calls.append("stable") or self.info(), check_nightly_=lambda: calls.append("nightly") or nightly,
                        dl=self.dl_factory(), exe=str(self.exe), argv=[],
                        restarter=lambda e, a: self.restarted.append(1), exiter=lambda: self.exited.append(1))
         st = u.start(run_async=False, channel="nightly")
         self.assertEqual((calls, st["status"]), (["nightly"], "restarting"))
-        self.assertIn("test build abc1234", st["message"])
+        self.assertIn("nightly build abc1234", st["message"])
         self.exe.write_text("old-version")  # the next run is a normal one again
         u.start(run_async=False)
         self.assertEqual(calls, ["nightly", "stable"])
@@ -223,7 +223,7 @@ class Flow(unittest.TestCase):
 
 
 class NightlyCheck(unittest.TestCase):
-    def rel(self, body="Test build.\n\nbuild: abc1234\n", assets=True):
+    def rel(self, body="Nightly build.\n\nbuild: abc1234\n", assets=True):
         base = "https://github.com/Ronin1mil/My-Mod-Manager/releases/download/test-build/"
         a = [{"id": 5, "name": "Mod-Manager-windows.exe", "size": 3, "browser_download_url": base + "Mod-Manager-windows.exe"},
              {"id": 6, "name": "evil.exe", "size": 3, "browser_download_url": "https://evil.example/x.exe"}] if assets else []
@@ -244,7 +244,7 @@ class NightlyCheck(unittest.TestCase):
             raise OSError("offline")
         self.assertEqual(update.check_nightly("", fetch=down)["status"], "unreachable")
 
-    def test_a_test_build_is_not_pushed_back_to_the_release_of_its_own_version(self):
+    def test_a_nightly_build_is_not_pushed_back_to_the_release_of_its_own_version(self):
         from unittest import mock
         from modmanager import update
         with mock.patch.object(update, "BUILD", "abc1234"):

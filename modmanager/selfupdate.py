@@ -251,7 +251,7 @@ class Updater:
         if not self.lock.acquire(blocking=False):
             return self.status()
         self.channel = channel if channel in ("nightly", "release") else "stable"
-        self._set("working", "Checking for the newest test build…" if self.channel == "nightly" else "Checking for the newest version…")
+        self._set("working", "Checking for the newest nightly build…" if self.channel == "nightly" else "Checking for the newest version…")
         if run_async:
             threading.Thread(target=self._run, daemon=True, name="self-update").start()
         else:

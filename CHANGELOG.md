@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.9 - Releases are always "Version X.Y.Z"
+- A copy that was installed from the nightly channel is now offered the newest official release whenever that release has a higher version number than the copy, and the banner and Tools > Check for updates call it **Version X.Y.Z**. Before, such a copy only ever heard about newer nightly builds, and called an official release by the wrong name.
+- The old name for the in-between versions is gone from the whole app, the release page title, the docs and the changelog. The in-between versions are plain **nightly builds**, named by their build id (for example "nightly build 380cdcf"); official versions are **Version 1.0.7** and so on. The release tag on GitHub is still `test-build` because installed copies look for that tag; people do not see it in the app.
+
 ## 1.0.8 - Choose who wins a clash, and Crash help (beta)
 - **Conflicts tab:** a new list at the top, **Mods that overwrite each other**: each pair with how many files and definitions clash, which one wins now, and a **Make X win** button. It moves the winner to load after the loser and remembers your choice; **Sort now** keeps it (ahead of every other rule). A choice that would break a dependency is refused with the reason. Reordering by hand the other way, or disabling a mod, cancels the choice.
 - **Crash help (beta):** a new tab. **Diagnose last crash** reads the game's logs and newest crash folder, names known causes (out of memory, access violation, graphics driver, a missing assembly, a module built for another game version ...) and ranks the mods the logs name, together with the app's own findings (missing dependencies, wrong game version) and recently updated mods. Disable one suspect or all likely ones with a click. Clues, not proof: see docs/23-crash-help.md. Where each game writes its logs is not yet confirmed on a real PC, so the tab lists the files it read.
@@ -38,7 +42,7 @@ While **Tools > Rescan** runs, nothing behind it can be clicked or tabbed to, an
 - **Pictures are about twice as big**, and they (and the rows) now grow with the text size. Settings > UI has a new **Picture size** (Small, Normal, Large, Huge)
 - **Start file (Windows)**: Settings > App & updates > **Install on this PC** copies the app to a folder of its own (`%LOCALAPPDATA%\Ronin Mod Manager\app`) and writes `Ronin Mod Manager.bat` there. Start the app from that .bat. No admin rights needed, nothing else on the PC is touched
 - **Install new versions when it starts** (turned on by the install above): the .bat's start asks GitHub for a newer release, checks it, installs it and then opens. Mods are never updated by this. Offline, it just opens
-- A test build is no longer offered when it is from an older version than the one you have (test builds now say their version)
+- A nightly build is no longer offered when it is from an older version than the one you have (nightly builds now say their version)
 
 ## 1.0.0 - Pictures, a loading screen and a calmer window
 Every mod now shows its own picture, switching games has a proper loading screen, and the header keeps to the buttons you use all the time.
@@ -86,7 +90,7 @@ Start Ronin Mod Manager from a desktop icon or from your Steam library.
 - **Desktop icon.** At the first start (Windows) the app asks once whether to put a Ronin Mod Manager icon on the desktop; Settings > App & updates can make it later. It starts this copy of the app: the installed exe, the `.pyzw` file with `pythonw`, or a source folder with `pythonw -m modmanager` (no console window), with the app's own icon. Windows writes the shortcut itself; nothing is asked again after either answer
 
 ## 0.9.12 - Saves per playset, faster start-up, Rescan, steamcmd for Bannerlord, Steam rate limits
-Each playset now has its own saves, Play starts Crusader Kings III and Europa Universalis V with your playset's mods (both confirmed on a real PC), Victoria 3 gets the load file format it actually reads, and Bannerlord has eight ready-made presets that steamcmd can now download straight into the game. Start-up is about two and a half times faster, a new **Rescan** button redoes it while the app runs, playsets have a right-click menu, and Steam rate limits show a countdown instead of an error. (0.9.2 was never released; it went out only as test builds.)
+Each playset now has its own saves, Play starts Crusader Kings III and Europa Universalis V with your playset's mods (both confirmed on a real PC), Victoria 3 gets the load file format it actually reads, and Bannerlord has eight ready-made presets that steamcmd can now download straight into the game. Start-up is about two and a half times faster, a new **Rescan** button redoes it while the app runs, playsets have a right-click menu, and Steam rate limits show a countdown instead of an error. (0.9.2 was never released; it went out only as nightly builds.)
 
 **How to install (Python edition only, no exe)**
 - You need Windows 10 or 11, **Python 3.8 or newer** from python.org and Edge or Chrome. Nothing else
@@ -120,7 +124,7 @@ Each playset now has its own saves, Play starts Crusader Kings III and Europa Un
 - **One window after an update.** The Python edition runs in an Edge/Chrome app window that stays open when the old copy exits, so an update used to show two windows. Now the old window waits until the new copy has finished its start-up work, then closes itself (or, when it cannot, says it can be closed), and the new copy opens its own. The window the new copy opens belongs to a browser that was already running, so the app now ends by itself about 2.5 minutes after the last page is closed (pages say they are open every few seconds). The first update FROM a version older than this one cannot close its old window, so the new copy continues in that window instead of opening another
 - **Start-up does the slow work first.** Before the window opens, the app reads the mod folders of the games you use, loads what it saved last time, and works out the conflicts of every playset, then opens the real interface with everything ready. Progress is printed in the terminal (run `py Mod-Manager-python.pyzw` from PowerShell to watch it; a double-click has no terminal, so the window simply appears once it is ready). The files it has read are saved between starts, but the conflicts are worked out again every time. That work is now shared out over a few worker processes (up to 6, by playset size) so it runs on several cores at once: on an 8-core PC with 33 playsets in three games, start-up went from about 40 s to 16 s, with the same answers. If a worker cannot start (the frozen exe) or fails, that game is checked the old way; `MODMANAGER_BOOT_PROCS=0` turns the workers off. Set `MODMANAGER_BOOT=0` to skip this pass
 - The game logo shows at once: it is served straight from the file on your PC (it no longer waits for the game's mods to be read first) and the browser keeps it. No shield is drawn behind it any more, and a game with no logo shows nothing there. The Steam logo download is skipped for games with no Steam app id
-- A copy running a test build follows the test builds first: the update notice and "Check for updates now" offer a newer test build (the banner says "Test build abc1234 is available"), and no longer offer the release of the version it is already on. A release with a higher version number is still offered. Settings > App & updates > Test builds has a new **Go back to the release** button for leaving the test channel
+- A copy running a nightly build follows the nightly builds first: the update notice and "Check for updates now" offer a newer nightly build (the banner says "Nightly build abc1234 is available"), and no longer offer the release of the version it is already on. A release with a higher version number is still offered. Settings > App & updates > Nightly builds has a new **Go back to the release** button for leaving the test channel
 
 ## 0.9.1 - Fast switching between big playsets
 Clicking between playsets with many mods is now instant after the first time, and the window no longer seems to ignore clicks.
@@ -139,7 +143,7 @@ Clicking between playsets with many mods is now instant after the first time, an
 - The mod folders are read without holding up other clicks
 - Updater: an old copy that cannot be removed no longer blocks the next update (it uses `.old1`, `.old2`, ... instead)
 - Installer: uninstalling also removes those leftovers
-- "Built" dates of test builds and releases are shown in your own time zone with the exact time, down to the second (they showed the UTC date, which can be a day ahead)
+- "Built" dates of nightly builds and releases are shown in your own time zone with the exact time, down to the second (they showed the UTC date, which can be a day ahead)
 
 ## 0.9.0 - Python edition (no exe), add your own games (beta)
 **How to install (this release is the Python edition only)**
@@ -162,16 +166,16 @@ What is new
 - **Check this game (beta)** in Settings -> Game, for every game: lists what the app found (install, base content, version, user folder, load file, Workshop folder, mods, launcher playsets, how Play starts the game) and what it was looking for where something is missing, with a button to copy the report
 - **Bigger Settings window** (and the Add a game form): as wide as the page minus the playset list's width on each side, so the playset list stays visible on the left with the same space mirrored on the right
 - **Safer self-update.** The downloaded file is started once (`--version`) before it replaces anything. If Windows refuses it (Smart App Control "Application Control policy has blocked this file", error 4551, or antivirus), nothing is changed and the page says why, instead of hanging at "Restarting..." with the blocked file already in place. If the new copy cannot start or ends at once after the swap, the previous version is put back
-- A test build now says so plainly: an orange "TEST BUILD <id>" under the version, "(test build)" in the window title and in Settings
+- A nightly build now says so plainly: an orange "NIGHTLY BUILD <id>" under the version, "(nightly build)" in the window title and in Settings
 
 ## 0.8.5 - checkboxes that always click, faster scan, activity log
 - **Fix: the enable/disable checkbox sometimes ignored a click** (seen on 1440p screens). The box was tiny and sat inside a draggable row, so a slightly moving mouse started a drag instead of a click, and a list redraw (a late warning check, or the window regaining focus) between mouse-down and mouse-up removed the box under the pointer. Now the whole 30 px square around the box is clickable, a row is dragged only by its ⠿ handle, and a redraw waits until the mouse button is released
 - **Faster conflict scan** (about 3x on a large mod list, same results): the file parser now tokenizes in C, per-file cache lookups use plain `os.stat`, and shared keys are grouped only when there is something to compare
-- **Activity log** (test builds, or `MODMANAGER_ACTIVITY_LOG=1`): `RoninModManager-activity.log` records every request, scan, conflict check and update step with millisecond timestamps and durations, to find what is slow or stuck. See docs/19
+- **Activity log** (nightly builds, or `MODMANAGER_ACTIVITY_LOG=1`): `RoninModManager-activity.log` records every request, scan, conflict check and update step with millisecond timestamps and durations, to find what is slow or stuck. See docs/19
 - Removed unused imports and a leftover loop variable
 
-## 0.8.4 - favourites, merge, library sort and tags, test builds
-- **Test builds (nightly), experimental.** Settings -> App & updates -> Test builds installs the newest build of the branch being worked on, so changes can be tried before they become a release. A release is made from the exact commit that was tested (the release job warns if not). See docs/19
+## 0.8.4 - favourites, merge, library sort and tags, nightly builds
+- **Nightly builds, experimental.** Settings -> App & updates -> Nightly builds installs the newest build of the branch being worked on, so changes can be tried before they become a release. A release is made from the exact commit that was tested (the release job warns if not). See docs/19
 - **Favourites.** Star a mod (Library) or a playset (sidebar). Starred playsets stay at the top of the list; the library has "Favourites first" and a "★ Favourites only" button
 - **Library sort by number of playsets:** "Most playsets first", with a "N playsets" count on every row
 - **Merge:** in the Compare tab, "Merge both into a new playset" makes a new playset with every mod of both (this one's order first, a mod is enabled if it is enabled in either); neither playset is changed

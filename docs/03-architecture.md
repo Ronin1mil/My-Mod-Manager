@@ -20,7 +20,7 @@
 | `updates.py` | per-mod update tracking for Workshop mods |
 | `selfupdate.py` | replace the running packaged app with a newer release (checksum-verified) |
 | `launcherdb.py` | read-only import of the game launcher's playsets |
-| `gamelog.py`, `errorlog.py`, `perflog.py` | the per-game log, the error log, the activity log (test builds) |
+| `gamelog.py`, `errorlog.py`, `perflog.py` | the per-game log, the error log, the activity log (nightly builds) |
 | `thumbs.py` | find a mod's own picture (`thumbnail.png` and the like) inside its folder |
 | `launchersync.py` | CK3: write the active playset into the Paradox launcher's database after every change |
 | `shortcut.py`, `steamshortcut.py` | desktop icon, and listing the app in Steam as a non-Steam game (Windows) |
