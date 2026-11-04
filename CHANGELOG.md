@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.7 - Sort now also looks at overwrites
+**Sort now** no longer only handles dependencies. After the dependency rules it reads which enabled mods overwrite each other (same file, same definition, or a folder one of them replaces) and orders those by rules of thumb:
+- a mod that replaces a whole folder (`replace_path`) loads before the mods that add files to that folder, so it does not delete them
+- a mod made for another one (its name contains the other's whole name) or called a patch / compatch / compatibility patch / submod loads after it
+- of two clashing mods, the one with far more files (an overhaul) loads before the small tweak, so the tweak is not overwritten
+- dependencies always win; a rule that would break one is skipped, so there is never a loop
+
+A report shows what decided each move and lists pairs that overwrite each other with nothing to decide the winner (your order is kept for them). The button is always available now, also with Auto-sort on. Auto-sort itself stays dependency-only so editing stays instant. The game cannot say which mod should win a clash, so these are guesses, and the Conflicts tab is still the place to check.
+
 ## 1.0.6 - Drag and drop shows where the mod will land
 - While you drag a mod in the Load order, a line shows the gap it will drop into and a chip names the new position ("Position 3 of 12")
 - The list scrolls by itself when you hold the mod near the top or bottom edge

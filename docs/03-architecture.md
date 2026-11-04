@@ -13,6 +13,7 @@
 | `scan.py` | discover mods (Paradox folders and Bannerlord `SubModule.xml` modules); conflicts: file / definition / patch / replace / localization, base-game comparison |
 | `library.py` | persistent library with new/updated/removed tracking |
 | `order.py` | validate, stable topological sort, explanations, one-click fixes |
+| `smartsort.py` | Sort now: extra "A before B" rules from overwrites (replace_path, patch/compatch names, bigger mod first), never against a dependency |
 | `store.py` | playsets (validated, atomic JSON, rolling `.bak`), share/import, global settings, the load-file writer and EU5's `playsets.json` writer |
 | `collections.py` | turn a Steam Workshop collection into a preset |
 | `updates.py` | per-mod update tracking for Workshop mods |

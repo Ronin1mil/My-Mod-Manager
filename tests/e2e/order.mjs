@@ -21,6 +21,9 @@ for (const [f, name, deps] of [['Lib', 'Lib', []], ['A', 'A', ['Lib']], ['B', 'B
     relationships: deps.map(d => ({ rel_type: 'dependency', display_name: d })) }));
   write(path.join(user, 'mod', `${f}.mod`), `name="${name}"\npath="mod/${f}"\n`);
 }
+// C is a one-file tweak, D an overhaul with many files, and both overwrite common/goods/x.txt
+write(path.join(user, 'mod/C/common/goods/x.txt'), 'g = { }');
+for (const f of ['x.txt', 'a.txt', 'b.txt', 'c.txt', 'd.txt', 'e.txt']) write(path.join(user, 'mod/D/common/goods', f), 'g = { }');
 const server = spawn('python3', ['-m', 'modmanager', '--game', 'vic3', '--user-dir', user, '--workshop-dir', path.join(root, 'none'),
   '--game-version', '1.7.6', '--no-browser', '--port', String(port)],
   { env: { ...process.env, MODMANAGER_FETCH_LOGOS: '0', MODMANAGER_CONFIG_DIR: path.join(root, 'cfg') }, stdio: 'inherit' });
@@ -49,6 +52,14 @@ try {
     for (let i = 0; i < 40; i++) { if (JSON.stringify(await names()) === JSON.stringify(expected)) return; await page.waitForTimeout(100); }
     assert.deepEqual(await names(), expected);
   };
+
+  // Sort now reads the mods' files, then a report says what decided the order
+  const sortNow = async () => {
+    await page.click('#sortnow');
+    await page.waitForSelector('#dlg[open] #srt-ok', { timeout: 8000 });
+    return page.textContent('#dlg');
+  };
+  const closeReport = async () => { await page.click('#srt-ok'); await page.waitForFunction(() => !document.getElementById('dlg').open); };
 
   // --- auto-sort ON: adding in a bad order always yields a valid order
   await page.click('[data-tab=library]');
@@ -120,14 +131,17 @@ try {
     await waitOrder([last, ...t1.slice(0, -1)]);
     assert.equal(await page.locator('#dropchip').count(), 0, 'chip gone after the drop');
     assert.equal(await page.locator('#view .row.dropb, #view .row.dropa').count(), 0, 'line gone after the drop');
-    await page.click('#sortnow'); await page.waitForTimeout(300);   // back to the valid order for the next steps
+    await sortNow(); await closeReport();   // back to the valid order for the next steps
   }
 
   // --- one-click "Sort now" fixes everything
-  await page.click('#sortnow');
-  await page.waitForTimeout(400);
+  const report = await sortNow();
+  assert.match(report, /What decided the order/);
+  assert.match(report, /C\s*before\s*D|D\s*before\s*C/);
+  await closeReport();
   n = await names();
   assert.ok(n.indexOf('Lib') < n.indexOf('A') && n.indexOf('A') < n.indexOf('B'));
+  assert.ok(n.indexOf('D') < n.indexOf('C'), `the small tweak C loads after the overhaul D, got ${n}`);
   await page.click('[data-tab=problems]');
   await page.waitForSelector('text=No problems found', {timeout: 3000}).catch(async e => { console.log('VIEW:', await page.textContent('#view')); throw e; });
 

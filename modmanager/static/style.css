@@ -229,3 +229,5 @@ h1{font-size:22px}
 .pbar{height:8px;border-radius:4px;background:var(--line);overflow:hidden;margin:14px 0 6px}
 .pbar i{display:block;height:100%;width:40%;border-radius:4px;background:linear-gradient(90deg,var(--p1),var(--acc));animation:slide 1.1s ease-in-out infinite}
 .pbar.det i{animation:none;transition:width .35s var(--ease)}
+
+.srt{margin:6px 0 12px;padding-left:20px;max-height:34vh;overflow:auto}.srt li{margin-bottom:6px}.srt .mut{font-size:12px}

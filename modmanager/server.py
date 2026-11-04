@@ -16,7 +16,7 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import APP_NAME, BUILD, __version__, collections, compare, detect, games as gamesmod, install, launch, order, presets, saves, scan, update, updates
+from . import APP_NAME, BUILD, __version__, collections, compare, detect, games as gamesmod, install, launch, order, presets, saves, scan, smartsort, update, updates
 from . import launcher, bootworker, thumbs, customgames, errorlog, gamelog, launcherdb, launchersync, perflog, selfupdate, shortcut, steamshortcut, workshop
 from .library import Library
 from .paths import LOGO_TYPES, config_dir, fetch_best_logo, find_first, find_logo, game_version, launcher_exe, user_dirs, workshop_dirs
@@ -33,7 +33,7 @@ CSP = ("default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline';
 
 MAX_TREE, MAX_RESULT = 5000, 30000
 LIVE_SYNC = ("ck3",)   # games whose own files follow every change to the active playset (others: at Play)
-SYNC_ACTIONS = ("update", "activate", "autosort", "enable", "enable_all", "disable_all", "prune", "delete")
+SYNC_ACTIONS = ("update", "activate", "autosort", "smartsort", "enable", "enable_all", "disable_all", "prune", "delete")
 RESULT_CACHE = 64   # conflict answers kept per game (one per load order recently looked at)
 
 
@@ -594,6 +594,40 @@ class GameApp:
             ps = self.store.update(pid, mods=order.sort_playset(self.mods, ps["mods"], ps["disabled"],
                                                                 self.game_version))
         return ps
+
+    def smart_sort_job(self, pid):
+        """Sort by dependencies AND by who overwrites whom (see smartsort). Snapshot here (quick, under the app lock);
+        the returned function reads the mods' files, which can take a while, and runs without it. Its answer goes to
+        smart_sort_apply, under the lock again."""
+        ps = self.store.get(pid)
+        enabled = [m for m in ps["mods"] if m not in ps["disabled"]]
+        base = order.compute_order(self.mods, enabled, True, self.game_version)["order"]   # valid by dependencies
+        mods, files, defs, trusted, has = dict(self.mods), self.files, self.game.def_dirs, self._trusted, self.game.has_conflicts
+
+        def run():
+            if not has:   # Bannerlord modules do not share script folders: nothing to compare
+                return {"enabled": enabled, "edges": [], "report": {"rules": [], "ties": [], "tie_count": 0, "dropped": 0, "no_conflicts": True}}
+            conflicts = scan.find_conflicts(mods, base, files, defs, None, trusted=trusted)
+            sizes = {m: len(files.get((mods[m]["root"], tuple(mods[m].get("only", ()))), ())) for m in base if m in mods}
+            return {"enabled": enabled, **smartsort.plan(mods, base, conflicts, sizes)}
+        return run
+
+    def smart_sort_apply(self, pid, res):
+        ps = self.store.get(pid)
+        if [m for m in ps["mods"] if m not in ps["disabled"]] != res["enabled"]:
+            raise ValueError("The playset changed while it was being sorted. Press Sort now again.")
+        before = [m for m in ps["mods"] if m not in ps["disabled"]]
+        new = order.sort_playset(self.mods, ps["mods"], ps["disabled"], self.game_version, res["edges"])
+        ps = self.store.update(pid, mods=new)
+        after = [m for m in ps["mods"] if m not in ps["disabled"]]
+        rep = dict(res["report"])
+        rep["moved"] = sum(1 for a, b in zip(before, after) if a != b)
+        rep["rules"] = [{**r, "first_name": self.mods[r["first"]]["name"], "second_name": self.mods[r["second"]]["name"]}
+                        for r in rep["rules"] if r["first"] in self.mods and r["second"] in self.mods]
+        rep["ties"] = [{**t, "a_name": self.mods[t["a"]]["name"], "b_name": self.mods[t["b"]]["name"]}
+                       for t in rep["ties"] if t["a"] in self.mods and t["b"] in self.mods]
+        gamelog.log(self.game.id, f"Sort: {rep['moved']} moved by {len(rep['rules'])} overwrite rules, {rep['tie_count']} clashing pairs left in your order")
+        return {"playset": ps, "report": rep}
 
     def enable(self, pid, mid):
         ps = self.store.get(pid)
@@ -1243,7 +1277,7 @@ def make_handler(hub):
 
         def _do_post(self):
             parts = self.path.strip("/").split("/")
-            if parts[-1] in ("install", "update-check", "downloads", "import-collection", "mod-updates", "self-update", "full-rescan"):
+            if parts[-1] in ("install", "update-check", "downloads", "import-collection", "mod-updates", "self-update", "full-rescan", "smartsort"):
                 return self._post()  # slow network/disk work must not hold the lock
             if len(parts) == 3 and parts[0] == "api" and parts[1] in hub.games and parts[2] == "rescan":
                 return self._rescan(parts[1])
@@ -1438,6 +1472,12 @@ def make_handler(hub):
                         ps = app.store.get(pid)
                         new = order.sort_playset(app.mods, ps["mods"], ps["disabled"], app.game_version)
                         return self._send(200, app.store.update(pid, mods=new))
+                    if act == "smartsort":   # reads the mods' files: not under the lock, like a conflict scan
+                        with hub.lock:
+                            job = app.smart_sort_job(pid)
+                        res = job()
+                        with hub.lock:
+                            return self._send(200, app.smart_sort_apply(pid, res))
                     if act == "enable":
                         return self._send(200, app.enable(pid, str(b.get("id"))))
                     if act in ("enable_all", "disable_all", "prune"):

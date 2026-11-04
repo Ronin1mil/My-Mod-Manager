@@ -138,11 +138,13 @@ def _edges(mods, nodes):
     return edges
 
 
-def compute_order(mods, selection, auto=True, game_version=""):
+def compute_order(mods, selection, auto=True, game_version="", soft=()):
     """Validate `selection` (enabled mod ids in the user's order) and compute the load order.
 
     auto=True  -> returned order satisfies every rule (when no cycle exists)
     auto=False -> the user's order is kept; rule violations become issues with an auto-sort fix
+    soft       -> extra "first, second, reason" rules from smartsort (overwrites and conflicts); they only steer the
+                  sort (auto=True), they are never reported as wrong order
     Returns {order, notes: {id: {moved, reason}}, issues}.
     """
     selection = _dedupe(selection)
@@ -154,9 +156,18 @@ def compute_order(mods, selection, auto=True, game_version=""):
     for a, b in edges:
         incoming.setdefault(b, []).append(a)
 
+    soft_why = {}
+    hard = set(edges)
+    sort_edges = list(edges)
+    if auto:
+        for a, b, why in soft:
+            if a in user_pos and b in user_pos and (a, b) not in hard:
+                hard.add((a, b))
+                sort_edges.append((a, b))
+                soft_why.setdefault(b, []).append(why)
     indeg = dict.fromkeys(nodes, 0)
     out_edges = {}
-    for a, b in edges:
+    for a, b in sort_edges:
         indeg[b] += 1
         out_edges.setdefault(a, []).append(b)
     rank = lambda n: mods[n].get("rank", 0)  # official Bannerlord modules sort ahead of the rest when nothing else decides
@@ -193,16 +204,18 @@ def compute_order(mods, selection, auto=True, game_version=""):
         reason = (f"Loads after {', '.join(deps)} (dependency)." if deps
                   else "Official module: loads before the others." if mods.get(mid, {}).get("official")
                   else "Keeps the position you gave it.")
+        if soft_why.get(mid):
+            reason += " " + "; ".join(soft_why[mid][:3]) + "."
         notes[mid] = {"moved": auto and user_pos.get(mid) != pos[mid], "reason": reason}
     issues.sort(key=lambda i: 0 if i["severity"] == "error" else 1)
     return {"order": order, "notes": notes, "issues": issues}
 
 
-def sort_playset(mods, playset_mods, disabled, game_version=""):
+def sort_playset(mods, playset_mods, disabled, game_version="", soft=()):
     """Sort only the enabled mods; disabled ones keep their slots. Returns the new full list."""
     playset_mods, off = _dedupe(playset_mods), set(disabled)
     enabled = [m for m in playset_mods if m not in off]
-    res = compute_order(mods, enabled, True, game_version)["order"]
+    res = compute_order(mods, enabled, True, game_version, soft)["order"]
     res += [m for m in enabled if m not in mods]  # uninstalled ids ride along at the end
     it = iter(res)
     return [m if m in off else next(it) for m in playset_mods]

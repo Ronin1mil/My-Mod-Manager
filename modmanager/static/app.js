@@ -261,7 +261,6 @@ function render() {
   document.body.classList.toggle('nomods', !!p.virtual);
   $('title').textContent = p.name;
   $('auto').checked = p.auto_sort;
-  $('sortnow').style.display = p.auto_sort ? 'none' : '';
   const nIss = visIssues().length, nCon = A && !A.pending ? A.conflicts.filter(x => x.severity !== 'info' && !x.vanilla).length : 0;
   $('tabs').innerHTML = [['order', 'Load order'], ['library', `Library (${S.mods.length})`], ['problems', `Warnings${nIss ? ` (${nIss})` : ''}`], ['conflicts', `Conflicts${A && A.pending ? ' …' : nCon ? ` (${nCon})` : ''}`], ['files', 'Files'], ['compare', 'Compare'], ['presets', 'Presets']].filter(([k]) => k !== 'conflicts' || S.game.has_conflicts)
     .map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('');
@@ -916,7 +915,31 @@ view.addEventListener('dragend', () => { drag = null; clearDrop(); render(); });
 view.addEventListener('dragleave', e => { if (!view.contains(e.relatedTarget)) clearDrop(); });
 
 $('auto').onchange = guard(() => patch({auto_sort: $('auto').checked}));
-$('sortnow').onclick = guard(async () => { Object.assign(cur(), await api(`playsets/${S.active}/autosort`, {})); render(); analyse(); });
+// Sort now: dependencies first, then who overwrites whom (the server reads the mods' files for it). A report says what
+// was decided and why, and which mods overwrite each other with nothing to decide the winner.
+$('sortnow').onclick = guard(async () => {
+  const p = cur(); if (!p || p.virtual) return;
+  block(true, 'Sorting', 'Checking which mods overwrite each other…');
+  let r;
+  try { r = await api(`playsets/${p.id}/smartsort`, {}); } finally { block(false); }
+  Object.assign(cur(), r.playset); render(); analyse();
+  sortReport(r.report);
+});
+function sortReport(rep) {
+  const nm = (id, n) => esc(n || nameOf(id));
+  if (rep.no_conflicts) { toast(rep.moved ? `Sorted by dependencies (${rep.moved} moved)` : 'Already in a good order'); return; }
+  if (!rep.rules.length && !rep.tie_count) { toast(rep.moved ? `Sorted: ${rep.moved} moved` : 'Already in a good order: no mods overwrite each other'); return; }
+  const d = $('dlg'); d.className = 'mid';
+  d.innerHTML = `<h2 style="margin-top:0">Sorted</h2>
+    <p>${rep.moved ? `<b>${rep.moved}</b> mod${rep.moved === 1 ? '' : 's'} moved.` : 'Nothing had to move.'} Dependencies come first; after that, mods that overwrite each other are ordered by the rules below. These are rules of thumb (the game cannot say which mod should win), so check the Conflicts tab for anything you care about.</p>
+    ${rep.rules.length ? `<h3>What decided the order (${rep.rules.length})</h3><ul class="srt">${rep.rules.slice(0, 40).map(x => `<li>${nm(x.first, x.first_name)} <span class="mut">before</span> ${nm(x.second, x.second_name)}<div class="mut">${esc(x.why)}${x.clashes > 1 && x.clashes < 1000 ? ` (${x.clashes} clashes)` : ''}</div></li>`).join('')}</ul>${rep.rules.length > 40 ? `<p class="mut">…and ${rep.rules.length - 40} more.</p>` : ''}` : ''}
+    ${rep.tie_count ? `<h3>Overwrite each other, nothing decides (${rep.tie_count})</h3><p class="mut">Your order is kept for these. Whichever is lower in the list wins.</p><ul class="srt">${rep.ties.map(x => `<li>${nm(x.a, x.a_name)} <span class="mut">and</span> ${nm(x.b, x.b_name)}<div class="mut">${x.clashes} clash${x.clashes === 1 ? '' : 'es'}</div></li>`).join('')}</ul>${rep.tie_count > rep.ties.length ? `<p class="mut">…and ${rep.tie_count - rep.ties.length} more pairs.</p>` : ''}` : ''}
+    ${rep.dropped ? `<p class="mut">${rep.dropped} rule${rep.dropped === 1 ? ' was' : 's were'} skipped because it would break a dependency or a stronger rule.</p>` : ''}
+    <div class="dlg-btns"><button id="srt-conf">Open Conflicts</button><span><button id="srt-ok" class="pri">Done</button></span></div>`;
+  $('srt-ok').onclick = () => d.close();
+  $('srt-conf').onclick = () => { d.close(); const b = document.querySelector('[data-tab=conflicts]'); if (b) b.click(); };
+  d.showModal();
+}
 $('rescan').onclick = guard(async () => {
   tools(false); block(true, 'Refreshing', 'Reading this game\'s mod folders again…');
   try { await load(await api('rescan', {})); } finally { block(false); }
