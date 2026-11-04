@@ -439,7 +439,8 @@ function viewCrash(p) {
 }
 // Random New World (beta), Europa Universalis V only (rnw.py). The generator is a separate program: this tab finds it, starts
 // it, lists the worlds you have with their settings, makes new ones through its command line, and turns one on in the playset.
-// The tab starts on a menu and loads NOTHING (no program is started, no folder read) until a choice is made. Every step that
+// The tab starts on a menu. It reads the list of your maps (rnw/files: your mod folder and this app's own records, no program is
+// started) so the menu already shows them; the generator's command line runs only when a choice needs it. Every step that
 // follows is written in a "What I'm doing" box, so it is always clear what the app is doing and where it is going.
 // RW.log is the "What I'm doing" box: rnwSay adds a line when a step starts, rnwOk ticks the last line and adds its result.
 function rnwSay(t, bad) { RW.log = [...(RW.log || []), {t, done: false, bad: !!bad}]; }
@@ -449,6 +450,8 @@ async function rnwEnter() {
     RW = {step: 'menu', log: [], worlds: []};
     try { const r = await api('rnw/job'); RW.job = r.job; } catch (e) { if (e instanceof Stale) return; }   // only asks whether a job is still running
     rnwPoll();
+    render();
+    return loadRnw(true, false);   // the maps show on the menu; nothing is started
   }
   render();
 }
@@ -636,8 +639,10 @@ function rnwLogHtml() {
   const l = (RW && RW.log) || []; if (!l.length) return '';
   return `<div class="rnw-log"><b>What I'm doing</b>${l.map((x, i) => `<div>${x.bad ? '✗' : x.done ? '✓' : i === l.length - 1 && RW.busy ? '…' : '•'} ${esc(x.t)}</div>`).join('')}</div>`;
 }
-function rnwMenu(head) {
-  const running = RW.job && RW.job.state === 'running';
+function rnwMenu(head, p) {
+  const n = (RW.worlds || []).length, can = !!(RW.generator && RW.generator.can_run);
+  const maps = RW.error ? `<p class="warn">The list of your maps could not be read: ${esc(RW.error)} <button class="sm" data-rnw="refresh">Try again</button></p>`
+    : `<h3>Your maps (${n})</h3>` + (n ? RW.worlds.map(w => rnwWorld(w, p, can)).join('') : '<div class="empty">No Random New World maps yet. Import a map file, or make a new map.</div>');
   $('view').innerHTML = head + `<h3>What do you want to do?</h3><div class="rnw-menu">
       <div class="rnw-card"><b>Import my maps</b>
         <p class="mut">Lists the Random New World maps you already have, with their names and settings. Reads your mod folder only: no program is started and nothing is built. From there you can also copy in a map folder from somewhere else, or paste a world code.</p>
@@ -645,14 +650,15 @@ function rnwMenu(head) {
       <div class="rnw-card"><b>Make a new map</b>
         <p class="mut">You point me to the folder where Random New World is installed, I check that folder and tell you what I found, then I build a new map with its command line. On the next screen, <b>Browse…</b> opens the file explorer for that folder. Takes some minutes, needs about 7.5 GB of free memory and about 1.2 GB of disk. The map is installed into your mod folder when it is done.</p>
         <button class="pri" data-rnw="gomake">Make a new map</button></div></div>
-    <div id="rnwjob">${rnwJobHtml()}</div>${running ? '' : '<p class="mut">Nothing has been loaded yet.</p>'}</div>`;
+    <div id="rnwjob">${rnwJobHtml()}</div>${rnwMapHtml()}${maps}</div>`;
+  if (RWM && RWM.ready && $('rnwmapcv')) $('rnwmapcv').appendChild(RWM.canvas);
 }
 function viewRnw(p) {
   const R = RW;
   const head = `<div class="rnw"><h3>Random New World <span class="b warn">beta</span></h3>
     <p class="mut">Random New World is a separate program that builds a new map for Europa Universalis V: the Old World stays, the Americas become new continents. Each map it makes is a mod. Start a <b>new 1337 campaign</b> with it, enable only one map, and restart the game before switching maps.</p>`;
   if (!R) { $('view').innerHTML = head + '</div>'; return; }
-  if (R.step === 'menu') return rnwMenu(head);
+  if (R.step === 'menu') return rnwMenu(head, p);
   const back = '<p><button class="sm" data-rnw="menu">← Back to the menu</button></p>';
   const say = rnwLogHtml();
   if (R.error) { $('view').innerHTML = head + back + say + `<div class="row static err">${esc(R.error)}</div><p><button class="sm" data-rnw="refresh">Try again</button></p></div>`; return; }
@@ -1151,8 +1157,8 @@ document.addEventListener('click', guard(async e => {
   const rb = t.closest('[data-rnw]');
   if (rb) {
     const act = rb.dataset.rnw;
-    if (act === 'refresh') return rnwGo(RW.step);
-    if (act === 'menu') { RW.step = 'menu'; return render(); }
+    if (act === 'refresh') return RW.step === 'menu' ? loadRnw(false, false) : rnwGo(RW.step);
+    if (act === 'menu') { RW.step = 'menu'; render(); return loadRnw(true); }
     if (act === 'goimport') return rnwGo('import');
     if (act === 'gomake') return rnwGo('make');
     if (act === 'library') return rnwReadLibrary();

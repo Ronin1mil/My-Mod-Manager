@@ -65,10 +65,12 @@ try {
   page.on('request', r => { if (r.url().includes('/rnw/') && !r.url().endsWith('/rnw/job')) rnwCalls.push(r.url()); });
   await page.click('[data-tab=rnw]');
   await page.waitForSelector('.rnw');
-  // 1. the tab opens on a menu and loads nothing
+  // 1. the tab opens on a menu that already lists the maps (rnw/files reads the mod folder and the app's records; no program is started)
   assert.match(await page.textContent('.rnw'), /What do you want to do\?/);
-  assert.match(await page.textContent('.rnw'), /Nothing has been loaded yet/);
-  assert.deepEqual(rnwCalls, []);
+  await page.waitForFunction(() => /Your maps \(1\)/.test(document.querySelector('.rnw').textContent));
+  assert.match(await page.textContent('.rnw'), /RNW: Continents AAAA/);
+  assert.deepEqual(rnwCalls.map(u => u.split('/rnw/')[1]), ['files']);
+  rnwCalls.length = 0;
 
   // 2. Import my maps: says what it does, reads the mod folder only, lists the installed world with its settings
   await page.click('[data-rnw=goimport]');
@@ -122,6 +124,10 @@ try {
 
   // 4. back to the menu, then Make a new map: the app does not search, it asks for the folder and reports what it finds there
   await page.click('[data-rnw=menu]');
+  await page.waitForFunction(() => /Your maps \(\d+\)/.test(document.querySelector('.rnw').textContent));
+  assert.match(await page.textContent('.rnw'), /What do you want to do\?/);
+  assert.match(await page.textContent('.rnw'), /My island/);                // the menu lists every map, imported files too
+  assert.ok(await page.locator('.rnw [data-rnw=openmap]').count() >= 1);   // and offers Show map from there
   await page.click('[data-rnw=gomake]');
   await page.waitForFunction(() => /none yet/.test(document.querySelector('.rnw-log').textContent));
   assert.match(await page.textContent('.rnw'), /Where is Random New World\?/);
