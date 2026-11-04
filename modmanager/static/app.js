@@ -536,9 +536,12 @@ function rnwWorld(w, p, can) {
     w.created ? ago(w.created) : '', w.seconds ? 'took ' + rnwTime(Math.round(w.seconds)) : '', w.made_here ? (/^imported/.test(w.how || '') ? 'imported here' : 'made here') : ''].filter(Boolean).join(' · ');
   const ch = w.changes.map(c => `<div><span class="mut">${esc(c.label)}</span> ${esc(c.value)}</div>`).join('');
   const dt = w.details.map(c => `<div><span class="mut">${esc(c.key)}</span> ${esc(c.value)}</div>`).join('');
-  const specs = `<details><summary class="mut">Settings${w.changes.length ? ` (${w.changes.length} changed from the defaults)` : ' (the defaults of its type)'}${w.specs_from.length ? ' · read from ' + esc(w.specs_from.join(', ')) : ''}</summary>
+  const key = rnwKey(w), open = RWOPEN.has(key);
+  const label = `Settings${w.changes.length ? ` (${w.changes.length} changed from the defaults)` : ' (the defaults of its type)'}${w.specs_from.length ? ' · read from ' + esc(w.specs_from.join(', ')) : ''}`;
+  const specs = `<div class="rnw-info"><button class="lnk" data-rnw="info" data-k="${esc(key)}" aria-expanded="${open}">${open ? '▾' : '▸'} ${label}</button>${open ? `<div class="rnw-infobody">
       ${w.code ? `<div><span class="mut">World code</span> <code>${esc(w.code)}</code></div>` : ''}${ch}${dt ? '<div class="mut" style="margin-top:6px">As recorded by the generator</div>' + dt : ''}
-      ${!ch && !dt && !w.code ? '<div class="mut">Nothing could be read for this world.</div>' : ''}</details>`;
+      ${!ch && !dt && !w.code ? '<div class="mut">Nothing could be read for this world.</div>' : ''}
+      <p><button class="sm" data-rnw="info" data-k="${esc(key)}">Hide settings</button></p></div>` : ''}</div>`;
   return `<div class="row static rnw-w">${thumb({id: w.mod_id || '', name: w.name, exists: !!w.mod_id}, 'md', 0, false)}
     <span class="nm" style="white-space:normal;cursor:default"><b>${esc(w.name)}</b> ${w.tag ? `<span class="b">${esc(w.tag)}</span>` : ''} <span class="b ${st[1]}">${st[0]}</span>${w.starred ? ' ★' : ''}
       <div class="mut">${esc(facts)}</div>${w.notes ? `<div class="mut">Notes: ${esc(w.notes)}</div>` : ''}${w.problem ? `<div class="warn">${esc(w.problem)}</div>` : ''}${!w.map && /^imported from a \.rnworld/.test(w.how || '') ? '<div class="mut">No map picture is kept for this one (it was imported before the app kept map files). Import its .rnworld file again under Import my maps to see the map.</div>' : ''}${specs}</span>
@@ -553,6 +556,8 @@ function rnwWorld(w, p, can) {
 // green*256 + blue, minus 1; black = open sea) and a table of what each location and country is. The picture is never shown as it
 // is (it looks like noise); the browser paints a real map from it: each location gets the colour of its country, terrain, vegetation,
 // climate, culture or religion. The data comes from the app's own data folder (rnw/map/<key>), never from outside.
+const RWOPEN = new Set();   // maps whose settings are open: kept here, so a redraw of the list does not close them
+const rnwKey = w => w.code || w.folder || w.id || w.name;
 let RWM = null;   // the map being looked at: {key, layer, ready, error, data, canvas, ids, w, h}
 const RWM_LAYERS = [['countries', 'Countries'], ['topography', 'Terrain'], ['vegetation', 'Vegetation'], ['climate', 'Climate'], ['culture', 'Cultures'], ['religion', 'Religions']];
 const RWM_FIXED = {flatland: [150, 190, 110], hills: [170, 160, 100], plateau: [205, 150, 90], mountains: [140, 140, 150], wetlands: [90, 150, 140], hills_wasteland: [120, 115, 100], mountain_wasteland: [105, 105, 110], plateau_wasteland: [130, 115, 95],
@@ -1158,6 +1163,7 @@ document.addEventListener('click', guard(async e => {
   if (rb) {
     const act = rb.dataset.rnw;
     if (act === 'refresh') return RW.step === 'menu' ? loadRnw(false, false) : rnwGo(RW.step);
+    if (act === 'info') { const k = rb.dataset.k; if (RWOPEN.has(k)) RWOPEN.delete(k); else RWOPEN.add(k); return render(); }
     if (act === 'menu') { RW.step = 'menu'; render(); return loadRnw(true); }
     if (act === 'goimport') return rnwGo('import');
     if (act === 'gomake') return rnwGo('make');

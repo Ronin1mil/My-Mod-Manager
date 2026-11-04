@@ -71,6 +71,16 @@ try {
   assert.match(await page.textContent('.rnw'), /RNW: Continents AAAA/);
   assert.deepEqual(rnwCalls.map(u => u.split('/rnw/')[1]), ['files']);
   rnwCalls.length = 0;
+  // the settings of a map open when clicked, stay open when the list is redrawn, and close with the Hide settings button
+  const info = page.locator('.rnw-w [data-rnw=info]').first();
+  await info.click();
+  assert.equal(await page.locator('.rnw-infobody').first().isVisible(), true);
+  assert.match(await page.textContent('.rnw-infobody'), /World code/);
+  await page.waitForTimeout(2500);
+  await page.evaluate(() => render());                      // a redraw of the page keeps it open
+  assert.equal(await page.locator('.rnw-infobody').count(), 1);
+  await page.click('.rnw-infobody [data-rnw=info]');
+  assert.equal(await page.locator('.rnw-infobody').count(), 0);
 
   // 2. Import my maps: says what it does, reads the mod folder only, lists the installed world with its settings
   await page.click('[data-rnw=goimport]');
@@ -79,10 +89,10 @@ try {
   assert.deepEqual(rnwCalls.map(u => u.split('/rnw/')[1]), ['files']);   // no program was started
   assert.match(await page.textContent('.rnw-w'), /RNW: Continents AAAA/);
   assert.match(await page.textContent('.rnw-w'), /Continents · seed 42 · generator 1\.1\.0 · game build 26300913/);
-  await page.locator('.rnw-w summary').first().click();
-  assert.match(await page.textContent('.rnw-w details'), /World: land\s*35 %/);              // a setting read from the world's code
-  assert.match(await page.textContent('.rnw-w details'), /read from the world's own files, the world's code/);
-  assert.match(await page.textContent('.rnw-w details'), /settings\.new_world\.land_permille\s*350/);   // and the generator's own record
+  await page.locator('.rnw-w [data-rnw=info]').first().click();
+  assert.match(await page.textContent('.rnw-infobody'), /World: land\s*35 %/);              // a setting read from the world's code
+  assert.match(await page.textContent('.rnw-w [data-rnw=info]'), /read from the world's own files, the world's code/);
+  assert.match(await page.textContent('.rnw-infobody'), /settings\.new_world\.land_permille\s*350/);   // and the generator's own record
 
   // 3. import a map folder from somewhere else, and a world code
   const other = path.join(root, 'elsewhere/rnw_exp_world_ccccc33333');

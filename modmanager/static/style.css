@@ -234,7 +234,7 @@ h1{font-size:22px}
 .pairs h3{margin:14px 0 6px}.pair .b{display:inline-flex;gap:6px;align-items:center}.pair .x{background:none;border:0;color:inherit;padding:0 2px;cursor:pointer}
 .crash h3{margin:14px 0 6px}.crash-s .b,.crash-r .b{flex:none}.crash code{font-size:12px;word-break:break-all}.crash-r .nm div{margin:2px 0}
 .rnw h3{margin:14px 0 6px}.rnw code{font-size:12px;word-break:break-all}.rnw .row{gap:12px;align-items:flex-start}
-.rnw-w .nm div{margin:2px 0}.rnw-w details{margin-top:4px}.rnw-w details div{font-size:12px}.rnw-btn{display:flex;flex-direction:column;gap:6px;flex:none}
+.rnw-w .nm div{margin:2px 0}.rnw-info{margin-top:4px}.rnw-info .lnk{background:none;border:0;padding:2px 0;color:var(--mut);font:inherit;cursor:pointer;text-align:left}.rnw-info .lnk:hover{color:var(--acc)}.rnw-infobody{margin-top:4px}.rnw-infobody div{font-size:12px}.rnw-btn{display:flex;flex-direction:column;gap:6px;flex:none}
 .rnw-form{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-end}.rnw-form label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--mut)}
 .rnw-form select,.rnw-form input{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:5px 8px}
 .rnw-job{margin:12px 0;padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}.rnw-job.bad{border-color:var(--err)}
