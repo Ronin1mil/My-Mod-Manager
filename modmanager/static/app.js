@@ -846,6 +846,11 @@ async function openPaths(first) {
         <div class="acts"><button id="s-erase">Erase all data…</button></div>
       </div>
       <div class="card">
+        <h3>GitHub page</h3>
+        <p class="desc">The project's home: downloads (Releases), the changelog, and where to report a problem or ask for a feature. It opens in your browser.</p>
+        <div class="acts"><button id="s-github">Open the GitHub page</button></div>
+      </div>
+      <div class="card">
         <h3>Problems</h3>
         <p class="desc">Errors are saved to <code>${esc(GI.log_file || 'Documents/Ronin Mod Manager/RoninModManager-errors.log')}</code>. What the app did with this game (what it found, every Play and the files it wrote) is saved to <code>${esc(S.game_log || 'Documents/Ronin Mod Manager/RoninModManager-' + G + '.log')}</code>. Send that file when a game does not start the way the app said.</p>
       </div>
@@ -867,6 +872,8 @@ async function openPaths(first) {
     GI.shortcut = await app('desktop-shortcut', {make: true}); GI.settings.shortcut_asked = true;
     toast('Made "Ronin Mod Manager" on your desktop.'); $('s-shortcut').textContent = 'Make it again';
   });
+  // a fixed address (REPO_LINK), opened by the browser itself in a new tab; nothing is sent to the app's server
+  $('s-github').onclick = () => { window.open(REPO_LINK, '_blank', 'noopener'); };
   $('st-tabs').onclick = e => {
     const t = e.target.closest && e.target.closest('[data-st]'), k = t && t.dataset.st; if (!k) return;
     d.querySelectorAll('[data-st]').forEach(b => b.classList.toggle('on', b.dataset.st === k));

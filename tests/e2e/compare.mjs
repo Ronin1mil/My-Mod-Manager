@@ -117,6 +117,10 @@ try {
   assert.ok(href.startsWith('https://github.com/Ronin1mil/My-Mod-Manager/'), `off-repo link replaced, got ${href}`);
   assert.equal(await page.locator('#s-result a').getAttribute('rel'), 'noopener noreferrer');
   assert.equal(await page.locator('#s-now').count(), 0, 'a copy run from source cannot replace itself, so no download button');
+  // the GitHub page button opens the project's own address in a new tab
+  const [gh] = await Promise.all([page.waitForEvent('popup'), page.click('#s-github')]);
+  assert.equal(gh.url().startsWith('https://github.com/Ronin1mil/My-Mod-Manager'), true, `opened ${gh.url()}`);
+  await gh.close().catch(() => {});
   await page.click('#p-cancel');
 
   // ---- the packaged app: "Check now" offers Download and restart, shows progress, and recovers from an error

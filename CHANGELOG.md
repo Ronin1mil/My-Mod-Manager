@@ -7,6 +7,7 @@
 - **Browse… opens the system's folder window** (PowerShell's folder window on Windows, tkinter elsewhere) wherever the app asks for a folder: Random New World's folder, and the map folder to import. Choosing the generator's folder checks it at once. If no folder window can be opened, pasting the path still works.
 - **No more searching for the generator.** Make a new map asks you to point to the folder where Random New World is installed, looks in that folder only, and tells you what it found (the command line, the window program, whether maps can be made from there). The Steam Workshop folder is shown as a suggestion you can click, never used on its own.
 - The log now also lists what is in the generator's folder, so where `rnw.cmd` lives (if anywhere) can be seen.
+- **Settings > App has an "Open the GitHub page" button** that opens the project's page (downloads, changelog, problem reports) in your browser.
 
 ## 1.1.2 - Random New World: the tab no longer loads for ever
 - Fixed: opening the Random New World tab could hang with nothing shown. The generator's `rnw.cmd worlds` command was started in a way that, on Windows, could not be stopped when it ran over time (the program that cmd.exe starts kept the output open). Commands now get no keyboard input, are stopped with their whole process tree when the time is up (25 seconds for the list), and the tab then shows the worlds found in your mod folder with a note saying what went wrong.
