@@ -1598,7 +1598,7 @@ def make_handler(hub):
             if act == "open":
                 return m.open_generator()
             if act == "folder":
-                return {"generator": m.set_folder(b.get("path"))}
+                return m.check_folder(b.get("path"))
             if act == "new":
                 return m.new_world(b.get("preset"), b.get("seed"), b.get("code"))
             if act == "add":

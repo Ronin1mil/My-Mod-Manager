@@ -442,16 +442,36 @@ class Route(GameCase):
             job = self.wait()
         self.assertIn("not the mod folder this app reads", job["error"])
 
-    def test_choosing_the_generators_folder(self):
+    def test_the_user_points_to_a_folder_and_gets_a_report_back(self):
         self.mgr._generator = None
         d = self.r / "rnwhere"
         d.mkdir()
-        self.assertEqual(self.post("/api/rnw/folder", {"path": str(d)})[0], 400)   # nothing of RNW there
+        res = self.post("/api/rnw/folder", {"path": str(self.r / "nowhere")})[1]   # not a folder
+        self.assertFalse(res["ok"])
+        self.assertIn("is not a folder", res["report"][0]["text"])
+        res = self.post("/api/rnw/folder", {"path": str(d)})[1]   # a folder without Random New World
+        self.assertEqual((res["ok"], res["generator"]), (False, None))
+        self.assertIn("was not found there", res["report"][-1]["text"])
+        self.assertEqual(self.app.store.settings()["rnw_dir"], "")
         (d / "rnw.cmd").write_text("x")
-        st, res, _ = self.post("/api/rnw/folder", {"path": str(d)})
-        self.assertEqual((st, res["generator"]["folder"], res["generator"]["how"]), (200, str(d), "the folder you chose"))
+        res = self.post("/api/rnw/folder", {"path": f'"{d}"'})[1]   # Copy as path adds quotes
+        self.assertTrue(res["ok"])
+        self.assertEqual((res["generator"]["folder"], res["generator"]["how"]), (str(d), "the folder you chose"))
+        self.assertEqual(res["report"][-1]["text"], "Ready: maps can be made from here.")
         self.assertEqual(self.app.store.settings()["rnw_dir"], str(d))
-        self.assertEqual(self.post("/api/rnw/folder", {"path": ""})[1], {"generator": None})
+        self.assertEqual(self.mgr.generator().cmd, d / "rnw.cmd")
+        self.assertFalse(self.post("/api/rnw/folder", {"path": ""})[1]["ok"])   # empty = forget
+        self.assertEqual(self.app.store.settings()["rnw_dir"], "")
+
+    def test_the_app_does_not_search_the_disk_for_the_generator_but_suggests_the_workshop_folder(self):
+        self.mgr._generator = None
+        ws = self.ws() / "3829217331"
+        ws.mkdir(parents=True, exist_ok=True)
+        (ws / "rnw.cmd").write_text("x")
+        self.assertIsNone(self.mgr.generator())   # it exists in the Workshop folder, but the user has not pointed to it
+        res = self.req("GET", "/api/rnw/files")[1]
+        self.assertIsNone(res["generator"])
+        self.assertEqual(res["hint"], str(ws))
 
     def test_open_starts_only_the_launcher_without_a_shell(self):
         calls = []

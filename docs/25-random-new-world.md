@@ -18,9 +18,12 @@ Tab **Random New World (beta)** right after **Crash help (beta)**, only when the
 ## How it runs the generator
 RNW has no web API. It has a command line (`rnw.cmd` on Windows, `RandomNewWorld --cli` elsewhere) that prints JSON, and a
 window program. The manager:
-- **finds it** in this order: the folder chosen in the tab; every Steam library's `workshop/content/3450310/3829217331`;
-  `<user folder>/mod/rnw_exp_hub`. A folder counts when it holds `rnw.cmd` and/or a program named like `Random New World*.exe`
-  / `RandomNewWorld*.exe` / `rnw*.exe` (uninstallers and crash handlers skipped). Three levels deep at most.
+- **does not search for it** (1.1.3). **Make a new map** asks the user to point to the folder where Random New World is installed
+  (`POST rnw/folder {path}`). Only that folder is looked at (three levels down at most): a folder counts when it holds `rnw.cmd`
+  and/or a program named like `Random New World*.exe` / `RandomNewWorld*.exe` / `rnw*.exe` (uninstallers and crash handlers
+  skipped). The answer is a report the page writes into its "What I'm doing" box: what was looked at, whether `rnw.cmd` and the
+  window program were found, and whether maps can be made from there. A folder that holds the generator is remembered (setting
+  `rnw_dir`); an empty answer forgets it. The Steam Workshop folder is only *suggested* (`hint`), never used on its own.
 - **runs commands** from an argument list, never a shell string. Because a `.cmd` file runs through `cmd.exe`, every word is
   checked first: values are letters, digits and `. _ : -` only; options are `--lowercase-words`; the only path passed
   (`--game-dir`) must not contain `% ^ & | < > " !` or control characters (otherwise it is left out and RNW finds the game itself).

@@ -2,7 +2,8 @@
 
 Random New World (RNW, https://github.com/Sir-Starch/eu5-random-new-world, MPL-2.0, Steam Workshop item 3829217331) is a
 separate program that builds a new map for EU5. Every world it makes is an ordinary mod, a folder `rnw_exp_world_<id>` in
-the game's `mod` folder. This module does not contain or copy RNW. It finds the generator the user installed, starts it
+the game's `mod` folder. This module does not contain or copy RNW. It does not search the disk for it: the user points to the folder (check_folder),
+which is looked at, and the user is told what was found. Then it starts the generator
 (its window, or its command line `rnw.cmd`), lists the worlds the user has with their settings, and turns one on in a
 playset. docs/24-random-new-world-plan.md has the plan and docs/25-random-new-world.md what was built.
 
@@ -645,25 +646,52 @@ class Manager:
 
     # -- finding it --
     def generator(self):
+        """The generator in the folder the USER pointed to (Settings key rnw_dir). The app does not search the disk for it:
+        it asks the user for the folder, checks that folder and says what it found (check_folder)."""
         if self._generator is not None:
             return self._generator
-        app = self.app
-        cands = []
-        for ws in workshop_dirs(app.game, app.extra_libraries):
-            cands.append((Path(ws) / WORKSHOP_ID, "the Steam Workshop"))
-        if app.workshop_dir:
-            cands.append((Path(app.workshop_dir) / WORKSHOP_ID, "the Steam Workshop"))
-        if app.user_dir:
-            cands.append((Path(app.user_dir) / "mod" / HUB_FOLDER, "your mod folder"))
-        return find_generator(app.store.settings().get("rnw_dir", ""), cands)
+        return find_generator(self.app.store.settings().get("rnw_dir", ""), [])
 
-    def set_folder(self, path):
-        path = str(path or "").strip()
-        if path and not inspect_folder(path):
-            raise ValueError("Random New World was not found in that folder (no rnw.cmd and no Random New World program).")
-        self.app.store.update_settings(rnw_dir=path)
-        gen = self.generator()
-        return gen.public() if gen else None
+    def hint(self):
+        """Where the Steam Workshop keeps Random New World, if that folder exists: only shown to the user as a suggestion to
+        point to, never used by itself."""
+        app = self.app
+        cands = [Path(w) / WORKSHOP_ID for w in workshop_dirs(app.game, app.extra_libraries)]
+        if app.workshop_dir:
+            cands.append(Path(app.workshop_dir) / WORKSHOP_ID)
+        return next((str(c) for c in cands if c.is_dir()), "")
+
+    def check_folder(self, path):
+        """The user pointed to a folder: look in it (three levels down at most), say what was found and what is missing, and
+        remember the folder when it holds Random New World. -> {"ok", "generator", "report": [{"ok", "text"}]}"""
+        path = str(path or "").strip().strip('"')
+        if not path:   # an empty answer forgets the folder
+            self.app.store.update_settings(rnw_dir="")
+            return {"ok": False, "generator": None, "report": [{"ok": True, "text": "Forgot the folder. Point to it again when you want to make maps."}]}
+        if any(ord(c) < 32 for c in path):
+            raise ValueError("That is not a folder path.")
+        folder = Path(path)
+        report = []
+        if not folder.is_dir():
+            return {"ok": False, "generator": None, "report": [{"ok": False, "text": f"{path} is not a folder on this PC. Check the spelling, "
+                                                                                 "or copy the folder's path from Explorer (Shift + right-click, Copy as path)."}]}
+        report.append({"ok": True, "text": f"Looked in {folder} (and up to three folders inside it)."})
+        gen = inspect_folder(folder, "the folder you chose")
+        if gen is None:
+            report.append({"ok": False, "text": "Random New World was not found there: no rnw.cmd and no Random New World program. "
+                                                "Point to the folder that holds them."})
+            return {"ok": False, "generator": None, "report": report}
+        report.append({"ok": bool(gen.cmd), "text": f"Command line (rnw.cmd): {gen.cmd}" if gen.cmd else "Command line (rnw.cmd): not found."})
+        report.append({"ok": bool(gen.launcher), "text": f"Window program: {gen.launcher.name}" if gen.launcher else "Window program: not found."})
+        if gen.can_run:
+            report.append({"ok": True, "text": "Ready: maps can be made from here."})
+        else:
+            report.append({"ok": False, "text": "Maps cannot be made from here without rnw.cmd" + (", but the window can be opened"
+                           if gen.launcher else "") + ". The Steam Workshop copy may not include it; the standalone Windows package from GitHub does."})
+        self.app.store.update_settings(rnw_dir=str(folder))
+        self._generator = None
+        gamelog.log(self.app.game.id, "Random New World folder chosen: " + " | ".join(r["text"] for r in report))
+        return {"ok": gen.can_run, "generator": gen.public(), "report": report}
 
     # -- listing --
     def list_job(self, use_cli=True):
@@ -728,7 +756,7 @@ class Manager:
                 notes.append("The generator's own list of worlds could not be read, so only worlds installed in your mod folder "
                              "are shown. " + cli["error"])
             return {"generator": gen.public() if gen else None, "worlds": worlds, "cli": cli, "cli_used": bool(use_cli and gen and gen.can_run), "notes": notes, "presets": PRESETS,
-                    "hub": {"installed": bool(hub), "enabled": any(h in enabled for h in hub)}, "playset": pid,
+                    "hint": self.hint(), "hub": {"installed": bool(hub), "enabled": any(h in enabled for h in hub)}, "playset": pid,
                     "game_version": version, "job": job, "free_gb": _free_gb(user_dir), "user_dir": str(user_dir or "")}
         return run
 

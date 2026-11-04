@@ -93,14 +93,20 @@ try {
   await page.click('[data-rnw=importcode]');
   await page.waitForFunction(() => /Remembered the code/.test(document.querySelector('.rnw-log').textContent));
 
-  // 4. back to the menu, then Make a new map: finds nothing at first, then the chosen folder
+  // 4. back to the menu, then Make a new map: the app does not search, it asks for the folder and reports what it finds there
   await page.click('[data-rnw=menu]');
   await page.click('[data-rnw=gomake]');
-  await page.waitForFunction(() => /not found/.test(document.querySelector('.rnw-log').textContent));
-  assert.match(await page.textContent('.rnw'), /was not found on this PC/);
-  assert.equal(await page.locator('[data-rnw=new]').isDisabled(), true);                    // cannot make worlds without it
-  await page.click('[data-rnw=folder]');                                                    // prompt answered with the folder
-  await page.waitForFunction(() => /Found in/.test(document.querySelector('.rnw').textContent));
+  await page.waitForFunction(() => /none yet/.test(document.querySelector('.rnw-log').textContent));
+  assert.match(await page.textContent('.rnw'), /Where is Random New World\?/);
+  assert.match(await page.textContent('.rnw'), /The app does not search your disk/);
+  assert.equal(await page.locator('[data-rnw=new]').isDisabled(), true);                    // cannot make maps until a folder was checked
+  await page.fill('[data-rnwf=gpath]', path.join(root, 'nowhere'));
+  await page.click('[data-rnw=check]');
+  await page.waitForFunction(() => /is not a folder/.test(document.querySelector('.rnw-log').textContent));
+  await page.fill('[data-rnwf=gpath]', gen);
+  await page.click('[data-rnw=check]');
+  await page.waitForFunction(() => /Ready: maps can be made from here/.test(document.querySelector('.rnw-log').textContent));
+  assert.match(await page.textContent('.rnw'), /Using/);
   assert.match(await page.textContent('.rnw'), /Command line: rnw\.cmd/);
 
   // make a world
