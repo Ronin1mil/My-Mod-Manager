@@ -928,6 +928,9 @@ class Manager:
             worlds = merge_worlds(installed, library, self.records.load(), mod_ids)
             self._diag(gen, cli, library, installed, worlds)
             for w in worlds:
+                if w["map"] and not self.maps.has(w["map"]):   # the app's copy is gone: do not offer a map that cannot open
+                    w["map"] = ""
+                    w["map_lost"] = True
                 mid = w["mod_id"]
                 w["in_playset"] = "none" if not mid or mid not in inlist else "on" if mid in enabled else "off"
             if gen is None:

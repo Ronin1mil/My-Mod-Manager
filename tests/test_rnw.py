@@ -508,6 +508,28 @@ class Route(GameCase):
         self.assertEqual(self.req("GET", "/api/rnw/map/0000000000000000")[0], 404)
         self.assertEqual(self.req("GET", "/api/rnw/map/..%2Fx")[0], 404)
 
+    def test_a_map_imported_by_an_older_build_gets_its_picture_when_the_file_is_imported_again(self):
+        f = make_rnworld(self.r / "island.rnworld")
+        self.post("/api/rnw/import", {"path": str(f)})
+        data = json.loads(self.mgr.records.path.read_text(encoding="utf-8"))   # what an older build wrote: no "map" at all
+        for rec in data["worlds"].values():
+            rec.pop("map", None)
+        self.mgr.records.path.write_text(json.dumps(data), encoding="utf-8")
+        w = self.req("GET", "/api/rnw/files")[1]["worlds"]
+        self.assertEqual((len(w), w[0]["map"], w[0]["name"]), (1, "", "My island"))   # the world stays, only its picture is missing
+        self.post("/api/rnw/import", {"path": str(f)})
+        w = self.req("GET", "/api/rnw/files")[1]["worlds"]
+        self.assertEqual(len(w), 1)
+        self.assertRegex(w[0]["map"], r"^[0-9a-f]{16}$")
+
+    def test_a_map_whose_saved_copy_is_gone_is_not_offered(self):
+        f = make_rnworld(self.r / "island.rnworld")
+        self.post("/api/rnw/import", {"path": str(f)})
+        for g in self.mgr.maps.folder.glob("*.rnworld"):
+            g.unlink()
+        w = self.req("GET", "/api/rnw/files")[1]["worlds"][0]
+        self.assertEqual((w["map"], w["name"]), ("", "My island"))
+
     def test_a_folder_of_rnworld_files_and_a_dropped_file(self):
         folder = self.r / "exports"
         folder.mkdir()
