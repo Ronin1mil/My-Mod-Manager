@@ -377,6 +377,14 @@ class Updates(Base):
         self.assertEqual((r["latest"], r.get("build"), r["update_available"]), ("9.0.0", None, True))
         self.assertNotIn("nightly", (r["message"] or "").lower())
 
+    def test_a_normal_copy_is_never_told_about_a_nightly_build_even_when_it_is_up_to_date(self):
+        from unittest import mock
+        from modmanager import __version__
+        self.hub.update_fetch = fake_both(release_tag="v" + __version__, build="def5678")   # no newer release, but a nightly build exists
+        with mock.patch("modmanager.server.BUILD", ""), mock.patch("modmanager.update.BUILD", ""):
+            r = self.hub.check_update(True)
+        self.assertEqual((r.get("build"), r["update_available"]), (None, False))
+
     def test_a_normal_copy_only_follows_releases(self):
         from unittest import mock
         self.hub.update_fetch = fake_both(release_tag="v9.0.0")

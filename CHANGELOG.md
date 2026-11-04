@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.1 - Random New World: a finished build is in the list at once; a log to check it
+- Fixed: the page could see a build as "done" a moment before the new world was found in the mod folder, so the world only appeared after a refresh. The job now counts as done only after the folder has been read.
+- The app log now records what Random New World showed on this PC (where the generator was found, what its `worlds` command printed, how many worlds were read, and any world code that could not be decoded) once per change, and the generator's last lines when a build fails. This is what is needed to check the beta against a real install.
+- Update notices: confirmed and covered by a test. A normal copy is told only about official releases ("Version X.Y.Z"); only a copy installed from the nightly channel also hears about newer nightly builds.
+
 ## 1.1.0 - Random New World for Europa Universalis V (beta)
 - **New tab "Random New World (beta)"**, next to Crash help, shown only in Europa Universalis V. [Random New World](https://github.com/Sir-Starch/eu5-random-new-world) is a separate program that builds a new map for EU5; every world it makes is a mod. The tab finds the generator (Steam Workshop item 3829217331, your mod folder, or a folder you choose), opens its window with **Open generator**, and runs its command line (`rnw.cmd`) for you.
 - **Your worlds, with names and settings.** Every installed world is listed (also the ones the generator keeps as a copy or only as a code): name, tag, world type, seed, generator version, game build, when it was made, and a **Settings** section with every setting changed from the defaults, written in words. The settings are read from the world's own files, from its world code (decoded here), from the generator's library, and from this app's own record.

@@ -508,15 +508,18 @@ class Jobs:
                 job["log"] = (job["log"] + [line[:200]])[-MAX_LOG:]
             rc = proc.wait()
             text = "\n".join(out)
+            # The result is held in "outcome" and only becomes the visible "state" after on_done (the rescan) has run,
+            # so a page that sees "done" always finds the new world already in the list.
             if job["cancel"]:
-                job["state"] = "cancelled"
+                job["outcome"] = "cancelled"
             elif rc == 0:
-                job["state"], job["percent"] = "done", 100
+                job["outcome"], job["percent"] = "done", 100
                 job["result"] = parse_json(text)
             else:
-                job["state"], job["error"] = "failed", _error_text(text, "")
+                job["outcome"], job["error"] = "failed", _error_text(text, "")
+                job["rc"] = rc
         except Exception as e:   # the program could not start, or the pipe broke: say so on the page
-            job["state"], job["error"] = "failed", f"{type(e).__name__}: {e}"[:300]
+            job["outcome"], job["error"] = "failed", f"{type(e).__name__}: {e}"[:300]
         finally:
             job["finished"] = time.time()
             try:
@@ -530,6 +533,7 @@ class Jobs:
                     on_done(job)
                 except Exception as e:
                     job["error"] = job["error"] or f"The world was made, but the app could not finish: {e}"[:300]
+            job["state"] = job.get("outcome") or "failed"
 
     def cancel(self):
         with self.lock:
@@ -573,6 +577,7 @@ class Manager:
         self.app = app
         self.runner, self.popen = runner, popen
         self.jobs = Jobs(popen)
+        self._diag_sig = ""
         self._generator = generator            # tests hand in a stub; None = look on this PC
         self.records = Records(app.cfg / "rnw-worlds.json")
 
@@ -636,6 +641,7 @@ class Manager:
                 except (OSError, subprocess.SubprocessError) as e:
                     cli["error"] = f"{type(e).__name__}: {e}"[:300]
             worlds = merge_worlds(installed, library, self.records.load(), mod_ids)
+            self._diag(gen, cli, library, installed, worlds)
             for w in worlds:
                 mid = w["mod_id"]
                 w["in_playset"] = "none" if not mid or mid not in inlist else "on" if mid in enabled else "off"
@@ -651,6 +657,32 @@ class Manager:
                     "hub": {"installed": bool(hub), "enabled": any(h in enabled for h in hub)}, "playset": pid,
                     "game_version": version, "job": job, "free_gb": _free_gb(user_dir), "user_dir": str(user_dir or "")}
         return run
+
+    def _diag(self, gen, cli, library, installed, worlds):
+        """Write what a real PC showed us to the app log, once per change (not on every page load), so one log is enough to
+        check the guesses listed in docs/25. LOG-CHECK: what a good log shows is described next to each line."""
+        lib_keys = sorted(library[0]) if library and isinstance(library[0], dict) else []
+        places = {}
+        for w in library:
+            if isinstance(w, dict):
+                places[str(w.get("place"))] = places.get(str(w.get("place")), 0) + 1
+        bad = ["%s: %s" % (w["folder"], w["problem"]) for w in worlds if w.get("problem")]
+        lines = [
+            # good: a folder that holds rnw.cmd (and a launcher .exe); "how" says where it was found
+            f"generator: {gen.public() if gen else None}",
+            # good: ok True; library = the number of worlds RNW itself lists; keys should include id, code, preset, seed, place
+            f"worlds command: ok={cli['ok']} error={cli['error']!r} library={len(library)} keys={lib_keys} places={places}",
+            # good: installed = the rnw_exp_world_* folders read here; each should carry a receipt (world.json) and a code
+            f"in the mod folder: {len(installed)} worlds, with receipt {sum(1 for e in installed if e.get('id'))}, "
+            f"with code {sum(1 for e in installed if e.get('code'))}",
+            # good: empty. Anything here is a world code this app could not decode (the format guess may be wrong)
+            f"codes that did not decode: {bad[:5]}",
+        ]
+        sig = "\n".join(lines)
+        if sig != self._diag_sig:
+            self._diag_sig = sig
+            for line in lines:
+                gamelog.log(self.app.game.id, "Random New World " + line)
 
     # -- starting things --
     def open_generator(self):
@@ -731,16 +763,18 @@ class Manager:
 
     def _finish(self, code, specs, how):
         def done(job):
-            ok = job["state"] == "done"
+            ok = job.get("outcome") == "done"
             res = job["result"] if isinstance(job["result"], dict) else {}
             if code is None:   # add-world: the world's id was in the command; the code comes from the result when it has one
                 return self._after(job, ok)
-            rec = {"state": job["state"], "finished_at": int(time.time()), "seconds": res.get("seconds") or job["finished"] - job["started"],
+            rec = {"state": job.get("outcome") or "failed", "finished_at": int(time.time()), "seconds": res.get("seconds") or job["finished"] - job["started"],
                    "how": how, "installed": str(res.get("installed") or ""), "error": job["error"]}
             if isinstance(res.get("summary"), (dict, list)):
                 rec["summary"] = res["summary"]
             self.records.put(code, rec)
-            gamelog.log(self.app.game.id, f"Random New World: {code} {job['state']}" + (f" ({job['error']})" if job["error"] else ""))
+            if not ok:   # LOG-CHECK: the program's own last lines, to compare with what a good run prints
+                gamelog.log(self.app.game.id, f"Random New World exit code {job.get('rc')}, last lines: " + " | ".join(job["log"][-6:])[:600])
+            gamelog.log(self.app.game.id, f"Random New World: {code} {job.get('outcome')}" + (f" ({job['error']})" if job["error"] else ""))
             self._after(job, ok, str(res.get("installed") or ""))
         return done
 

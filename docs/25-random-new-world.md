@@ -73,6 +73,13 @@ exported playsets.
 Please send: the output of `rnw.cmd find-game` and `rnw.cmd worlds` (replace your Windows user name with `<user>`), and the
 error log if the tab shows a problem.
 
+## Reading the log (1.1.1)
+The app log (Tools > Open log folder) gets four `Random New World ...` lines whenever the tab is opened and something changed.
+In the code each line has a `LOG-CHECK` comment saying what a good value looks like (`modmanager/rnw.py`, `Manager._diag`):
+`generator:` (a folder with `rnw.cmd`), `worlds command:` (`ok=True`, keys such as id, code, preset, seed, place), `in the mod
+folder:` (worlds with receipt and code) and `codes that did not decode:` (should be empty). A failed build also logs the
+generator's last lines and exit code. Send that part of the log; the Windows user name is already replaced by `<user>`.
+
 ## Next steps (1.1.x)
 Increments are the third number: 1.1.1, 1.1.2, ... until it works well on a real PC. Candidates: read the world's picture
 (`preview.png`) as the card image, the generator's full settings (sliders) in the new-world form, queues of several worlds,
