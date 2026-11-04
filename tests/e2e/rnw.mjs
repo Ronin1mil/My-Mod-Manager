@@ -105,7 +105,7 @@ try {
   await page.click('[data-rnw=browse][data-what=generator]');
   await page.waitForFunction(() => /Ready: maps can be made from here/.test(document.querySelector('.rnw-log').textContent));
   assert.match(await page.textContent('.rnw-log'), /you chose/);
-  await page.click('[data-rnw=folder]');                                                    // Use another folder…
+  assert.equal(await page.locator('[data-rnw=browse][data-what=generator]').isVisible(), true);   // the folder box and Browse… stay on screen once a folder is chosen
   await page.fill('[data-rnwf=gpath]', path.join(root, 'nowhere'));
   await page.click('[data-rnw=check]');
   await page.waitForFunction(() => /is not a folder/.test(document.querySelector('.rnw-log').textContent));

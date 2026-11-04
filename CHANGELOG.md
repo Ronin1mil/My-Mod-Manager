@@ -8,6 +8,8 @@
 - **No more searching for the generator.** Make a new map asks you to point to the folder where Random New World is installed, looks in that folder only, and tells you what it found (the command line, the window program, whether maps can be made from there). The Steam Workshop folder is shown as a suggestion you can click, never used on its own.
 - The log now also lists what is in the generator's folder, so where `rnw.cmd` lives (if anywhere) can be seen.
 - **Settings > App has an "Open the GitHub page" button** that opens the project's page (downloads, changelog, problem reports) in your browser.
+- **Make a new map always shows the folder box with Browse…** (it opens the file explorer), also when a folder is already remembered; before, a remembered folder hid the box behind "Use another folder…". The menu card says where it is.
+- **Clicking the dark background no longer closes Settings** (and the other windows): they close only with their buttons or Esc, so changes are not lost by a stray click.
 - A generator command that is out of time is now ended for good on Windows too: its output goes to temporary files instead of pipes, so a program left running by `rnw.cmd` can no longer keep the app waiting (the Windows test run showed 30 seconds instead of a few).
 
 ## 1.1.2 - Random New World: the tab no longer loads for ever

@@ -34,6 +34,10 @@ try {
   const ck3Acc = await css('--acc');
 
   await page.click('#appcfg');
+  // a click on the dark background must not close Settings (unsaved changes would be lost); only Save, Cancel or Esc close it
+  await page.mouse.click(2, 2);
+  await page.waitForTimeout(300);
+  assert.equal(await page.evaluate(() => document.getElementById('dlg').open), true, 'a click on the background leaves Settings open');
   await page.click('[data-st=ui]');
   await page.click('[data-scheme=forest]');
   await page.waitForFunction(() => getComputedStyle(document.documentElement).getPropertyValue('--acc').trim() === '#8fd08a');

@@ -555,7 +555,7 @@ function rnwMenu(head) {
         <p class="mut">Lists the Random New World maps you already have, with their names and settings. Reads your mod folder only: no program is started and nothing is built. From there you can also copy in a map folder from somewhere else, or paste a world code.</p>
         <button class="pri" data-rnw="goimport">Import my maps</button></div>
       <div class="rnw-card"><b>Make a new map</b>
-        <p class="mut">You point me to the folder where Random New World is installed, I check that folder and tell you what I found, then I build a new map with its command line. Takes some minutes, needs about 7.5 GB of free memory and about 1.2 GB of disk. The map is installed into your mod folder when it is done.</p>
+        <p class="mut">You point me to the folder where Random New World is installed, I check that folder and tell you what I found, then I build a new map with its command line. On the next screen, <b>Browse…</b> opens the file explorer for that folder. Takes some minutes, needs about 7.5 GB of free memory and about 1.2 GB of disk. The map is installed into your mod folder when it is done.</p>
         <button class="pri" data-rnw="gomake">Make a new map</button></div></div>
     <div id="rnwjob">${rnwJobHtml()}</div>${running ? '' : '<p class="mut">Nothing has been loaded yet.</p>'}</div>`;
 }
@@ -570,14 +570,16 @@ function viewRnw(p) {
   if (R.error) { $('view').innerHTML = head + back + say + `<div class="row static err">${esc(R.error)}</div><p><button class="sm" data-rnw="refresh">Try again</button></p></div>`; return; }
   if (R.busy && !R.generator && !(R.worlds && R.worlds.length)) { $('view').innerHTML = head + back + say + '</div>'; return; }
   const g = R.generator, can = !!(g && g.can_run), busy = !!(R.job && R.job.state === 'running');
-  const gbox = g && !R.pick ? `<div class="row static"><span class="nm" style="white-space:normal;cursor:default">Using <code>${esc(g.folder)}</code>
+  // The folder box is ALWAYS on this screen (also when a folder is already remembered): a text box and a Browse… button that
+  // opens the system's file explorer. The line above it says which folder is in use and what was found there.
+  const gstat = g ? `<div class="row static"><span class="nm" style="white-space:normal;cursor:default">Using <code>${esc(g.folder)}</code>
         <div class="mut">${g.cmd ? 'Command line: ' + esc(g.cmd.split(/[\\/]/).pop()) : 'No command line (rnw.cmd) found: maps cannot be made from here.'} · ${g.launcher ? 'Window: ' + esc(g.launcher.split(/[\\/]/).pop()) : 'No window program found.'}</div></span>
-        ${g.can_open ? '<button class="pri sm" data-rnw="open">Open generator</button>' : ''}<button class="sm" data-rnw="folder">Use another folder…</button></div>`
-    : `<div class="rnw-drop"><b>Where is Random New World?</b>
-        <div class="mut">The app does not search your disk. Press <b>Browse…</b> and choose the folder where Random New World is installed (the one that holds <code>rnw.cmd</code>); I will look in it, and only in it, and tell you what I find. You can also paste the path.</div>
+        ${g.can_open ? '<button class="pri sm" data-rnw="open">Open generator</button>' : ''}</div>` : '';
+  const gbox = `<div class="rnw-drop"><b>Where is Random New World?</b>
+        <div class="mut">${g ? 'A folder is in use (shown below the box).' : 'The app does not search your disk.'} Press <b>Browse…</b> to open the file explorer and choose the folder where Random New World is installed (the one that holds <code>rnw.cmd</code>), or paste the path. I look in that folder only and tell you what I find.</div>
         <div class="rnw-form" style="margin-top:8px"><label>Folder of Random New World<input data-rnwf="gpath" value="${esc(RWF.gpath || (g ? g.folder : ''))}" placeholder="C:\\…\\RandomNewWorld" size="52"></label>
-          <button class="pri" data-rnw="browse" data-what="generator">Browse…</button><button class="sm" data-rnw="check">Check this folder</button>${g ? '<button class="sm" data-rnw="keep">Keep the current one</button>' : ''}</div>
-        ${R.hint ? `<div class="mut" style="margin-top:6px">The Steam Workshop copy is usually here: <a href="#" data-rnw="usehint" data-path="${esc(R.hint)}"><code>${esc(R.hint)}</code></a> (click to put it in the box; nothing is checked until you press Check).</div>` : ''}
+          <button class="pri" data-rnw="browse" data-what="generator">Browse…</button><button class="sm" data-rnw="check">Check this folder</button></div>
+        ${R.hint && !g ? `<div class="mut" style="margin-top:6px">The Steam Workshop copy is usually here: <a href="#" data-rnw="usehint" data-path="${esc(R.hint)}"><code>${esc(R.hint)}</code></a> (click to put it in the box; nothing is checked until you press Check).</div>` : ''}
         <div class="mut" style="margin-top:6px">Not installed? <a href="https://steamcommunity.com/sharedfiles/filedetails/?id=3829217331" target="_blank" rel="noopener">Steam Workshop</a> or <a href="https://github.com/Sir-Starch/eu5-random-new-world/releases" target="_blank" rel="noopener">GitHub</a> (the GitHub package includes rnw.cmd).</div></div>`;
   const notes = (R.notes || []).filter(n => g).map(n => `<div class="row static warn">${esc(n)}</div>`).join('');
   const hub = R.hub && R.hub.enabled ? '<div class="row static warn">The generator itself is switched on in this playset. Use this world switches it off, as Random New World asks.</div>' : '';
@@ -598,7 +600,7 @@ function viewRnw(p) {
         <div class="mut">A code is only the recipe: it shows the map's settings here, and Add to game rebuilds it with the generator.</div></div>
       ${R.cli && R.cli.ok ? '' : can ? `<p><button class="sm" data-rnw="library" ${busy || R.busy ? 'disabled' : ''}>Also ask Random New World for its own list</button> <span class="mut">(shows maps it keeps that are not installed; starts its command line)</span></p>` : '<p class="mut">To also read Random New World’s own list of maps, point me to its folder under Make a new map first.</p>'}`;
   } else {
-    body = `${gbox}${notes}${hub}<h3>Make a new map</h3><div class="rnw-form">
+    body = `${gbox}${gstat}${notes}${hub}<h3>Make a new map</h3><div class="rnw-form">
       <label>World type <select data-rnwf="preset">${(R.presets || []).map(x => `<option value="${x.id}" ${RWF.preset === x.id ? 'selected' : ''}>${esc(x.title)} - ${esc(x.about)}</option>`).join('')}</select></label>
       <label>Seed <input data-rnwf="seed" value="${esc(RWF.seed)}" placeholder="empty = random" inputmode="numeric" size="22"></label>
       <label>or a world code <input data-rnwf="code" value="${esc(RWF.code)}" placeholder="RNW1-…" size="30"></label>
