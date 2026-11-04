@@ -1361,8 +1361,8 @@ def make_handler(hub):
                 return self._post()  # slow network/disk work must not hold the lock
             if len(parts) == 3 and parts[0] == "api" and parts[1] in hub.games and parts[2] == "rescan":
                 return self._rescan(parts[1])
-            if len(parts) == 4 and parts[0] == "api" and parts[2] == "rnw" and parts[3] in ("new", "remove"):
-                return self._post()   # these first run one of the generator's commands: not under the lock
+            if len(parts) == 4 and parts[0] == "api" and parts[2] == "rnw" and parts[3] in ("new", "remove", "pick"):
+                return self._post()   # these first run one of the generator's commands (or wait for the folder window): not under the lock
             with hub.lock:
                 self._post()
 
@@ -1597,6 +1597,9 @@ def make_handler(hub):
             m = app.rnw_manager()
             if act == "open":
                 return m.open_generator()
+            if act == "pick":   # the system's folder window; waits for the user
+                what = "generator" if b.get("what") == "generator" else "map"
+                return m.pick_folder(what, str(b.get("start") or ""))
             if act == "folder":
                 return m.check_folder(b.get("path"))
             if act == "new":

@@ -479,6 +479,17 @@ async function rnwGo(step) {
   render();
 }
 // The one place a command is run just to read: the generator's own list (kept and code-only maps). The server stops it after 25 s.
+// The user pointed to a folder: the server looks in that folder only and the answer is written into the log box.
+async function rnwCheck(path) {
+  if (!path) return toast('Choose or paste the folder of Random New World first.', true);
+  rnwSay(`Looking in ${path}…`); RW.busy = true; render();
+  let r;
+  try { r = await api('rnw/folder', {path}); } finally { RW.busy = false; }
+  rnwOk();
+  for (const x of r.report) rnwSay(x.text, !x.ok);
+  if (r.generator) { RW.generator = r.generator; RW.pick = false; RWF.gpath = ''; }   // a folder that fails the check does not forget the one that works
+  await loadRnw(true, false);
+}
 async function rnwReadLibrary() {
   rnwSay('Asking Random New World for its own list of maps (starts its command line, waits up to 25 seconds)…');
   render();
@@ -563,10 +574,9 @@ function viewRnw(p) {
         <div class="mut">${g.cmd ? 'Command line: ' + esc(g.cmd.split(/[\\/]/).pop()) : 'No command line (rnw.cmd) found: maps cannot be made from here.'} · ${g.launcher ? 'Window: ' + esc(g.launcher.split(/[\\/]/).pop()) : 'No window program found.'}</div></span>
         ${g.can_open ? '<button class="pri sm" data-rnw="open">Open generator</button>' : ''}<button class="sm" data-rnw="folder">Use another folder…</button></div>`
     : `<div class="rnw-drop"><b>Where is Random New World?</b>
-        <div class="mut">The app does not search your disk. Point me to the folder where Random New World is installed (the one that holds <code>rnw.cmd</code>) and I will look in it, and only in it, and tell you what I find.
-        In Explorer, Shift + right-click the folder and choose “Copy as path”, then paste it here.</div>
+        <div class="mut">The app does not search your disk. Press <b>Browse…</b> and choose the folder where Random New World is installed (the one that holds <code>rnw.cmd</code>); I will look in it, and only in it, and tell you what I find. You can also paste the path.</div>
         <div class="rnw-form" style="margin-top:8px"><label>Folder of Random New World<input data-rnwf="gpath" value="${esc(RWF.gpath || (g ? g.folder : ''))}" placeholder="C:\\…\\RandomNewWorld" size="52"></label>
-          <button class="pri" data-rnw="check">Check this folder</button>${g ? '<button class="sm" data-rnw="keep">Keep the current one</button>' : ''}</div>
+          <button class="pri" data-rnw="browse" data-what="generator">Browse…</button><button class="sm" data-rnw="check">Check this folder</button>${g ? '<button class="sm" data-rnw="keep">Keep the current one</button>' : ''}</div>
         ${R.hint ? `<div class="mut" style="margin-top:6px">The Steam Workshop copy is usually here: <a href="#" data-rnw="usehint" data-path="${esc(R.hint)}"><code>${esc(R.hint)}</code></a> (click to put it in the box; nothing is checked until you press Check).</div>` : ''}
         <div class="mut" style="margin-top:6px">Not installed? <a href="https://steamcommunity.com/sharedfiles/filedetails/?id=3829217331" target="_blank" rel="noopener">Steam Workshop</a> or <a href="https://github.com/Sir-Starch/eu5-random-new-world/releases" target="_blank" rel="noopener">GitHub</a> (the GitHub package includes rnw.cmd).</div></div>`;
   const notes = (R.notes || []).filter(n => g).map(n => `<div class="row static warn">${esc(n)}</div>`).join('');
@@ -580,8 +590,8 @@ function viewRnw(p) {
       <div class="rnw-drop" id="rnwdrop"><b>Add a map you have somewhere else</b>
         <div class="rnw-form">
           <label>Folder of a map (or a folder that holds several)<input data-rnwf="path" value="${esc(RWF.path || '')}" placeholder="C:\\…\\rnw_exp_world_abcde23456" size="46"></label>
-          <button class="pri" data-rnw="importdir" ${busy ? 'disabled' : ''}>Copy into my mod folder</button></div>
-        <div class="mut">In Explorer, Shift + right-click the folder and choose “Copy as path”, then paste it here. The folder is copied, never moved. A .zip of a map can be dropped anywhere in this window.</div>
+          <button class="sm" data-rnw="browse" data-what="map">Browse…</button><button class="pri" data-rnw="importdir" ${busy ? 'disabled' : ''}>Copy into my mod folder</button></div>
+        <div class="mut">Browse to the map folder (or paste its path), then press Copy. The folder is copied, never moved. A .zip of a map can be dropped anywhere in this window.</div>
         <div class="rnw-form" style="margin-top:8px">
           <label>or a world code<input data-rnwf="code" value="${esc(RWF.code)}" placeholder="RNW1-…" size="40"></label>
           <button class="sm" data-rnw="importcode">Remember this code</button></div>
@@ -1058,19 +1068,20 @@ document.addEventListener('click', guard(async e => {
     }
     if (act === 'open') { await api('rnw/open', {}); return toast('Opening Random New World…'); }
     if (act === 'folder') { RW.pick = true; return render(); }
+    if (act === 'browse') {
+      const what = rb.dataset.what === 'generator' ? 'generator' : 'map', key = what === 'generator' ? 'gpath' : 'path';
+      rnwSay('Opening the folder window. It can be behind this window: look for it in the taskbar…'); RW.busy = true; render();
+      let r;
+      try { r = await api('rnw/pick', {what, start: RWF[key] || ''}); } finally { RW.busy = false; }
+      if (r.error) { rnwOk(); rnwSay(r.error, true); return render(); }
+      if (r.cancelled || !r.path) { rnwOk('cancelled, nothing changed'); return render(); }
+      rnwOk('you chose ' + r.path); RWF[key] = r.path;
+      if (what === 'generator') { RWF.gpath = r.path; return rnwCheck(r.path); }   // pointing to the folder is the question: answer at once
+      return render();
+    }
     if (act === 'keep') { RW.pick = false; return render(); }
     if (act === 'usehint') { e.preventDefault && e.preventDefault(); RWF.gpath = rb.dataset.path; return render(); }
-    if (act === 'check') {
-      const path = (RWF.gpath || '').trim(); if (!path) return toast('Paste the folder of Random New World first.', true);
-      rnwSay(`Looking in ${path}…`); RW.busy = true; render();
-      let r;
-      try { r = await api('rnw/folder', {path}); } finally { RW.busy = false; }
-      rnwOk();
-      for (const x of r.report) rnwSay(x.text, !x.ok);
-      RW.generator = r.generator; RW.pick = !r.generator; if (r.generator) RWF.gpath = '';
-      await loadRnw(true, false);
-      return;
-    }
+    if (act === 'check') return rnwCheck((RWF.gpath || '').trim());
     if (act === 'new') {
       const r = await api('rnw/new', {preset: RWF.preset, seed: RWF.seed.trim(), code: RWF.code.trim()});
       RW.job = r.job; render(); rnwPoll(); return toast('Making the world. This takes some minutes; you can keep using the app.');

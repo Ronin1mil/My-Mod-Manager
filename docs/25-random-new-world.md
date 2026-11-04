@@ -23,7 +23,7 @@ window program. The manager:
   and/or a program named like `Random New World*.exe` / `RandomNewWorld*.exe` / `rnw*.exe` (uninstallers and crash handlers
   skipped). The answer is a report the page writes into its "What I'm doing" box: what was looked at, whether `rnw.cmd` and the
   window program were found, and whether maps can be made from there. A folder that holds the generator is remembered (setting
-  `rnw_dir`); an empty answer forgets it. The Steam Workshop folder is only *suggested* (`hint`), never used on its own.
+  `rnw_dir`); an empty answer forgets it. **Browse…** (`POST rnw/pick {what: generator|map, start?}` -> `{path, cancelled, error}`) opens the system's folder window through `modmanager/pickfolder.py` (PowerShell `FolderBrowserDialog` on Windows, tkinter elsewhere; the title and start folder are passed in environment variables, never in the script text); choosing the generator's folder runs the check at once, choosing a map folder only fills the box. A folder that fails the check does not make the app forget the one that works. The Steam Workshop folder is only *suggested* (`hint`), never used on its own.
 - **runs commands** from an argument list, never a shell string. Because a `.cmd` file runs through `cmd.exe`, every word is
   checked first: values are letters, digits and `. _ : -` only; options are `--lowercase-words`; the only path passed
   (`--game-dir`) must not contain `% ^ & | < > " !` or control characters (otherwise it is left out and RNW finds the game itself).

@@ -27,7 +27,7 @@ import time
 import zlib
 from pathlib import Path
 
-from . import gamelog, order
+from . import gamelog, order, pickfolder
 from .paths import workshop_dirs
 from .rnw_fields import CHANGE_FIELDS, PRESET_IDS
 
@@ -635,9 +635,9 @@ def _kill_tree(proc):
 class Manager:
     """Random New World for one GameApp (Europa Universalis V)."""
 
-    def __init__(self, app, runner=None, popen=subprocess.Popen, generator=None):
+    def __init__(self, app, runner=None, popen=subprocess.Popen, generator=None, picker=pickfolder.pick_folder):
         self.app = app
-        self.runner, self.popen = runner, popen
+        self.runner, self.popen, self.picker = runner, popen, picker
         self.jobs = Jobs(popen)
         self._diag_sig = ""
         self._logged_start = False
@@ -651,6 +651,15 @@ class Manager:
         if self._generator is not None:
             return self._generator
         return find_generator(self.app.store.settings().get("rnw_dir", ""), [])
+
+    def pick_folder(self, what, start=""):
+        """Open the system's folder window for the user. what: 'generator' | 'map'. Waits for the choice, so the request
+        that calls this must not hold the data lock."""
+        title = "Choose the folder where Random New World is installed (the one with rnw.cmd)" if what == "generator" \
+            else "Choose the folder of a Random New World map (rnw_exp_world_…), or a folder that holds several"
+        if not start and what == "generator":
+            start = self.hint()
+        return self.picker(title, start)
 
     def hint(self):
         """Where the Steam Workshop keeps Random New World, if that folder exists: only shown to the user as a suggestion to

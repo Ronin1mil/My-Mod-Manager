@@ -183,6 +183,36 @@ class Reading(unittest.TestCase):
 
 
 @unittest.skipIf(os.name == "nt", "uses a POSIX shell to hold the output pipe open")
+class Pick(unittest.TestCase):
+    """The system's folder window (pickfolder.py), with a fake program instead of a window."""
+
+    def run_with(self, out, code=0, start=""):
+        import tempfile
+        from types import SimpleNamespace
+        from modmanager import pickfolder
+        seen = {}
+
+        def fake(argv, **kw):
+            seen.update(argv=argv, env=kw["env"])
+            return SimpleNamespace(stdout=out, returncode=code)
+        with mock.patch.object(pickfolder, "_powershell", return_value=None):
+            return pickfolder.pick_folder("Choose", start, runner=fake), seen
+
+    def test_a_chosen_folder_is_returned(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            res, seen = self.run_with(d + "\n", start=d)
+            self.assertEqual(res, {"path": d, "cancelled": False, "error": ""})
+            self.assertEqual(seen["env"]["RMM_PICK_START"], d)       # the title and start folder travel in the environment,
+            self.assertNotIn(d, " ".join(seen["argv"]))             # never inside the script text
+
+    def test_cancel_and_a_missing_window_are_told_apart(self):
+        self.assertTrue(self.run_with("")[0]["cancelled"])           # Cancel: nothing printed, exit 0
+        res = self.run_with("", code=1)[0]                           # no window program on this PC
+        self.assertEqual((res["cancelled"], bool(res["error"])), (False, True))
+        self.assertTrue(self.run_with("/not/a/folder/anywhere")[0]["cancelled"])   # a path that is not a folder is not accepted
+
+
 class Hang(unittest.TestCase):
     def test_a_command_whose_child_keeps_the_pipe_open_still_ends_on_time(self):
         # on Windows rnw.cmd starts a child program; killing only cmd.exe left the pipe open and the page loaded for ever
@@ -462,6 +492,16 @@ class Route(GameCase):
         self.assertEqual(self.mgr.generator().cmd, d / "rnw.cmd")
         self.assertFalse(self.post("/api/rnw/folder", {"path": ""})[1]["ok"])   # empty = forget
         self.assertEqual(self.app.store.settings()["rnw_dir"], "")
+
+    def test_browse_asks_the_system_for_a_folder_without_the_lock(self):
+        calls = []
+        self.mgr.picker = lambda title, start: calls.append((title, start)) or {"path": str(self.r), "cancelled": False, "error": ""}
+        res = self.post("/api/rnw/pick", {"what": "generator"})[1]
+        self.assertEqual(res["path"], str(self.r))
+        self.assertIn("Random New World is installed", calls[0][0])
+        self.post("/api/rnw/pick", {"what": "map", "start": "x"})
+        self.assertIn("map", calls[1][0])
+        self.assertEqual(calls[1][1], "x")
 
     def test_the_app_does_not_search_the_disk_for_the_generator_but_suggests_the_workshop_folder(self):
         self.mgr._generator = None
