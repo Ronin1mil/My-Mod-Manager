@@ -441,6 +441,7 @@ function viewCrash(p) {
 // it, lists the worlds you have with their settings, makes new ones through its command line, and turns one on in the playset.
 // The tab starts on a menu and loads NOTHING (no program is started, no folder read) until a choice is made. Every step that
 // follows is written in a "What I'm doing" box, so it is always clear what the app is doing and where it is going.
+// RW.log is the "What I'm doing" box: rnwSay adds a line when a step starts, rnwOk ticks the last line and adds its result.
 function rnwSay(t) { RW.log = [...(RW.log || []), {t, done: false}]; }
 function rnwOk(t) { const l = RW.log || []; if (l.length) { l[l.length - 1].done = true; if (t) l[l.length - 1].t += ' — ' + t; } }
 async function rnwEnter() {
@@ -464,6 +465,8 @@ async function loadRnw(quiet, cli) {
   if (g !== gen) return;
   render(); rnwPoll();
 }
+// A choice on the menu. 'import' only reads the mod folder; 'make' only looks for the generator's folder. Neither starts a program
+// (rnw/files); the generator's command line is started only by Make map, or by the button that asks for its own list.
 async function rnwGo(step) {
   RW.step = step; RW.log = []; RW.cli = false; RW.error = null;
   if (step === 'import') rnwSay('Reading your mod folder for Random New World maps (no program is started)…');
@@ -475,6 +478,7 @@ async function rnwGo(step) {
   if (step === 'make' && RW.generator && !RW.generator.can_run) rnwSay('This copy has no rnw.cmd, so maps cannot be made from here. You can still open its window.');
   render();
 }
+// The one place a command is run just to read: the generator's own list (kept and code-only maps). The server stops it after 25 s.
 async function rnwReadLibrary() {
   rnwSay('Asking Random New World for its own list of maps (starts its command line, waits up to 25 seconds)…');
   render();

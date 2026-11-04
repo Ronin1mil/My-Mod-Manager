@@ -62,7 +62,7 @@ the file). Generated worlds contain data derived from the game and are for local
 exported playsets.
 
 ## Not yet checked on a real PC (verify, then fix what differs)
-1. The window program's file name (the finder accepts `Random New World*.exe`, `RandomNewWorld*.exe`, `rnw*.exe`).
+1. ~~The window program's file name~~ Seen on a real PC (1.1.1 log): the Workshop copy holds `Random New World Generator.exe` and no `rnw.cmd`. Still open: where `rnw.cmd` is (the 1.1.3 log lists the generator's folder), and whether the standalone package from GitHub works with this app.
 2. That `rnw.cmd worlds`, `world-code`, `world --install`, `add-world`, `remove-world` behave as in RNW's source, and the
    exact JSON of `worlds` (the code only needs `id`, `code`, `place`, `name`, `tag`; all optional).
 3. That `world --install` writes into the same mod folder this app reads (the job warns when it does not).
