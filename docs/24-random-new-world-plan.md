@@ -1,6 +1,6 @@
 # Random New World for Europa Universalis V: plan (version 1.1.0)
 
-Status: **plan only, nothing is built yet.** Written after reading Random New World's own documentation and command-line
+Status: **built in 1.1.0 as a first version (beta): see [25-random-new-world.md](25-random-new-world.md).** This file is the plan it came from. Written after reading Random New World's own documentation and command-line
 source (links at the end). Nothing here has been run on a real PC: the generator is a Windows program and this was
 written in a cloud session. Every "verify" item is listed at the bottom and has to be checked on a real install
 (see the same method as [22-checked-on-a-real-pc.md](22-checked-on-a-real-pc.md)).

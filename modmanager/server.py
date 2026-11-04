@@ -16,7 +16,7 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import APP_NAME, BUILD, __version__, collections, compare, crash, detect, games as gamesmod, install, launch, order, presets, saves, scan, smartsort, update, updates
+from . import APP_NAME, BUILD, __version__, collections, compare, crash, detect, games as gamesmod, install, launch, order, presets, rnw, saves, scan, smartsort, update, updates
 from . import launcher, bootworker, thumbs, customgames, errorlog, gamelog, launcherdb, launchersync, perflog, selfupdate, shortcut, steamshortcut, workshop
 from .library import Library
 from .paths import LOGO_TYPES, config_dir, fetch_best_logo, find_first, find_logo, game_version, launcher_exe, user_dirs, workshop_dirs
@@ -659,6 +659,14 @@ class GameApp:
             return res
         return run
 
+    def rnw_manager(self):
+        """Random New World (beta), Europa Universalis V only (see rnw.py)."""
+        if self.game.id != "eu5":
+            raise ValueError("Random New World only works with Europa Universalis V.")
+        if getattr(self, "_rnw", None) is None:
+            self._rnw = rnw.Manager(self)
+        return self._rnw
+
     def smart_sort_job(self, pid):
         """Sort by dependencies AND by who overwrites whom (see smartsort). Snapshot here (quick, under the app lock);
         the returned function reads the mods' files, which can take a while, and runs without it. Its answer goes to
@@ -1234,7 +1242,7 @@ def make_handler(hub):
         def _timed(self, method, run):
             path = self.path.split("?")[0]
             self._status = 0
-            quiet = path.startswith(self.QUIET) or not path.startswith("/api/")
+            quiet = path.startswith(self.QUIET) or path.endswith("/rnw/job") or not path.startswith("/api/")
             if quiet and not path.startswith("/api/"):
                 return run()  # the page itself and its files: not worth a line
             with perflog.timed(f"{method} {path}", quiet=quiet) as t:
@@ -1253,7 +1261,7 @@ def make_handler(hub):
 
         def _do_get(self):
             p = self.path.split("?")[0].strip("/").split("/")
-            if len(p) >= 4 and p[0] == "api" and p[2] in ("conflicts", "tree", "crash") and p[1] in hub.games:
+            if len(p) >= 4 and p[0] == "api" and p[2] in ("conflicts", "tree", "crash", "rnw") and p[1] in hub.games:
                 return self._heavy_get(p)
             if p == ["api", "ping"]:   # "this page is still open": no lock, no work
                 if not self._host_ok():
@@ -1329,6 +1337,11 @@ def make_handler(hub):
                         job = app.conflicts_job(p[3])
                     elif p[2] == "crash":
                         job = app.crash_job(p[3])
+                    elif p[2] == "rnw":
+                        mgr = app.rnw_manager()
+                        if p[3] == "job":   # polled every second or two while a world is being made
+                            return self._send(200, {"job": mgr.jobs.status()})
+                        job = mgr.list_job()
                     elif len(p) == 4:
                         job = app.tree_job(p[3])
                     else:
@@ -1348,6 +1361,8 @@ def make_handler(hub):
                 return self._post()  # slow network/disk work must not hold the lock
             if len(parts) == 3 and parts[0] == "api" and parts[1] in hub.games and parts[2] == "rescan":
                 return self._rescan(parts[1])
+            if len(parts) == 4 and parts[0] == "api" and parts[2] == "rnw" and parts[3] in ("new", "remove"):
+                return self._post()   # these first run one of the generator's commands: not under the lock
             with hub.lock:
                 self._post()
 
@@ -1483,6 +1498,8 @@ def make_handler(hub):
                 if parts == ["api", "paths"]:
                     app.configure(b)
                     return self._send(200, app.state())
+                if len(parts) == 3 and parts[:2] == ["api", "rnw"]:
+                    return self._send(200, self._rnw(app, parts[2], b))
                 if parts == ["api", "fav-mod"]:
                     if not isinstance(b.get("on"), bool):
                         raise ValueError("'on' must be true or false.")
@@ -1574,6 +1591,25 @@ def make_handler(hub):
             except Exception as e:  # surface to UI rather than hang the request
                 errorlog.write_exception("server", e, f"POST {self.path.split('?')[0]}")
                 self._send(500, {"error": f"{type(e).__name__}: {e}", "log_file": str(errorlog.log_path())})
+
+        def _rnw(self, app, act, b):
+            """Random New World (beta) actions. `new` and `remove` arrive without the lock (they run a command first)."""
+            m = app.rnw_manager()
+            if act == "open":
+                return m.open_generator()
+            if act == "folder":
+                return {"generator": m.set_folder(b.get("path"))}
+            if act == "new":
+                return m.new_world(b.get("preset"), b.get("seed"), b.get("code"))
+            if act == "add":
+                return m.add_world(str(b.get("id", "")))
+            if act == "remove":
+                return m.remove_world(str(b.get("id", "")))
+            if act == "cancel":
+                return {"job": m.cancel()}
+            if act == "use":
+                return m.use(str(b.get("playset", "")), str(b.get("folder", "")), b.get("on") is not False)
+            raise ValueError("Unknown Random New World action.")
 
         def _install(self, app):
             n = self._length(MAX_UPLOAD)

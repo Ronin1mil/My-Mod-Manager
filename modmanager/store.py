@@ -21,7 +21,7 @@ DEFAULTS = {"notes": "", "launch_args": [], "auto_sort": True, "separate_saves":
 # per-game settings (folders + base-game comparison); app-wide ones live in GlobalSettings
 SETTINGS_DEFAULTS = {"game_dir": "", "user_dir": "", "workshop_dir": "", "include_vanilla": True,
                      "setup_done": False, "steamcmd": "", "steam_user": "", "save_version_check": True,
-                     "ui_scheme": "default", "ui_text": "normal", "ui_img": "normal"}
+                     "ui_scheme": "default", "ui_text": "normal", "ui_img": "normal", "rnw_dir": ""}
 UI_SCHEMES = ("default", "midnight", "parchment", "forest", "slate", "rose", "contrast")
 UI_TEXT = ("small", "normal", "large", "xlarge")
 UI_IMG = UI_TEXT

@@ -14,6 +14,7 @@
 | `library.py` | persistent library with new/updated/removed tracking |
 | `order.py` | validate, stable topological sort, explanations, one-click fixes |
 | `crash.py` | Crash help (beta): reads the game's logs, names known crash causes, ranks suspect mods |
+| `rnw.py`, `rnw_fields.py` | Random New World (beta, EU5): finds the generator, runs its command line, lists worlds with their settings (own files, world code, library, this app's records), turns one world on in a playset. `rnw_fields.py` is data from RNW's source (MPL-2.0) |
 | `smartsort.py` | Sort now: extra "A before B" rules from overwrites (replace_path, patch/compatch names, bigger mod first), never against a dependency |
 | `store.py` | playsets (validated, atomic JSON, rolling `.bak`), share/import, global settings, the load-file writer and EU5's `playsets.json` writer |
 | `collections.py` | turn a Steam Workshop collection into a preset |

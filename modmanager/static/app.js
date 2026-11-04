@@ -1,5 +1,5 @@
 'use strict';
-let G = null, GI = null, S = null, A = null, C = null, P = null, CR = null, cmpWith = null, drag = null, tab = 'order', sel = null, flt = 'all', q = '', lastMissing = [];
+let G = null, GI = null, S = null, A = null, C = null, P = null, CR = null, RW = null, RWT = null, RWF = {preset: 'continents', seed: '', code: ''}, cmpWith = null, drag = null, tab = 'order', sel = null, flt = 'all', q = '', lastMissing = [];
 const REPO_LINK = 'https://github.com/Ronin1mil/My-Mod-Manager/';
 const STEAMCMD_URL = 'https://developer.valvesoftware.com/wiki/SteamCMD';   // Valve's own page: download and setup
 const $ = i => document.getElementById(i);
@@ -262,12 +262,12 @@ function render() {
   $('title').textContent = p.name;
   $('auto').checked = p.auto_sort;
   const nIss = visIssues().length, nCon = A && !A.pending ? A.conflicts.filter(x => x.severity !== 'info' && !x.vanilla).length : 0;
-  $('tabs').innerHTML = [['order', 'Load order'], ['library', `Library (${S.mods.length})`], ['problems', `Warnings${nIss ? ` (${nIss})` : ''}`], ['conflicts', `Conflicts${A && A.pending ? ' …' : nCon ? ` (${nCon})` : ''}`], ['files', 'Files'], ['compare', 'Compare'], ['presets', 'Presets'], ['crash', 'Crash help (beta)']].filter(([k]) => k !== 'conflicts' || S.game.has_conflicts)
+  $('tabs').innerHTML = [['order', 'Load order'], ['library', `Library (${S.mods.length})`], ['problems', `Warnings${nIss ? ` (${nIss})` : ''}`], ['conflicts', `Conflicts${A && A.pending ? ' …' : nCon ? ` (${nCon})` : ''}`], ['files', 'Files'], ['compare', 'Compare'], ['presets', 'Presets'], ['crash', 'Crash help (beta)'], ['rnw', 'Random New World (beta)']].filter(([k]) => (k !== 'conflicts' || S.game.has_conflicts) && (k !== 'rnw' || S.game.id === 'eu5'))
     .map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('');
   const active = p.mods.length - p.disabled.length;
   $('status').innerHTML = `${esc(GNAME())}${S.game_version ? ` ${esc(S.game_version)}` : ''} · ${active} mod${active === 1 ? '' : 's'} active` +
     (errs ? ` · <span class="err">${errs} error${errs === 1 ? '' : 's'}</span>` : A && nIss ? ` · <span class="warn">${nIss} warning${nIss === 1 ? '' : 's'}</span>` : '') + syncNote();
-  ({order: viewOrder, library: viewLibrary, problems: viewProblems, conflicts: viewConflicts, compare: viewCompare, presets: viewPresets, files: viewFiles, crash: viewCrash})[tab](p);
+  ({order: viewOrder, library: viewLibrary, problems: viewProblems, conflicts: viewConflicts, compare: viewCompare, presets: viewPresets, files: viewFiles, crash: viewCrash, rnw: viewRnw})[tab](p);
   drawer();
 }
 
@@ -436,6 +436,84 @@ function viewCrash(p) {
     (reasons ? '<h3>What the logs say</h3>' + reasons : '') +
     (sus ? `<h3>Mods to look at (${CR.suspects.length})</h3>` + (likely.length ? `<p><button class="sm" data-crash="offlikely">Disable the ${likely.length} likely mod${likely.length === 1 ? '' : 's'}</button> <span class="mut">then press Play and see if it still crashes; Diagnose again if it does.</span></p>` : '') + sus : '') +
     (logs ? '<h3>Files read</h3>' + logs : '') + '</div>';
+}
+// Random New World (beta), Europa Universalis V only (rnw.py). The generator is a separate program: this tab finds it, starts
+// it, lists the worlds you have with their settings, makes new ones through its command line, and turns one on in the playset.
+async function loadRnw(quiet) {
+  const g = gen;
+  if (!quiet) { RW = {...(RW || {}), busy: true}; render(); }
+  try { const r = await api('rnw/list'); if (g === gen) RW = r; }
+  catch (e) { if (e instanceof Stale) return; RW = {error: e.message, worlds: []}; }
+  if (g !== gen) return;
+  render(); rnwPoll();
+}
+function rnwPoll() {
+  if (RWT || !RW || !RW.job || RW.job.state !== 'running') return;
+  const g = gen;
+  RWT = setInterval(async () => {
+    if (g !== gen) { clearInterval(RWT); RWT = null; return; }
+    try { const r = await api('rnw/job'); RW.job = r.job; } catch (e) { return; }
+    if (RW.job && RW.job.state === 'running') return rnwDrawJob();
+    clearInterval(RWT); RWT = null;
+    const j = RW.job;
+    toast(j.state === 'done' ? 'The world is made and installed. Press Use this world.' : j.state === 'cancelled' ? 'Cancelled.' : 'Random New World failed: ' + j.error, j.state === 'failed');
+    if (j.state === 'done') { try { await load(); } catch (e) { /* the list below still reloads */ } }
+    loadRnw(true);
+  }, 2000);
+}
+const rnwTime = s => s < 90 ? s + ' s' : Math.floor(s / 60) + ' min ' + String(s % 60).padStart(2, '0') + ' s';
+function rnwJobHtml() {
+  const j = RW && RW.job; if (!j) return '';
+  const run = j.state === 'running', bad = j.state === 'failed';
+  return `<div class="rnw-job ${bad ? 'bad' : ''}"><b>${esc(j.label)}</b> · ${run ? 'working' : esc(j.state)} · ${rnwTime(j.elapsed)}
+    ${run ? `<div class="pbar det"><i style="width:${Math.max(3, j.percent)}%"></i></div><div class="mut">${j.percent}% · ${esc(j.stage)}</div>` : ''}
+    ${j.error ? `<div class="err">${esc(j.error)}</div>` : ''}
+    ${j.log.length ? `<details><summary class="mut">What the generator says</summary>${j.log.map(l => `<code class="mut" style="display:block;white-space:pre-wrap">${esc(l)}</code>`).join('')}</details>` : ''}
+    ${run ? '<p><button class="sm" data-rnw="cancel">Cancel</button></p>' : ''}</div>`;
+}
+function rnwDrawJob() { const b = document.getElementById('rnwjob'); if (b && tab === 'rnw') b.innerHTML = rnwJobHtml(); }
+function rnwWorld(w, p, can) {
+  const on = w.in_playset === 'on';
+  const st = on ? ['On in this playset', 'ok'] : w.in_playset === 'off' ? ['Off in this playset', 'warn'] : w.installed ? ['Installed', 'new'] :
+    w.place === 'kept' ? ['Kept, not installed', ''] : ['Code only', ''];
+  const facts = [w.preset_title, w.seed !== '' ? 'seed ' + w.seed : '', w.generator ? 'generator ' + w.generator : '', w.game_build ? 'game build ' + w.game_build : '',
+    w.created ? ago(w.created) : '', w.seconds ? 'took ' + rnwTime(Math.round(w.seconds)) : '', w.made_here ? 'made here' : ''].filter(Boolean).join(' · ');
+  const ch = w.changes.map(c => `<div><span class="mut">${esc(c.label)}</span> ${esc(c.value)}</div>`).join('');
+  const dt = w.details.map(c => `<div><span class="mut">${esc(c.key)}</span> ${esc(c.value)}</div>`).join('');
+  const specs = `<details><summary class="mut">Settings${w.changes.length ? ` (${w.changes.length} changed from the defaults)` : ' (the defaults of its type)'}${w.specs_from.length ? ' · read from ' + esc(w.specs_from.join(', ')) : ''}</summary>
+      ${w.code ? `<div><span class="mut">World code</span> <code>${esc(w.code)}</code></div>` : ''}${ch}${dt ? '<div class="mut" style="margin-top:6px">As recorded by the generator</div>' + dt : ''}
+      ${!ch && !dt && !w.code ? '<div class="mut">Nothing could be read for this world.</div>' : ''}</details>`;
+  return `<div class="row static rnw-w">${thumb({id: w.mod_id || '', name: w.name, exists: !!w.mod_id}, 'md', 0, false)}
+    <span class="nm" style="white-space:normal;cursor:default"><b>${esc(w.name)}</b> ${w.tag ? `<span class="b">${esc(w.tag)}</span>` : ''} <span class="b ${st[1]}">${st[0]}</span>${w.starred ? ' ★' : ''}
+      <div class="mut">${esc(facts)}</div>${w.notes ? `<div class="mut">Notes: ${esc(w.notes)}</div>` : ''}${w.problem ? `<div class="warn">${esc(w.problem)}</div>` : ''}${specs}</span>
+    <span class="rnw-btn">${w.installed && w.mod_id ? (on ? `<button class="sm" data-rnw="useoff" data-f="${esc(w.folder)}">Turn off</button>` : `<button class="pri sm" data-rnw="use" data-f="${esc(w.folder)}" title="Turns this world on in the current playset, turns the other worlds and the generator itself off, and puts it last">Use this world</button>`) : ''}
+      ${!w.installed && can && w.id ? `<button class="sm" data-rnw="add" data-id="${esc(w.id)}" title="Installs it into your mod folder (the generator builds it again from its code if it must)">Add to game</button>` : ''}
+      ${w.installed && can && w.id ? `<button class="sm" data-rnw="remove" data-id="${esc(w.id)}" data-f="${esc(w.name)}">Remove from game</button>` : ''}
+      ${w.code ? `<button class="sm" data-rnw="copy" data-code="${esc(w.code)}">Copy code</button>` : ''}</span></div>`;
+}
+function viewRnw(p) {
+  const R = RW;
+  const head = `<div class="rnw"><h3>Random New World <span class="b warn">beta</span></h3>
+    <p class="mut">Random New World is a separate program that builds a new map for Europa Universalis V: the Old World stays, the Americas become new continents. Each world it makes is a mod. This page starts the generator, lists your worlds, and turns one on in this playset. Start a <b>new 1337 campaign</b> with it, enable only one world, and restart the game before switching worlds.</p>`;
+  if (!R || (R.busy && !R.worlds)) { $('view').innerHTML = head + '<div class="empty">Looking for Random New World and your worlds…</div></div>'; return; }
+  if (R.error) { $('view').innerHTML = head + `<div class="row static err">${esc(R.error)}</div><p><button class="sm" data-rnw="refresh">Try again</button></p></div>`; return; }
+  const g = R.generator, can = !!(g && g.can_run), busy = !!(R.job && R.job.state === 'running');
+  const gbox = g ? `<div class="row static"><span class="nm" style="white-space:normal;cursor:default">Found in <code>${esc(g.folder)}</code> <span class="mut">(${esc(g.how || 'your PC')})</span>
+        <div class="mut">${g.cmd ? 'Command line: ' + esc(g.cmd.split(/[\\/]/).pop()) : 'No command line (rnw.cmd) found: worlds cannot be made from here.'} · ${g.launcher ? 'Window: ' + esc(g.launcher.split(/[\\/]/).pop()) : 'No window program found.'}</div></span>
+        ${g.can_open ? '<button class="pri sm" data-rnw="open">Open generator</button>' : ''}<button class="sm" data-rnw="folder">Choose folder…</button><button class="sm" data-rnw="refresh">Refresh</button></div>`
+    : `<div class="row static warn"><span class="nm" style="white-space:normal;cursor:default">Random New World was not found on this PC. Subscribe to it on the <a href="https://steamcommunity.com/sharedfiles/filedetails/?id=3829217331" target="_blank" rel="noopener">Steam Workshop</a> (or download it from <a href="https://github.com/Sir-Starch/eu5-random-new-world/releases" target="_blank" rel="noopener">GitHub</a>), then press Refresh. If it is somewhere else, choose its folder.</span>
+        <button class="sm" data-rnw="folder">Choose folder…</button><button class="sm" data-rnw="refresh">Refresh</button></div>`;
+  const notes = R.notes.filter(n => g || !n.startsWith('Random New World was not found')).map(n => `<div class="row static warn">${esc(n)}</div>`).join('');
+  const hub = R.hub.enabled ? '<div class="row static warn">The generator itself is switched on in this playset. Use this world switches it off, as Random New World asks.</div>' : '';
+  const form = `<h3>Make a new world</h3><div class="rnw-form">
+      <label>World type <select data-rnwf="preset">${R.presets.map(x => `<option value="${x.id}" ${RWF.preset === x.id ? 'selected' : ''}>${esc(x.title)} - ${esc(x.about)}</option>`).join('')}</select></label>
+      <label>Seed <input data-rnwf="seed" value="${esc(RWF.seed)}" placeholder="empty = random" inputmode="numeric" size="22"></label>
+      <label>or a world code <input data-rnwf="code" value="${esc(RWF.code)}" placeholder="RNW1-…" size="30"></label>
+      <button class="pri" data-rnw="new" ${can && !busy ? '' : 'disabled'}>Make world</button></div>
+      <p class="mut">Takes some minutes and about 7.5 GB of free memory; the world needs about 1.2 GB of disk${R.free_gb != null ? ` (${R.free_gb} GB free here)` : ''}. A world code makes the same world again (with the same game and generator version). The world is installed into your mod folder when it is done.</p>`;
+  const list = R.worlds.map(w => rnwWorld(w, p, can)).join('');
+  $('view').innerHTML = head + gbox + notes + hub + form + `<div id="rnwjob">${rnwJobHtml()}</div>` +
+    `<h3>Your worlds (${R.worlds.length})</h3>` + (list || '<div class="empty">No worlds yet. Make one above, or open the generator.</div>') + '</div>';
 }
 async function loadCompare() {
   const others = S.playsets.filter(x => x.id !== S.active);
@@ -856,7 +934,7 @@ document.addEventListener('click', guard(async e => {
     activateQ = activateQ.then(() => api(`playsets/${id}/activate`, {}), () => api(`playsets/${id}/activate`, {}));
     await activateQ; return analyse();
   }
-  if (ds.tab) { tab = ds.tab; render(); if (tab === 'compare') { C = null; render(); await loadCompare(); } if (tab === 'files') await loadFiles(); }
+  if (ds.tab) { tab = ds.tab; render(); if (tab === 'compare') { C = null; render(); await loadCompare(); } if (tab === 'files') await loadFiles(); if (tab === 'rnw') await loadRnw(); }
   if (ds.f) { flt = ds.f; render(); }
   const pick = t.closest('[data-sel]');   // a picture's tile holds an image inside it
   if (pick) { const id = pick.dataset.sel; sel = sel === id ? null : id; render(); }
@@ -878,6 +956,38 @@ document.addEventListener('click', guard(async e => {
     lastMissing = r.missing; steamQ = null; await api(`playsets/${r.id}/activate`, {}); await load();
     tab = 'presets'; render();
     toast(r.missing.length ? `Playset created. ${r.missing.length} mod(s) still need downloading.` : 'Playset created. Everything is installed.');
+  }
+  const rb = t.closest('[data-rnw]');
+  if (rb) {
+    const act = rb.dataset.rnw;
+    if (act === 'refresh') return loadRnw();
+    if (act === 'open') { await api('rnw/open', {}); return toast('Opening Random New World…'); }
+    if (act === 'folder') {
+      const v = prompt('Folder where Random New World is installed (the one with rnw.cmd in it).\nLeave empty to look for it automatically:', RW && RW.generator ? RW.generator.folder : '');
+      if (v === null) return;
+      await api('rnw/folder', {path: v.trim()}); return loadRnw();
+    }
+    if (act === 'new') {
+      const r = await api('rnw/new', {preset: RWF.preset, seed: RWF.seed.trim(), code: RWF.code.trim()});
+      RW.job = r.job; render(); rnwPoll(); return toast('Making the world. This takes some minutes; you can keep using the app.');
+    }
+    if (act === 'cancel') { const r = await api('rnw/cancel', {}); RW.job = r.job; return render(); }
+    if (act === 'use' || act === 'useoff') {
+      const r = await api('rnw/use', {playset: S.active, folder: rb.dataset.f, on: act === 'use'});
+      Object.assign(cur(), r.playset); render(); analyse(); loadRnw(true);
+      return toast(r.did.join(' ') || 'Nothing to change.');
+    }
+    if (act === 'add') { const r = await api('rnw/add', {id: rb.dataset.id}); RW.job = r.job; render(); rnwPoll(); return toast('Adding the world to the game…'); }
+    if (act === 'remove') {
+      if (!confirm(`Remove "${rb.dataset.f}" from the game?\n\nIts mod is taken out of your mod folder. Random New World keeps its code and pictures, so you can add it again. A save made with it will not load without it.`)) return;
+      block(true, 'Removing', 'Random New World is taking the world out…');
+      try { await api('rnw/remove', {id: rb.dataset.id}); } finally { block(false); }
+      try { await load(); } catch (e) { /* the list reloads below */ }
+      return loadRnw();
+    }
+    if (act === 'copy') {
+      try { await navigator.clipboard.writeText(rb.dataset.code); return toast('World code copied'); } catch (e) { return toast('Select the code in Settings and copy it by hand: ' + rb.dataset.code); }
+    }
   }
   const cb = t.closest('[data-crash]'), co = t.closest('[data-crashoff]');
   if (cb && cb.dataset.crash === 'go') return runCrash();
@@ -1346,7 +1456,7 @@ function setLogo(id) {
   img.onerror = () => { if (logoTry++ < 2 && box.dataset.k === id) setTimeout(() => { if (box.dataset.k === id) img.src = `/api/${encodeURIComponent(id)}/logo?r=${logoTry}`; }, 1500); };
 }
 async function useGame(id, first) {
-  gen++; G = id; S = A = C = P = CR = null; sel = null; tab = 'order'; cmpWith = null; lastMissing = []; steamQ = null; setupShown = false;
+  gen++; G = id; S = A = C = P = CR = RW = null; clearInterval(RWT); RWT = null; sel = null; tab = 'order'; cmpWith = null; lastMissing = []; steamQ = null; setupShown = false;
   try { localStorage.setItem('mm-game', id); } catch (e) { /* storage may be blocked */ }
   if (location.hash.slice(1) !== id) history.replaceState(null, '', '#' + id);
   const g = GI.games.find(x => x.id === id);
@@ -1428,6 +1538,7 @@ $('game').onchange = guard(async () => {
   await useGame($('game').value, true);
 });
 window.addEventListener('hashchange', () => { const w = location.hash.slice(1); if (GI && w !== G && GI.games.some(g => g.id === w)) useGame(w, true).catch(e => fail(e, 'hash')); });
+document.addEventListener('input', e => { const f = e.target.closest && e.target.closest('[data-rnwf]'); if (f) RWF[f.dataset.rnwf] = f.value; });
 setInterval(() => { fetch('/api/ping').catch(() => {}); }, 5000);   // "this page is open": lets the app end after its window was closed (see watch_window)
 (async () => {
   try {   // ask for the logo of the game most likely to open while the game list is still on its way

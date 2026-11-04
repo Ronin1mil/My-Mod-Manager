@@ -168,7 +168,8 @@ This project was written with the help of an AI coding assistant (see the note a
 | [docs/21-dev-data-locations.md](docs/21-dev-data-locations.md) | Where every file and log is (for testers) |
 | [docs/22-checked-on-a-real-pc.md](docs/22-checked-on-a-real-pc.md) | What a real PC showed, and the fixes |
 | [docs/23-crash-help.md](docs/23-crash-help.md) | Choosing which mod wins a clash, and Crash help (beta) |
-| [docs/24-random-new-world-plan.md](docs/24-random-new-world-plan.md) | Plan: Random New World support for Europa Universalis V (not built yet) |
+| [docs/24-random-new-world-plan.md](docs/24-random-new-world-plan.md) | Plan: Random New World support for Europa Universalis V |
+| [docs/25-random-new-world.md](docs/25-random-new-world.md) | Random New World (beta): what 1.1.0 does, where the settings come from, what is not yet checked |
 
 ## License
 [MIT](LICENSE) © 2026 Ronin1mil
