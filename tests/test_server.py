@@ -222,6 +222,22 @@ class Hardening(Base):
         self.assertEqual(self.req("POST", "/api/playsets", {"name": "x"},
                                   headers={"Origin": f"http://127.0.0.1:{self.port}"})[0], 200)
 
+    def test_requests_from_other_websites_are_refused_before_any_work(self):
+        # an <img src="http://127.0.0.1:8765/api/<game>/inspect?path=\\host\share"> on any page must not touch that path
+        with mock.patch("modmanager.detect.find_install_root") as look:
+            for site in ("cross-site", "same-site"):
+                st = self.req("GET", "/api/inspect?path=x", headers={"Sec-Fetch-Site": site})[0]
+                self.assertEqual(st, 403)
+            look.assert_not_called()
+        for site in ("cross-site", "same-site"):
+            self.assertEqual(self.req("GET", "/api/state", headers={"Sec-Fetch-Site": site})[0], 403)
+            self.assertEqual(self.req("POST", "/api/playsets", {"name": "x"}, headers={"Sec-Fetch-Site": site})[0], 403)
+        # the app's own page (same-origin), the address bar (none) and clients that send nothing still work
+        for site in ("same-origin", "none", None):
+            h = {"Sec-Fetch-Site": site} if site else {}
+            self.assertEqual(self.req("GET", "/api/state", headers=h)[0], 200)
+        self.assertEqual(self.req("GET", "/", headers={"Sec-Fetch-Site": "cross-site"})[0], 200)   # the page itself is harmless
+
     def test_invalid_input_gets_400_not_500_and_changes_nothing(self):
         pid = self.new_playset(["local:lib"])
         before = self.req("GET", "/api/state")[1]["playsets"]

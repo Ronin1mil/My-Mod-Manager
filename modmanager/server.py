@@ -1232,6 +1232,12 @@ def make_handler(hub):
             # guards against DNS rebinding: only answer for our own loopback host name
             return self.headers.get("Host", "").rsplit(":", 1)[0] in ("127.0.0.1", "localhost")
 
+        def _cross_site(self):
+            """True for an /api/ request that another website made (an <img>, a link, a form or a script on any page the
+            user has open). Edge and Chrome say so in Sec-Fetch-Site; such a request must not even start work: a GET like
+            /api/<game>/inspect?path=\\\\host\\share would make Windows try to log in to that host."""
+            return self.path.startswith("/api/") and self.headers.get("Sec-Fetch-Site", "").lower() in ("cross-site", "same-site")
+
         def _route(self):
             """-> (parts, GameApp or None). Raises KeyError for an unknown game."""
             parts = self.path.split("?")[0].strip("/").split("/")
@@ -1262,6 +1268,8 @@ def make_handler(hub):
             self._timed("POST", self._do_post)
 
         def _do_get(self):
+            if self._cross_site():
+                return self._send(403, {"error": "cross-site request"})
             p = self.path.split("?")[0].strip("/").split("/")
             if len(p) == 5 and p[0] == "api" and p[2] == "rnw" and p[3] == "map" and p[1] == "eu5":
                 return self._rnw_map(p[4])
@@ -1377,6 +1385,9 @@ def make_handler(hub):
                 return self._send(500, {"error": f"{type(e).__name__}: {e}", "log_file": str(errorlog.log_path())})
 
         def _do_post(self):
+            if self._cross_site():
+                self._drain()
+                return self._send(403, {"error": "cross-site request"})
             parts = self.path.strip("/").split("/")
             if parts[-1] in ("install", "update-check", "downloads", "import-collection", "mod-updates", "self-update", "full-rescan", "smartsort"):
                 return self._post()  # slow network/disk work must not hold the lock
