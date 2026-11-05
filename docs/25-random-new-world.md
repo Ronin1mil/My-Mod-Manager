@@ -54,7 +54,7 @@ Each card says which sources it used ("read from ...").
    later removed, so the specs are not lost.
 
 ## Using a world in a playset
-**Use this world** (`POST rnw/use`): adds the mod to the playset if it is not in it, turns it on, turns **every other RNW
+**Use this world** (`POST rnw/use`): adds the mod to the playset if it is not in it, turns it on, turns **every other RNW A world that has just been made or added (job kinds `new` and `add`) gets the same treatment by itself when its job finishes (`Manager._apply`): the job's public record then carries `applied` = `{playset, world, folder, did[]}` (or `applied_error`), and the page says which map the user will now be playing on. With no active playset nothing is applied and the page says to press Use this world.
 world and the generator hub off** (RNW's rule: one world, hub disabled), moves it to the end, and adds any mod it depends on.
 The playset's own rules still apply afterwards (auto-sort keeps a stable order). RNW's own note: Refined Colonization must load
 before the world; with the world last that holds. Starting still goes through the normal Play button.

@@ -797,6 +797,7 @@ class Jobs:
             return None
         end = job["finished"] or time.time()
         return {**{k: job[k] for k in ("id", "kind", "label", "state", "percent", "stage", "log", "error", "result")},
+                "applied": job.get("applied"), "applied_error": job.get("applied_error", ""),
                 "elapsed": round(end - job["started"])}
 
     def status(self):
@@ -1051,7 +1052,7 @@ class Manager:
                               "changes": specs["changes"], "requested_at": int(time.time()), "state": "running",
                               "how": "made by this app", "game_version": self.app.game_version})
         job = self.jobs.start("new", f"Making {PRESET_TITLES.get(specs['preset'], specs['preset'])} (seed {specs['seed']})",
-                              gen.argv(argv), gen.folder, self._finish(wc, specs, "made by this app"))
+                              gen.argv(argv), gen.folder, self._finish(wc, specs, "made by this app", before=self._world_folders()))
         gamelog.log(self.app.game.id, f"Random New World: making {wc}")
         return {"job": job, "code": wc}
 
@@ -1060,7 +1061,7 @@ class Manager:
         wid = check_args([str(world_id)])[0]
         self._need_space()
         job = self.jobs.start("add", f"Adding {wid} to the game", gen.argv(["add-world", wid]), gen.folder,
-                              self._finish(None, None, "added by this app"))
+                              self._finish(None, None, "added by this app", before=self._world_folders(), wid=wid))
         return {"job": job}
 
     def remove_world(self, world_id):
@@ -1211,12 +1212,16 @@ class Manager:
     def cancel(self):
         return self.jobs.cancel()
 
-    def _finish(self, code, specs, how):
+    def _world_folders(self):
+        return {Path(d.get("root") or "").name for d in self.app.mods.values() if is_world(d)}
+
+    def _finish(self, code, specs, how, before=None, wid=""):
         def done(job):
             ok = job.get("outcome") == "done"
             res = job["result"] if isinstance(job["result"], dict) else {}
             if code is None:   # add-world: the world's id was in the command; the code comes from the result when it has one
-                return self._after(job, ok)
+                self._after(job, ok)
+                return self._apply(job, ok, before, "", wid)
             rec = {"state": job.get("outcome") or "failed", "finished_at": int(time.time()), "seconds": res.get("seconds") or job["finished"] - job["started"],
                    "how": how, "installed": str(res.get("installed") or ""), "error": job["error"]}
             if isinstance(res.get("summary"), (dict, list)):
@@ -1226,6 +1231,7 @@ class Manager:
                 gamelog.log(self.app.game.id, f"Random New World exit code {job.get('rc')}, last lines: " + " | ".join(job["log"][-6:])[:600])
             gamelog.log(self.app.game.id, f"Random New World: {code} {job.get('outcome')}" + (f" ({job['error']})" if job["error"] else ""))
             self._after(job, ok, str(res.get("installed") or ""))
+            self._apply(job, ok, before, str(res.get("installed") or ""), wid)
         return done
 
     def _after(self, job, ok, installed=""):
@@ -1236,6 +1242,30 @@ class Manager:
         if installed and Path(installed).parent != mod:
             job["error"] = job["error"] or (f"Random New World installed the world into {installed}, which is not the mod folder this app reads "
                                             f"({mod}). Check the folders in Settings.")
+
+    def _apply(self, job, ok, before, installed="", wid=""):
+        """A world that was just made (or added) is put to use at once: it is turned on in the active playset (the other worlds and the
+        generator itself off, it loads last), and the page tells the user which map they will now be playing on (job["applied"])."""
+        if not ok:
+            return
+        try:
+            app = self.app
+            now = self._world_folders()
+            cands = ([Path(installed).name] if installed else []) + ([WORLD_PREFIX + wid] if wid else []) + sorted(now - (before or set()))
+            folder = next((c for c in cands if c in now), "")
+            if not folder:
+                return
+            with (app.state_lock or app.lock):
+                pid = app.store.data.get("active")
+                if not pid or pid not in app.store.data["playsets"]:
+                    return
+                res = self.use(pid, folder)
+                mid = next(m for m, d in app.mods.items() if Path(d.get("root") or "").name == folder)
+                job["applied"] = {"playset": app.store.data["playsets"][pid]["name"], "world": app.mods[mid]["name"], "folder": folder, "did": res["did"]}
+            gamelog.log(app.game.id, f"Random New World: {folder} turned on in the playset {job['applied']['playset']}")
+        except Exception as e:   # the world is made and installed either way: the user can still press Use this world
+            job["applied_error"] = f"{type(e).__name__}: {e}"[:200]
+            gamelog.log(self.app.game.id, "Random New World: could not turn the new world on in the playset: " + job["applied_error"])
 
     def _rescan(self):
         mods = self.app.read_mods()

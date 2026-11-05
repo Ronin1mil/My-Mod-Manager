@@ -606,6 +606,44 @@ class Route(GameCase):
         self.assertEqual(rec["summary"], {"locations": 123, "land": "35 %"})
         self.assertEqual(rec["changes"]["new_world"]["land_permille"], 350)
 
+    def active_playset_with_the_generator_on(self):
+        mkworkshop(self.ws(), 3829217331, "Random New World")
+        mkmod(self.user(), "Refined", "Refined Colonization", stub=False)
+        self.post("/api/rescan", {})
+        pid = self.new_playset(["ws:3829217331", "local:Refined"])
+        self.post(f"/api/playsets/{pid}/activate", {})
+        self.assertEqual(self.app.store.data["active"], pid)
+        return pid
+
+    def test_a_world_that_was_just_made_is_turned_on_in_the_playset_by_itself(self):
+        self.active_playset_with_the_generator_on()
+        self.assertEqual(self.post("/api/rnw/new", {"code": CODE})[0], 200)
+        job = self.wait()
+        self.assertEqual(job["state"], "done", job)
+        ap = job["applied"]
+        self.assertEqual(ap["folder"], "rnw_exp_world_abcde23456")
+        self.assertTrue(any("now loads last" in d for d in ap["did"]), ap)
+        ps = self.app.store.data["playsets"][self.app.store.data["active"]]
+        self.assertEqual(ps["mods"][-1], "local:rnw_exp_world_abcde23456")
+        self.assertNotIn("local:rnw_exp_world_abcde23456", ps["disabled"])
+        self.assertEqual(job["applied_error"], "")
+        w = self.req("GET", "/api/rnw/files")[1]
+        self.assertFalse(w["hub"]["enabled"])
+
+    def test_adding_a_kept_world_also_turns_it_on(self):
+        self.active_playset_with_the_generator_on()
+        self.assertEqual(self.post("/api/rnw/add", {"id": "kept000000"})[0], 200)
+        job = self.wait()
+        self.assertEqual(job["state"], "done", job)
+        self.assertEqual(job["applied"]["folder"], "rnw_exp_world_kept000000")
+        ps = self.app.store.data["playsets"][self.app.store.data["active"]]
+        self.assertIn("ws:3829217331", ps["disabled"])                  # the generator itself is switched off for the world
+
+    def test_without_a_playset_a_made_world_is_just_installed(self):
+        self.assertEqual(self.post("/api/rnw/new", {"code": CODE})[0], 200)
+        job = self.wait()
+        self.assertEqual((job["state"], job["applied"]), ("done", None))
+
     def test_a_failed_build_shows_the_generators_own_message_and_is_recorded(self):
         with mock.patch.dict(os.environ, {"RNW_STUB": "fail"}):
             self.post("/api/rnw/new", {"code": CODE})

@@ -513,8 +513,15 @@ function rnwPoll() {
     clearInterval(RWT); RWT = null;
     const j = RW.job;
     const what = j.kind === 'import' ? 'import' : 'build';
-    toast(j.state === 'done' ? (j.kind === 'import' ? 'The map was copied into your mod folder. Press Use this world.' : 'The world is made and installed. Press Use this world.') : j.state === 'cancelled' ? 'Cancelled.' : `Random New World ${what} failed: ` + j.error, j.state === 'failed');
-    if (j.state === 'done') { try { await load(); } catch (e) { /* the list below still reloads */ } }
+    const ap = j.applied;
+    const doneText = j.kind === 'import' ? 'The map was copied into your mod folder. Press Use this world.'
+      : ap ? `Done. You will now be playing on ${ap.world} (it is on in your playset "${ap.playset}", the generator is off). Start a NEW 1337 campaign with it.`
+      : 'The world is made and installed. Press Use this world.' + (j.applied_error ? ' It could not be turned on by itself: ' + j.applied_error : '');
+    toast(j.state === 'done' ? doneText : j.state === 'cancelled' ? 'Cancelled.' : `Random New World ${what} failed: ` + j.error, j.state === 'failed');
+    if (j.state === 'done') {
+      try { await load(); } catch (e) { /* the list below still reloads */ }
+      if (ap && RW) { rnwSay(`${ap.world} is now on in your playset "${ap.playset}": ${ap.did.join(' ')}`); rnwOk(); }
+    }
     if (RW.step !== 'menu') loadRnw(true);
   }, 2000);
 }
@@ -684,7 +691,7 @@ function viewRnw(p) {
           <button class="pri" data-rnw="browse" data-what="generator">Browse…</button><button class="sm" data-rnw="check">Check this folder</button></div>
         </div>`;
   const notes = (R.notes || []).filter(n => g).map(n => `<div class="row static warn">${esc(n)}</div>`).join('');
-  const hub = R.hub && R.hub.enabled ? '<div class="row static warn">The generator itself is switched on in this playset. Use this world switches it off, as Random New World asks.</div>' : '';
+  const hub = '';   // a world that is made or added is turned on in the playset by itself (the generator is switched off then), so there is nothing to warn about
   const list = (R.worlds || []).map(w => rnwWorld(w, p, can)).join('');
   const jobbox = `<div id="rnwjob">${rnwJobHtml()}</div>`;
   const worlds = `<h3>Your maps (${(R.worlds || []).length})</h3>` + (list || '<div class="empty">No Random New World maps in your mod folder yet.</div>');
@@ -1192,7 +1199,7 @@ document.addEventListener('click', guard(async e => {
       const what = ['generator', 'file'].includes(rb.dataset.what) ? rb.dataset.what : 'map', key = what === 'generator' ? 'gpath' : 'path';
       rnwSay(what === 'file' ? 'Opening the file window.' : 'Opening the folder window. It can be behind this window: look for it in the taskbar…'); RW.busy = true; render();
       let r;
-      try { r = await api('rnw/pick', {what, start: RWF[key] || ''}); } finally { RW.busy = false; }
+      try { r = await api('rnw/pick', {what, start: RWF[key] || (what === 'generator' && RW.generator ? RW.generator.folder : '')}); } finally { RW.busy = false; }
       if (r.error) { rnwOk(); rnwSay(r.error, true); return render(); }
       if (r.cancelled || !r.path) { rnwOk('cancelled, nothing changed'); return render(); }
       rnwOk('you chose ' + r.path); RWF[key] = r.path;
@@ -1203,7 +1210,10 @@ document.addEventListener('click', guard(async e => {
     if (act === 'layer') { if (RWM) { RWM.layer = rb.dataset.l; rnwPaintMap(); render(); } return; }
     if (act === 'fromcode') { RWF.code = rb.dataset.code; RW.step = 'make'; return render(); }
     if (act === 'keep') { RW.pick = false; return render(); }
-    if (act === 'check') return rnwCheck((RWF.gpath || '').trim());
+    if (act === 'check') {   // the folder shown in the box (typed, or the one already in use): a remembered folder is not typed, so RWF.gpath may be empty
+      const box = document.querySelector('[data-rnwf=gpath]');
+      return rnwCheck(((box && box.value) || RWF.gpath || (RW.generator ? RW.generator.folder : '') || '').trim());
+    }
     if (act === 'new') {
       const r = await api('rnw/new', {preset: RWF.preset, seed: RWF.seed.trim(), code: RWF.code.trim()});
       RW.job = r.job; render(); rnwPoll(); return toast('Making the world. This takes some minutes; you can keep using the app.');

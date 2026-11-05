@@ -166,6 +166,12 @@ try {
   assert.equal(await page.locator('.rnw-need').count(), 0);                                   // rnw.cmd was found: the note is gone
   assert.match(await page.textContent('.rnw-log'), /you chose/);
   assert.equal(await page.locator('[data-rnw=browse][data-what=generator]').isVisible(), true);   // the folder box and Browse… stay on screen once a folder is chosen
+  // pressing Check this folder with the folder already shown in the box (nothing typed) checks it again; it is not "Choose or paste the folder first"
+  assert.equal(await page.inputValue('[data-rnwf=gpath]'), gen);
+  const before = (await page.textContent('.rnw-log')).split('Searched').length;
+  await page.click('[data-rnw=check]');
+  await page.waitForFunction(n => document.querySelector('.rnw-log').textContent.split('Searched').length > n, before);
+  assert.doesNotMatch(await page.textContent('#toast'), /Choose or paste/);
   await page.fill('[data-rnwf=gpath]', path.join(root, 'nowhere'));
   await page.click('[data-rnw=check]');
   await page.waitForFunction(() => /is not a folder/.test(document.querySelector('.rnw-log').textContent));
@@ -187,10 +193,11 @@ try {
   assert.equal(made.state, 'done');
   assert.equal(made.preset, 'continents');   // the stand-in prints the code of its own fixture
 
-  // use the new world: it is on, the other world and the hub are off, it loads after Refined Colonization
-  const target = page.locator('.rnw-w [data-f=rnw_exp_world_abcde23456]').first();
-  await target.click();
+  // the new world was turned on in the playset by itself: it is on, the other world and the hub are off, it loads after Refined Colonization,
+  // the user is told which map they will be playing on, and there is no warning about the generator being on
   await page.waitForFunction(() => /On in this playset/.test(document.querySelector('.rnw').textContent));
+  assert.match(await page.textContent('.rnw-log'), /is now on in your playset/);
+  assert.doesNotMatch(await page.textContent('.rnw'), /generator itself is switched on/);
   const ps = (await (await fetch(`${base}/api/eu5/state`)).json()).playsets[0];
   const on = ps.mods.filter(m => !ps.disabled.includes(m));
   assert.equal(on[on.length - 1], 'local:rnw_exp_world_abcde23456');
