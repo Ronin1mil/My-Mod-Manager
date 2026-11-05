@@ -153,7 +153,12 @@ class AfterEveryChange(unittest.TestCase):
         b = self.server(games.VIC3)
         make_db(b.r / "user", [("m-c", None, "mod/c.mod", "C", str(b.r / "user" / "mod" / "c"))])
         pid = b.new_playset()
-        names = lambda: sorted(n for (n,) in sqlite3.connect(str(b.r / "user" / "launcher-v2.sqlite")).execute("SELECT name FROM playsets WHERE isRemoved=0"))
+        def names():
+            con = sqlite3.connect(str(b.r / "user" / "launcher-v2.sqlite"))
+            try:
+                return sorted(n for (n,) in con.execute("SELECT name FROM playsets WHERE isRemoved=0"))
+            finally:
+                con.close()   # an open handle keeps the file locked on Windows
         with mock.patch.object(launchersync, "launcher_running", return_value=False):
             b.post(f"/api/playsets/{pid}/update", {"mods": ["local:c"]})
             self.assertIn("T", names())
