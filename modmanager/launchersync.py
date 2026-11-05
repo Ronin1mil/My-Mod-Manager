@@ -1,4 +1,4 @@
-"""Keep the game's own playset in step with the app's active playset (Crusader Kings III first).
+"""Keep the game's own playset in step with the app's active playset (Crusader Kings III and Victoria 3).
 
 Starting CK3 from Steam opens the Paradox launcher, which writes ITS active playset into dlc_load.json before the game
 starts, so a change made only in this app was lost. After every change to the active playset the app therefore also
@@ -46,10 +46,11 @@ def _backup(db):
     return b
 
 
-def sync(user_dir, name, enabled, disabled, mods, registry_id, running=None):
+def sync(user_dir, name, enabled, disabled, mods, registry_id, running=None, others=()):
     """Write a playset into the launcher's database under `name` and make it the active one: `enabled` mod ids in load
     order (as the game will load them), then `disabled` ones switched off. `registry_id(mod)` gives a mod's
-    'mod/<name>.mod' path. -> {status: synced|launcher_open|no_db, file, missing, created}"""
+    'mod/<name>.mod' path. `others` is [(name, enabled, disabled)] for the app's other playsets: the launcher gets each one it does
+    not have yet (never changed when it has one of that name, and never made the active one). -> {status: synced|launcher_open|no_db, file, missing, created}"""
     dbs = launcherdb.db_files(user_dir)
     if not dbs:
         return {"status": "no_db", "file": "", "missing": [], "created": False}
@@ -65,17 +66,29 @@ def sync(user_dir, name, enabled, disabled, mods, registry_id, running=None):
         by_steam = {str(s): i for i, s, _, _ in rows if s}
         by_reg = {g: i for i, _, g, _ in rows if g}
         by_dir = {_norm(d): i for i, _, _, d in rows if d}
-        order, missing = [], []
-        for mid, on in [*((i, True) for i in enabled), *((i, False) for i in disabled if i not in enabled)]:
-            m = mods.get(mid)
-            if not m:
-                continue
-            lid = (by_dir.get(_norm(m.get("root"))) or (by_steam.get(str(m["remote_id"])) if m.get("remote_id") else None)
-                   or by_reg.get(registry_id(m)))
-            if lid and all(lid != x for x, _ in order):
-                order.append((lid, on))
-            else:
-                missing.append(m.get("name") or mid)
+        missing = []
+
+        def ordered(en, dis):
+            order = []
+            for mid, on in [*((i, True) for i in en), *((i, False) for i in dis if i not in en)]:
+                m = mods.get(mid)
+                if not m:
+                    continue
+                lid = (by_dir.get(_norm(m.get("root"))) or (by_steam.get(str(m["remote_id"])) if m.get("remote_id") else None)
+                       or by_reg.get(registry_id(m)))
+                if lid and all(lid != x for x, _ in order):
+                    order.append((lid, on))
+                else:
+                    missing.append(m.get("name") or mid)
+            return order
+
+        def insert(pid, pname, now_):
+            con.execute("INSERT INTO playsets (id, name, isActive, loadOrder, createdOn, updatedOn, isRemoved, hasNotApprovedChanges,"
+                        " syncState, state, owned, author, subscribersCount, ratingsCount, offDisk, lastUsedAt)"
+                        " VALUES (?, ?, 0, 'custom', ?, ?, 0, 0, 'NOT_ELIGIBLE', 'private', 1, '', 0, 0, 0, ?)",
+                        (pid, pname, now_, now_, now_))
+
+        order = ordered(enabled, disabled)
         now = int(time.time() * 1000)   # the launcher stores times as milliseconds
         found = con.execute("SELECT id FROM playsets WHERE name = ? AND isRemoved = 0 ORDER BY isActive DESC LIMIT 1",
                             (name,)).fetchone()
@@ -85,13 +98,19 @@ def sync(user_dir, name, enabled, disabled, mods, registry_id, running=None):
             con.execute("UPDATE playsets SET updatedOn = ?, lastUsedAt = ? WHERE id = ?", (now, now, pid))
         else:
             pid = str(uuid.uuid4())
-            con.execute("INSERT INTO playsets (id, name, isActive, loadOrder, createdOn, updatedOn, isRemoved, hasNotApprovedChanges,"
-                        " syncState, state, owned, author, subscribersCount, ratingsCount, offDisk, lastUsedAt)"
-                        " VALUES (?, ?, 0, 'custom', ?, ?, 0, 0, 'NOT_ELIGIBLE', 'private', 1, '', 0, 0, 0, ?)",
-                        (pid, name, now, now, now))
+            insert(pid, name, now)
         con.execute("DELETE FROM playsets_mods WHERE playsetId = ?", (pid,))
         con.executemany("INSERT INTO playsets_mods (playsetId, modId, enabled, position) VALUES (?, ?, ?, ?)",
                         [(pid, lid, 1 if on else 0, n) for n, (lid, on) in enumerate(order)])
+        known = {r[0] for r in con.execute("SELECT name FROM playsets WHERE isRemoved = 0")}
+        for oname, oen, odis in others:
+            if not oname or oname in known:
+                continue
+            known.add(oname)
+            oid = str(uuid.uuid4())
+            insert(oid, oname, now)
+            con.executemany("INSERT INTO playsets_mods (playsetId, modId, enabled, position) VALUES (?, ?, ?, ?)",
+                            [(oid, lid, 1 if on else 0, n) for n, (lid, on) in enumerate(ordered(oen, odis))])
         con.execute("UPDATE playsets SET isActive = CASE WHEN id = ? THEN 1 ELSE 0 END", (pid,))
         con.commit()
     except Exception:

@@ -89,6 +89,20 @@ class Sync(unittest.TestCase):
         self.assertEqual(r["missing"], ["Brand New"])
         self.assertEqual(self.q("SELECT count(*) FROM mods"), [(3,)])
 
+    def test_the_apps_other_playsets_are_added_but_an_existing_one_is_left_alone_and_none_becomes_active(self):
+        r = launchersync.sync(self.user, "Swords & Sorcery", ["local:swords_sorcery"], [], MODS, REG, running=lambda: False,
+                              others=[("Made in the app", ["ws:2986538297", "local:swords_sorcery"], ["local:new"]), ("Africa", ["ws:2986538297"], [])])
+        self.assertEqual(r["status"], "synced")
+        self.assertEqual(self.q("SELECT name FROM playsets WHERE isActive=1"), [("Swords & Sorcery",)])
+        new = self.q("SELECT id, isActive, isRemoved FROM playsets WHERE name='Made in the app'")
+        self.assertEqual(len(new), 1)
+        self.assertEqual(new[0][1:], (0, 0))
+        self.assertEqual(self.q("SELECT modId, enabled FROM playsets_mods WHERE playsetId=? ORDER BY position", new[0][0]),
+                         [("m-cheat", 1), ("m-ss", 1)])   # "Brand New" is not known to the launcher yet: reported, not invented
+        self.assertEqual(self.q("SELECT modId FROM playsets_mods WHERE playsetId='p-other'"), [("m-big",)])   # "Africa" kept as it was
+        self.assertEqual(self.q("SELECT count(*) FROM playsets WHERE name='Africa'"), [(1,)])
+        self.assertIn("Brand New", r["missing"])
+
     def test_never_while_the_launcher_runs(self):
         before = self.db.read_bytes()
         self.assertEqual(self.sync(running=True)["status"], "launcher_open")
@@ -135,8 +149,26 @@ class AfterEveryChange(unittest.TestCase):
         finally:
             con.close()
 
+    def test_victoria_3_follows_the_app_too_and_a_copy_reaches_the_launcher_at_once(self):
+        b = self.server(games.VIC3)
+        make_db(b.r / "user", [("m-c", None, "mod/c.mod", "C", str(b.r / "user" / "mod" / "c"))])
+        pid = b.new_playset()
+        names = lambda: sorted(n for (n,) in sqlite3.connect(str(b.r / "user" / "launcher-v2.sqlite")).execute("SELECT name FROM playsets WHERE isRemoved=0"))
+        with mock.patch.object(launchersync, "launcher_running", return_value=False):
+            b.post(f"/api/playsets/{pid}/update", {"mods": ["local:c"]})
+            self.assertIn("T", names())
+            b.post(f"/api/playsets/{pid}/duplicate", {"name": "Copy of T"})
+            self.assertIn("Copy of T", names())
+            b.post("/api/playsets", {"name": "Fresh one"})
+            self.assertIn("Fresh one", names())
+        con = sqlite3.connect(str(b.r / "user" / "launcher-v2.sqlite"))
+        try:
+            self.assertEqual(con.execute("SELECT name FROM playsets WHERE isActive=1").fetchall(), [("T",)])   # the copy is not made active
+        finally:
+            con.close()
+
     def test_other_games_wait_for_play(self):
-        v = self.server(games.VIC3)
+        v = self.server(games.EU5)
         pid = v.new_playset()
         with mock.patch.object(launchersync, "sync", side_effect=AssertionError("synced")):
             v.post(f"/api/playsets/{pid}/activate")

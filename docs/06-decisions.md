@@ -7,7 +7,7 @@
 | 3 | Base engine | The VIC3 manager's engine (order engine, library, safe install, saves, compare, update check, security headers, CI) because it was the most complete and best-tested. EU5's install detection, setup dialog, base-game comparison, patches and sharing, and CK3's load-file export were ported in. |
 | 4 | Games as data | Everything game-specific is a `Game` in `games.py`. The engine never names a game. |
 | 5 | Per-game state | Separate config folder, playsets, library, backups and settings per game; app-wide settings (updates, last game) separate. |
-| 6 | Source of truth | Our own `playsets.json`. The official launcher's sqlite is read for Import and, since 0.9.14, written for CK3 only (docs/16): Steam starts CK3 through the Paradox launcher, which otherwise overwrites the app's playset. |
+| 6 | Source of truth | Our own `playsets.json`. The official launcher's sqlite is read for Import and, since 0.9.14, written for CK3 and VIC3 (docs/16); both also get the app's other playsets that the launcher lacks, by name: Steam starts CK3 through the Paradox launcher, which otherwise overwrites the app's playset. |
 | 7 | Launch | Write what the game reads (its load file, EU5's `playsets.json`, Bannerlord's command line), then start the game: its own exe when the install says which one (CK3, VIC3, Bannerlord), else Steam; `--game-exe` wins. Nothing is marked verified until a real install confirms it. |
 | 8 | Saves | Per-playset folders are **opt-in** (they touch user files and are unverified on a real install). |
 | 9 | Archives | `.zip` only for now; executables/scripts are rejected outright (Paradox mods are data). |

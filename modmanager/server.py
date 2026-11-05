@@ -32,8 +32,8 @@ CSP = ("default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline';
 
 
 MAX_TREE, MAX_RESULT = 5000, 30000
-LIVE_SYNC = ("ck3",)   # games whose own files follow every change to the active playset (others: at Play)
-SYNC_ACTIONS = ("update", "activate", "autosort", "smartsort", "winner", "enable", "enable_all", "disable_all", "prune", "delete")
+LIVE_SYNC = ("ck3", "vic3")   # games whose own files follow every change to the active playset (others: at Play)
+SYNC_ACTIONS = ("update", "activate", "autosort", "smartsort", "winner", "enable", "enable_all", "disable_all", "prune", "delete", "merge", "duplicate")
 RESULT_CACHE = 64   # conflict answers kept per game (one per load order recently looked at)
 
 
@@ -294,7 +294,9 @@ class GameApp:
             ids, _ = self._chosen(pid, None)
             write_load_file(self.game, self.user_dir, self.mods, ids, ps["name"])
             off = [m for m in ps["mods"] if m in ps["disabled"]]
-            res.update(launchersync.sync(self.user_dir, ps["name"], ids, off, self.mods, lambda m: mod_entry(self.game, m)))
+            others = [(q["name"], self.store.export(k, self.mods), [m for m in q["mods"] if m in q["disabled"]])
+                      for k, q in self.store.data["playsets"].items() if k != pid]
+            res.update(launchersync.sync(self.user_dir, ps["name"], ids, off, self.mods, lambda m: mod_entry(self.game, m), others=others))
         except Exception as e:   # the app keeps working; Play still writes the files
             res.update(status="error", message=f"{type(e).__name__}: {e}")
             errorlog.write_exception("game sync", e, self.game.id)
@@ -1480,7 +1482,9 @@ def make_handler(hub):
             self._sync_app = None
             try:
                 parts, app = self._route()
-                if app is not None and app.live_sync and len(parts) == 4 and parts[:2] == ["api", "playsets"] and parts[3] in SYNC_ACTIONS:
+                new_set = parts in (["api", "playsets"], ["api", "import"], ["api", "launcher", "import"]) or (
+                    parts[:2] == ["api", "presets"] and parts[-1:] in (["apply"], ["import-collection"]))   # a playset was made or brought in
+                if app is not None and app.live_sync and (new_set or (len(parts) == 4 and parts[:2] == ["api", "playsets"] and parts[3] in SYNC_ACTIONS)):
                     self._sync_app = app   # just before the answer goes out: the game's own files get the change (see GameApp.sync_game)
                 if app is None:  # app-wide routes
                     if parts == ["api", "self-update"]:
