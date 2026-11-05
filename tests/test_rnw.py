@@ -558,12 +558,13 @@ class Route(GameCase):
             self.assertEqual(st, 400, path)
             self.assertIn("Europa Universalis V", res["error"])
 
-    def test_list_without_the_generator_says_where_to_get_it(self):
+    def test_list_without_the_generator_says_to_choose_its_folder(self):
         self.mgr._generator = None
         with mock.patch("modmanager.rnw.find_generator", return_value=None):
             st, res, _ = self.req("GET", "/api/rnw/list")
         self.assertEqual((st, res["generator"], res["worlds"]), (200, None, []))
-        self.assertIn("3829217331", res["notes"][0])
+        self.assertIn("choose the folder where it is installed", res["notes"][0])
+        self.assertNotRegex(res["notes"][0], r"(?i)workshop|github|3829217331")
 
     def test_installed_worlds_are_listed_without_the_generator_with_their_specs(self):
         self.mgr._generator = None
@@ -687,15 +688,48 @@ class Route(GameCase):
         self.assertIn("map", calls[1][0])
         self.assertEqual(calls[1][1], "x")
 
-    def test_the_app_does_not_search_the_disk_for_the_generator_but_suggests_the_workshop_folder(self):
+    def test_the_app_does_not_search_the_disk_by_itself_and_suggests_no_folder(self):
         self.mgr._generator = None
         ws = self.ws() / "3829217331"
         ws.mkdir(parents=True, exist_ok=True)
         (ws / "rnw.cmd").write_text("x")
-        self.assertIsNone(self.mgr.generator())   # it exists in the Workshop folder, but the user has not pointed to it
+        self.assertIsNone(self.mgr.generator())   # it exists on this PC, but the user has not pointed to it
         res = self.req("GET", "/api/rnw/files")[1]
         self.assertIsNone(res["generator"])
-        self.assertEqual(res["hint"], str(ws))
+        self.assertNotIn("hint", res)
+        self.assertNotRegex(json.dumps(res["notes"]), r"(?i)workshop|github")
+
+    def test_a_folder_the_user_chose_is_searched_deeply_for_rnw_cmd(self):
+        deep = self.r / "chosen" / "a" / "b" / "c" / "d" / "e" / "f"      # six levels down: past the old three-level limit
+        deep.mkdir(parents=True)
+        (deep / "rnw.cmd").write_text("x")
+        res = self.mgr.check_folder(str(self.r / "chosen"))
+        self.assertTrue(res["ok"], res)
+        self.assertEqual(res["generator"]["cmd"], str(deep / "rnw.cmd"))
+        self.assertRegex(res["report"][0]["text"], r"Searched .* and every folder inside it")
+
+    def test_when_rnw_cmd_is_not_in_the_chosen_folder_the_folder_next_to_it_is_searched(self):
+        top = self.r / "pkgs" / "one"
+        inner = top / "game" / "x"
+        inner.mkdir(parents=True)
+        (self.r / "pkgs" / "two").mkdir()
+        (top / "rnw.cmd").write_text("x")
+        (top / "Random New World.exe").write_text("x")
+        res = self.mgr.check_folder(str(inner))   # the user chose a folder inside the package
+        self.assertTrue(res["ok"], res)
+        self.assertEqual(res["generator"]["folder"], str(top))
+        self.assertTrue(any("also searched the folder above" in r["text"] for r in res["report"]), res)
+        self.assertEqual(self.app.store.settings().get("rnw_dir"), str(top))   # the folder that really holds it is remembered
+
+    def test_nothing_found_says_so_and_names_no_website(self):
+        d = self.r / "empty" / "x"
+        d.mkdir(parents=True)
+        res = self.mgr.check_folder(str(d))
+        text = " ".join(r["text"] for r in res["report"])
+        self.assertIn("no rnw.cmd and no Random New World program", text)
+        self.assertNotRegex(text, r"(?i)workshop|github|steam")
+        src = Path(rnw.__file__).read_text(encoding="utf-8")
+        self.assertNotRegex(src[src.index("def check_folder"):src.index("# -- listing --")], r"(?i)workshop|github")
 
     def test_open_starts_only_the_launcher_without_a_shell(self):
         calls = []

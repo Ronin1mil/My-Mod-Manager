@@ -474,7 +474,7 @@ async function loadRnw(quiet, cli) {
 async function rnwGo(step) {
   RW.step = step; RW.log = []; RW.cli = false; RW.error = null;
   if (step === 'import') rnwSay('Reading your mod folder for Random New World maps (no program is started)…');
-  else rnwSay('Checking whether you already pointed me to the Random New World folder (the disk is not searched)…');
+  else rnwSay('Checking whether you already pointed me to the Random New World folder (your whole disk is not searched)…');
   await loadRnw(false, false);
   if (RW.error) return;
   if (step === 'import') rnwOk(`found ${RW.worlds.length} map${RW.worlds.length === 1 ? '' : 's'}`);
@@ -677,11 +677,10 @@ function viewRnw(p) {
         <div class="mut">${g.cmd ? 'Command line: ' + esc(g.cmd.split(/[\\/]/).pop()) : 'No command line (rnw.cmd) found: maps cannot be made from here.'} · ${g.launcher ? 'Window: ' + esc(g.launcher.split(/[\\/]/).pop()) : 'No window program found.'}</div></span>
         ${g.can_open ? '<button class="pri sm" data-rnw="open">Open generator</button>' : ''}</div>` : '';
   const gbox = `<div class="rnw-drop"><b>Where is Random New World?</b>
-        <div class="mut">${g ? 'A folder is in use (shown below the box).' : 'The app does not search your disk.'} Press <b>Browse…</b> to open the file explorer and choose the folder where Random New World is installed (the one that holds <code>rnw.cmd</code>), or paste the path. I look in that folder only and tell you what I find.</div>
+        <div class="mut">${g ? 'A folder is in use (shown below the box).' : 'The app does not search your whole disk.'} Press <b>Browse…</b> to open the file explorer and choose the folder where Random New World is installed (the one that holds <code>rnw.cmd</code>), or paste the path. I search that folder and every folder inside it for <code>rnw.cmd</code> (and, if it is not there, the two folders above it), and tell you what I find.</div>
         <div class="rnw-form" style="margin-top:8px"><label>Folder of Random New World<input data-rnwf="gpath" value="${esc(RWF.gpath || (g ? g.folder : ''))}" placeholder="C:\\…\\RandomNewWorld" size="52"></label>
           <button class="pri" data-rnw="browse" data-what="generator">Browse…</button><button class="sm" data-rnw="check">Check this folder</button></div>
-        ${R.hint && !g ? `<div class="mut" style="margin-top:6px">Found on this PC, in your Steam Workshop folder: <a href="#" data-rnw="usehint" data-path="${esc(R.hint)}"><code>${esc(R.hint)}</code></a> (click to put it in the box; nothing is checked until you press Check).</div>` : ''}
-        <div class="mut" style="margin-top:6px">Not installed? <a href="https://steamcommunity.com/sharedfiles/filedetails/?id=3829217331" target="_blank" rel="noopener">Steam Workshop</a> or <a href="https://github.com/Sir-Starch/eu5-random-new-world/releases" target="_blank" rel="noopener">GitHub</a> (the GitHub package includes rnw.cmd).</div></div>`;
+        </div>`;
   const notes = (R.notes || []).filter(n => g).map(n => `<div class="row static warn">${esc(n)}</div>`).join('');
   const hub = R.hub && R.hub.enabled ? '<div class="row static warn">The generator itself is switched on in this playset. Use this world switches it off, as Random New World asks.</div>' : '';
   const list = (R.worlds || []).map(w => rnwWorld(w, p, can)).join('');
@@ -1202,7 +1201,6 @@ document.addEventListener('click', guard(async e => {
     if (act === 'layer') { if (RWM) { RWM.layer = rb.dataset.l; rnwPaintMap(); render(); } return; }
     if (act === 'fromcode') { RWF.code = rb.dataset.code; RW.step = 'make'; return render(); }
     if (act === 'keep') { RW.pick = false; return render(); }
-    if (act === 'usehint') { e.preventDefault && e.preventDefault(); RWF.gpath = rb.dataset.path; return render(); }
     if (act === 'check') return rnwCheck((RWF.gpath || '').trim());
     if (act === 'new') {
       const r = await api('rnw/new', {preset: RWF.preset, seed: RWF.seed.trim(), code: RWF.code.trim()});

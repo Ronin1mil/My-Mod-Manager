@@ -28,7 +28,6 @@ import zlib
 from pathlib import Path
 
 from . import gamelog, order, pickfolder
-from .paths import workshop_dirs
 from .rnw_fields import CHANGE_FIELDS, PRESET_IDS
 
 WORKSHOP_ID = "3829217331"
@@ -59,6 +58,7 @@ OPT_OK = re.compile(r"^--[a-z][a-z\-]{0,30}$")
 BAD_PATH = re.compile(r'[%^&|<>"!\x00-\x1f]')   # characters cmd.exe treats specially, even in a quoted .cmd argument
 CODE_IN_TEXT = re.compile(r"RNW1(?:-[A-Za-z0-9]+)+", re.I)
 PROGRESS = re.compile(r"^\[\s*(\d+)%\]\s*(start|done)?\s*(.*)$")
+SEARCH_DEPTH, SEARCH_CAP, SEARCH_SECONDS = 8, 60000, 10   # how far a search of the folder the user chose goes (levels, entries, seconds)
 SKIP_EXE = re.compile(r"unins|uninstall|crash|setup|updater", re.I)
 _records_lock = threading.Lock()
 
@@ -220,14 +220,23 @@ class Generator:
                 "can_open": bool(self.launcher), "can_run": self.can_run}
 
 
-def _walk(folder, depth=3, cap=4000):
+def _walk(folder, depth=3, cap=4000, seconds=None, stats=None):
+    """Every file in a folder and the folders inside it, level by level. Stops after `cap` entries, or `seconds`, so a search
+    can never run for long. `stats` (a dict) gets the number of folders and entries looked at."""
     todo, seen = [(Path(folder), 0)], 0
+    end = time.monotonic() + seconds if seconds else None
     while todo:
         d, lvl = todo.pop(0)
+        if stats is not None:
+            stats["folders"] = stats.get("folders", 0) + 1
+        if end and time.monotonic() > end:
+            return
         try:
             with os.scandir(d) as it:
                 for e in it:
                     seen += 1
+                    if stats is not None:
+                        stats["entries"] = seen
                     if seen > cap:
                         return
                     try:
@@ -242,7 +251,7 @@ def _walk(folder, depth=3, cap=4000):
             continue
 
 
-def inspect_folder(folder, how=""):
+def inspect_folder(folder, how="", depth=3, cap=4000, seconds=None, stats=None):
     """-> Generator or None: does this folder hold Random New World (rnw.cmd and/or its launcher)?"""
     folder = Path(folder)
     if folder.is_file():
@@ -250,7 +259,7 @@ def inspect_folder(folder, how=""):
     if not folder.is_dir():
         return None
     cmd = launcher = None
-    for f in _walk(folder):
+    for f in _walk(folder, depth, cap, seconds, stats):
         n = f.name.lower()
         if n == "rnw.cmd" and (cmd is None or len(f.parts) < len(cmd.parts)):
             cmd = f
@@ -836,18 +845,7 @@ class Manager:
             return self.picker("Choose a Random New World map file (.rnworld)", start, kind="file")
         title = "Choose the folder where Random New World is installed (the one with rnw.cmd)" if what == "generator" \
             else "Choose the folder of a Random New World map (rnw_exp_world_…), or a folder that holds several"
-        if not start and what == "generator":
-            start = self.hint()
         return self.picker(title, start)
-
-    def hint(self):
-        """Where the Steam Workshop keeps Random New World, if that folder exists: only shown to the user as a suggestion to
-        point to, never used by itself."""
-        app = self.app
-        cands = [Path(w) / WORKSHOP_ID for w in workshop_dirs(app.game, app.extra_libraries)]
-        if app.workshop_dir:
-            cands.append(Path(app.workshop_dir) / WORKSHOP_ID)
-        return next((str(c) for c in cands if c.is_dir()), "")
 
     def check_folder(self, path):
         """The user pointed to a folder: look in it (three levels down at most), say what was found and what is missing, and
@@ -863,8 +861,24 @@ class Manager:
         if not folder.is_dir():
             return {"ok": False, "generator": None, "report": [{"ok": False, "text": f"{path} is not a folder on this PC. Check the spelling, "
                                                                                  "or copy the folder's path from Explorer (Shift + right-click, Copy as path)."}]}
-        report.append({"ok": True, "text": f"Looked in {folder} (and up to three folders inside it)."})
-        gen = inspect_folder(folder, "the folder you chose")
+        stats = {}
+        gen = inspect_folder(folder, "the folder you chose", depth=SEARCH_DEPTH, cap=SEARCH_CAP, seconds=SEARCH_SECONDS, stats=stats)
+        report.append({"ok": True, "text": f"Searched {folder} and every folder inside it for rnw.cmd and the Random New World program "
+                                           f"({stats.get('folders', 0):,} folders looked at)."})
+        if gen is None or not gen.cmd:   # rnw.cmd was not inside: look in the two folders above it (the user may have chosen a folder inside the package)
+            up = folder
+            for _ in range(2):
+                up = up.parent
+                if len(up.parts) <= 2:   # a drive's top folder or the home folder is far too big to search
+                    break
+                stats2 = {}
+                near = inspect_folder(up, "a folder above the one you chose", depth=4, cap=SEARCH_CAP // 2, seconds=SEARCH_SECONDS // 2, stats=stats2)
+                if near and near.cmd:
+                    report.append({"ok": True, "text": f"rnw.cmd was not in that folder, so I also searched the folder above it, {up} "
+                                                       f"({stats2.get('folders', 0):,} folders looked at), and found it there."})
+                    gen = near
+                    break
+                report.append({"ok": False, "text": f"rnw.cmd was not in that folder, and not in the folder above it, {up} ({stats2.get('folders', 0):,} folders looked at)."})
         if gen is None:
             report.append({"ok": False, "text": "Random New World was not found there: no rnw.cmd and no Random New World program. "
                                                 "Point to the folder that holds them."})
@@ -874,9 +888,9 @@ class Manager:
         if gen.can_run:
             report.append({"ok": True, "text": "Ready: maps can be made from here."})
         else:
-            report.append({"ok": False, "text": "Maps cannot be made from here without rnw.cmd" + (", but the window can be opened"
-                           if gen.launcher else "") + ". The Steam Workshop copy may not include it; the standalone Windows package from GitHub does."})
-        self.app.store.update_settings(rnw_dir=str(folder))
+            report.append({"ok": False, "text": "Maps cannot be made from here: rnw.cmd was not found" + (", but the window can be opened"
+                           if gen.launcher else "") + ". You can still import maps you already have."})
+        self.app.store.update_settings(rnw_dir=str(gen.folder))
         self._generator = None
         gamelog.log(self.app.game.id, "Random New World folder chosen: " + " | ".join(r["text"] for r in report))
         return {"ok": gen.can_run, "generator": gen.public(), "report": report}
@@ -934,20 +948,17 @@ class Manager:
                 mid = w["mod_id"]
                 w["in_playset"] = "none" if not mid or mid not in inlist else "on" if mid in enabled else "off"
             if gen is None:
-                notes.append("Random New World was not found on this PC. Subscribe to it on the Steam Workshop (item "
-                             f"{WORKSHOP_ID}), or download it from GitHub, then press Find again or choose its folder.")
+                notes.append("Random New World was not found yet. Under Make a new map, press Browse… and choose the folder where it is installed.")
             elif not use_cli:
                 pass   # the page asked for the files only: no program is started, nothing is said about the generator's list
             elif not gen.can_run:
-                notes.append("Random New World's window program was found, but not its command line (rnw.cmd), which the Steam "
-                             "Workshop copy may not include. You can still open the generator and import worlds you already have; "
-                             "to make worlds from here, download the standalone Windows package from GitHub (it includes rnw.cmd) "
-                             "and choose its folder.")
+                notes.append("Random New World's window program was found, but not its command line (rnw.cmd), so maps cannot be made from "
+                             "here. You can still open the generator and import maps you already have.")
             elif not cli["ok"]:
                 notes.append("The generator's own list of worlds could not be read, so only worlds installed in your mod folder "
                              "are shown. " + cli["error"])
             return {"generator": gen.public() if gen else None, "worlds": worlds, "cli": cli, "cli_used": bool(use_cli and gen and gen.can_run), "notes": notes, "presets": PRESETS,
-                    "hint": self.hint(), "hub": {"installed": bool(hub), "enabled": any(h in enabled for h in hub)}, "playset": pid,
+                    "hub": {"installed": bool(hub), "enabled": any(h in enabled for h in hub)}, "playset": pid,
                     "game_version": version, "job": job, "free_gb": _free_gb(user_dir), "user_dir": str(user_dir or "")}
         return run
 

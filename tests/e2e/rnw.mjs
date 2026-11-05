@@ -154,7 +154,7 @@ try {
   await page.click('[data-rnw=gomake]');
   await page.waitForFunction(() => /none yet/.test(document.querySelector('.rnw-log').textContent));
   assert.match(await page.textContent('.rnw'), /Where is Random New World\?/);
-  assert.match(await page.textContent('.rnw'), /The app does not search your disk/);
+  assert.match(await page.textContent('.rnw'), /The app does not search your whole disk/);
   assert.equal(await page.locator('[data-rnw=new]').isDisabled(), true);                    // cannot make maps until a folder was checked
   // Browse… opens the system's folder window on the server; here the answer is faked (a real window cannot open in a test)
   await page.route('**/api/eu5/rnw/pick', r => r.fulfill({ json: { path: gen, cancelled: false, error: '' } }));
