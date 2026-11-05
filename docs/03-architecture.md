@@ -24,7 +24,8 @@
 | `launcherdb.py` | read-only import of the game launcher's playsets |
 | `gamelog.py`, `errorlog.py`, `perflog.py` | the per-game log, the error log, the activity log (nightly builds) |
 | `thumbs.py` | find a mod's own picture (`thumbnail.png` and the like) inside its folder |
-| `launchersync.py` | CK3: write the active playset into the Paradox launcher's database after every change |
+| `launchersync.py` | CK3 and VIC3: write the active playset (and the app's playsets the launcher lacks) into the Paradox launcher's database after every change |
+| `launcher.py` | Windows start file for the Python edition (Settings > Install on this PC): copies the `.pyzw` and writes `Ronin Mod Manager.bat` |
 | `shortcut.py`, `steamshortcut.py` | desktop icon, and listing the app in Steam as a non-Steam game (Windows) |
 | `bootworker.py` | worker processes that work out conflicts at start-up |
 | `window.py` | the app window (Edge/Chrome app mode, default browser fallback) |

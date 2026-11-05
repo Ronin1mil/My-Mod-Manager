@@ -62,7 +62,10 @@ Your Windows user name is replaced by `<user>` in these files. Settings → Prob
 - **Import the launcher's playsets** ([docs/16](docs/16-launcher-import.md)).
 - **Presets** from Workshop collections ([docs/11](docs/11-presets-and-downloads.md)); **getting Workshop mods** via *Open in Steam* or optional `steamcmd` (no password is ever handled by the app).
 - **Install `.zip`/`.tar*` mods** by drag and drop (checked for unsafe contents); uninstall and upgrades keep the old version in a backup folder.
-- **CK3 changes reach the game at once**: starting CK3 from Steam opens the Paradox launcher, which writes its own active playset over the app's. So after every change to the active playset the app also writes it into the launcher's playset of the same name and makes that the launcher's active one (only while the launcher is closed; the database is backed up once a day first).
+- **CK3 and Victoria 3 changes reach the game at once**: starting CK3 from Steam opens the Paradox launcher, which writes its own active playset over the app's. So after every change to the active playset the app also writes it into the launcher's playset of the same name and makes that the launcher's active one (only while the launcher is closed; the database is backed up once a day first).
+- **Sort now** orders by dependencies and by who overwrites whom (`replace_path`, patch/compatch names, overhaul before tweak), with a report of each move; or **choose which mod wins a clash** yourself in the Conflicts tab ([docs/23](docs/23-crash-help.md)).
+- **Crash help** (beta): reads the game's logs after a crash, names known causes and ranks suspect mods ([docs/23](docs/23-crash-help.md)).
+- **Random New World** (beta, Europa Universalis V): make, import, preview and switch generated maps from the app ([docs/25](docs/25-random-new-world.md)).
 - **Desktop icon and Add to Steam** (Windows): start the app from the desktop or your Steam library.
 - **Saves per playset**: a playset made now gets its own save folder, so the game's save list shows only that playset's saves.
 - **Add your own game** (beta, Stellaris and Imperator: Rome templates included, unchecked): [docs/20](docs/20-v0.9-plan.md).
@@ -81,7 +84,7 @@ Your Windows user name is replaced by `<user>` in these files. Settings → Prob
 More: [docs/02-game-notes.md](docs/02-game-notes.md), [docs/17-bannerlord.md](docs/17-bannerlord.md).
 
 ## Known limits
-- The official launcher keeps its own playsets in `launcher-v2.sqlite`. Only Crusader Kings III's is written, and only while the launcher is closed (a daily backup is kept); for Victoria 3 it is read-only. Start the game from this tool so its load order is used.
+- The official launcher keeps its own playsets in `launcher-v2.sqlite`. Crusader Kings III's and Victoria 3's are written, and only while the launcher is closed (a daily backup is kept); for Europa Universalis V it is read-only. Start the game from this tool so its load order is used.
 - Mods install from `.zip` and `.tar*` archives; `.7z` and `.rar` are not supported.
 - Definition scanning covers top-level keys in the game's script folders; it does not model per-database merge rules.
 - Saves per playset are confirmed for CK3 only.

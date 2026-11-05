@@ -1,6 +1,6 @@
 # HTTP API
 
-JSON over HTTP on `127.0.0.1` (default port 8765). Everything is same-origin only: requests must carry `Host: 127.0.0.1|localhost`, and a POST with an `Origin` header must match the host. Errors are `{"error": "..."}` with 400 (bad input, nothing changed), 403 (bad host/origin), 404, 413 (body too large) or 500.
+JSON over HTTP on `127.0.0.1` (default port 8765). Everything is same-origin only: requests must carry `Host: 127.0.0.1|localhost`, a POST with an `Origin` header must match the host, and any `/api/` request that Edge/Chrome mark `Sec-Fetch-Site: cross-site` or `same-site` (another website's link, `<img>` or script) is refused. Errors are `{"error": "..."}` with 400 (bad input, nothing changed), 403 (bad host/origin), 404, 413 (body too large) or 500.
 
 ## App-wide
 | Route | |
@@ -12,6 +12,9 @@ JSON over HTTP on `127.0.0.1` (default port 8765). Everything is same-origin onl
 | `POST /api/update-check` | `{force?}` -> release check result (cached 10 min) |
 | `POST /api/self-update` · `GET /api/self-update` | start the checksum-verified update · its progress |
 | `POST /api/full-rescan` | **Rescan**: start-up's work again for every game |
+| `GET /api/ping` | the page is still open (keeps an app that runs in a browser window alive); no lock, no work |
+| `GET /api/nightly` | the newest nightly build (`test-build` prerelease) for Settings -> Test builds |
+| `POST /api/install-launcher` | Settings -> Install on this PC (Windows, Python edition): copy the app file to `%LOCALAPPDATA%` and write the start `.bat`; turns on install-on-start |
 | `GET /api/rescan-progress` | While Rescan runs: `{step, of, text}` for the progress bar |
 | `POST /api/desktop-shortcut` · `POST /api/add-to-steam` | make the desktop icon (`{make: true}`) · add the app to Steam's non-Steam games (Steam closed) |
 | `POST /api/erase-all` | Settings -> Erase all data (needs the typed word) |
@@ -22,6 +25,8 @@ JSON over HTTP on `127.0.0.1` (default port 8765). Everything is same-origin onl
 |---|---|
 | `GET state` | mods, playsets, active, folders, game root/version, `has_logo`, `include_vanilla`, `setup_done`, `setup_needed`, steamcmd settings |
 | `GET analyse/<playset>` | `{issues, notes, conflicts, counts, truncated}`; conflicts: `{kind: file\|definition\|patch\|replace\|localization, severity, path, mods, winner, vanilla?}` |
+| `GET conflicts/<playset>` | only the conflicts of that playset (worked out outside the lock) |
+| `GET tree/<playset>` · `GET tree/<playset>/<mod id>` | the merged file list: for each path, the mod whose copy wins · one mod's files, each with the other enabled mods that also have it (later in the order wins) |
 | `GET compare/<a>/<b>` | playset comparison with summaries |
 | `GET playsets/<id>/share` | portable playset document (`modmanager-playset`, carries the game) |
 | `GET presets` · `POST presets/<id>/apply` | list presets with installed counts · create a playset -> `{id, missing, status}` |
