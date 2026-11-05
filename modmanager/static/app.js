@@ -479,7 +479,7 @@ async function rnwGo(step) {
   if (RW.error) return;
   if (step === 'import') rnwOk(`found ${RW.worlds.length} map${RW.worlds.length === 1 ? '' : 's'}`);
   else rnwOk(RW.generator ? `using ${RW.generator.folder}` : 'none yet. Point me to the folder below and I will check it');
-  if (step === 'make' && RW.generator && !RW.generator.can_run) rnwSay('That folder has no rnw.cmd, so maps cannot be made from here. You can still open its window.', true);
+  if (step === 'make' && RW.generator && !RW.generator.can_run) rnwSay('That folder has no rnw.cmd, so maps cannot be made from here. Only the GitHub version of Random New World includes rnw.cmd. You can still open its window.', true);
   render();
 }
 // The one place a command is run just to read: the generator's own list (kept and code-only maps). The server stops it after 25 s.
@@ -655,7 +655,7 @@ function rnwMenu(head, p) {
         <p class="mut">Lists the Random New World maps you already have, with their names and settings. Reads your mod folder only: no program is started and nothing is built. From there you can also copy in a map folder from somewhere else, or paste a world code.</p>
         <button class="pri" data-rnw="goimport">Import my maps</button></div>
       <div class="rnw-card"><b>Make a new map</b>
-        <p class="mut">You point me to the folder where Random New World is installed, I check that folder and tell you what I found, then I build a new map with its command line. On the next screen, <b>Browse…</b> opens the file explorer for that folder. Takes some minutes, needs about 7.5 GB of free memory and about 1.2 GB of disk. The map is installed into your mod folder when it is done.</p>
+        <p class="mut">You point me to the folder where Random New World is installed, I check that folder and tell you what I found, then I build a new map with its command line. On the next screen, <b>Browse…</b> opens the file explorer for that folder. Needs the <b>GitHub version</b> of Random New World, the only one that includes rnw.cmd. Takes some minutes, needs about 7.5 GB of free memory and about 1.2 GB of disk. The map is installed into your mod folder when it is done.</p>
         <button class="pri" data-rnw="gomake">Make a new map</button></div></div>
     <div id="rnwjob">${rnwJobHtml()}</div>${rnwMapHtml()}${maps}</div>`;
   if (RWM && RWM.ready && $('rnwmapcv')) $('rnwmapcv').appendChild(RWM.canvas);
@@ -674,9 +674,11 @@ function viewRnw(p) {
   // The folder box is ALWAYS on this screen (also when a folder is already remembered): a text box and a Browse… button that
   // opens the system's file explorer. The line above it says which folder is in use and what was found there.
   const gstat = g ? `<div class="row static"><span class="nm" style="white-space:normal;cursor:default">Using <code>${esc(g.folder)}</code>
-        <div class="mut">${g.cmd ? 'Command line: ' + esc(g.cmd.split(/[\\/]/).pop()) : 'No command line (rnw.cmd) found: maps cannot be made from here.'} · ${g.launcher ? 'Window: ' + esc(g.launcher.split(/[\\/]/).pop()) : 'No window program found.'}</div></span>
+        <div class="mut">${g.cmd ? 'Command line: ' + esc(g.cmd.split(/[\\/]/).pop()) : 'No command line (rnw.cmd) found: maps cannot be made from here. Get the GitHub version, which includes it.'} · ${g.launcher ? 'Window: ' + esc(g.launcher.split(/[\\/]/).pop()) : 'No window program found.'}</div></span>
         ${g.can_open ? '<button class="pri sm" data-rnw="open">Open generator</button>' : ''}</div>` : '';
-  const gbox = `<div class="rnw-drop"><b>Where is Random New World?</b>
+  const need = g && g.cmd ? '' : `<div class="rnw-need"><b>To make maps you need the GitHub version of Random New World.</b> Only that version includes <code>rnw.cmd</code>, the command line this app uses to build maps.
+        <a href="https://github.com/Sir-Starch/eu5-random-new-world/releases" target="_blank" rel="noopener">Download it from GitHub</a>, unpack it, then press <b>Browse…</b> below and choose its folder.</div>`;
+  const gbox = `${need}<div class="rnw-drop"><b>Where is Random New World?</b>
         <div class="mut">${g ? 'A folder is in use (shown below the box).' : 'The app does not search your whole disk.'} Press <b>Browse…</b> to open the file explorer and choose the folder where Random New World is installed (the one that holds <code>rnw.cmd</code>), or paste the path. I search that folder and every folder inside it for <code>rnw.cmd</code> (and, if it is not there, the two folders above it), and tell you what I find.</div>
         <div class="rnw-form" style="margin-top:8px"><label>Folder of Random New World<input data-rnwf="gpath" value="${esc(RWF.gpath || (g ? g.folder : ''))}" placeholder="C:\\…\\RandomNewWorld" size="52"></label>
           <button class="pri" data-rnw="browse" data-what="generator">Browse…</button><button class="sm" data-rnw="check">Check this folder</button></div>

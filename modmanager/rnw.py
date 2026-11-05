@@ -881,7 +881,7 @@ class Manager:
                 report.append({"ok": False, "text": f"rnw.cmd was not in that folder, and not in the folder above it, {up} ({stats2.get('folders', 0):,} folders looked at)."})
         if gen is None:
             report.append({"ok": False, "text": "Random New World was not found there: no rnw.cmd and no Random New World program. "
-                                                "Point to the folder that holds them."})
+                                                "Point to the folder that holds them. Only the GitHub version of Random New World includes rnw.cmd, so to make maps you need that version."})
             return {"ok": False, "generator": None, "report": report}
         report.append({"ok": bool(gen.cmd), "text": f"Command line (rnw.cmd): {gen.cmd}" if gen.cmd else "Command line (rnw.cmd): not found."})
         report.append({"ok": bool(gen.launcher), "text": f"Window program: {gen.launcher.name}" if gen.launcher else "Window program: not found."})
@@ -889,7 +889,7 @@ class Manager:
             report.append({"ok": True, "text": "Ready: maps can be made from here."})
         else:
             report.append({"ok": False, "text": "Maps cannot be made from here: rnw.cmd was not found" + (", but the window can be opened"
-                           if gen.launcher else "") + ". You can still import maps you already have."})
+                           if gen.launcher else "") + ". Only the GitHub version of Random New World includes rnw.cmd, so to make maps you need that version. You can still import maps you already have."})
         self.app.store.update_settings(rnw_dir=str(gen.folder))
         self._generator = None
         gamelog.log(self.app.game.id, "Random New World folder chosen: " + " | ".join(r["text"] for r in report))
@@ -948,12 +948,12 @@ class Manager:
                 mid = w["mod_id"]
                 w["in_playset"] = "none" if not mid or mid not in inlist else "on" if mid in enabled else "off"
             if gen is None:
-                notes.append("Random New World was not found yet. Under Make a new map, press Browse… and choose the folder where it is installed.")
+                notes.append("Random New World was not found yet. Under Make a new map, press Browse… and choose the folder where it is installed. Only the GitHub version of Random New World includes rnw.cmd, so to make maps you need that version.")
             elif not use_cli:
                 pass   # the page asked for the files only: no program is started, nothing is said about the generator's list
             elif not gen.can_run:
                 notes.append("Random New World's window program was found, but not its command line (rnw.cmd), so maps cannot be made from "
-                             "here. You can still open the generator and import maps you already have.")
+                             "here. Only the GitHub version of Random New World includes rnw.cmd, so to make maps you need that version. You can still open the generator and import maps you already have.")
             elif not cli["ok"]:
                 notes.append("The generator's own list of worlds could not be read, so only worlds installed in your mod folder "
                              "are shown. " + cli["error"])

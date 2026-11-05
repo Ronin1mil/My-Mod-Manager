@@ -257,3 +257,4 @@ button.danger{color:color-mix(in srgb,var(--err) 62%,var(--ink));border-color:co
 button.danger:hover:not(:disabled){background:#b3261e;color:#fff;border-color:#ff8a80}
 button#launch.pri{background:linear-gradient(#2f9e44,#1e6f2e);border-color:#8ce99a;color:#fff}
 button#launch.pri:hover:not(:disabled){filter:brightness(1.2);border-color:#fff}
+.rnw-need{margin:10px 0;padding:10px 14px;border:1px solid var(--warn);border-left-width:5px;border-radius:10px;background:var(--panel)}.rnw-need a{color:var(--acc);font-weight:700}

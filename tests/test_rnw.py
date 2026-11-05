@@ -564,7 +564,7 @@ class Route(GameCase):
             st, res, _ = self.req("GET", "/api/rnw/list")
         self.assertEqual((st, res["generator"], res["worlds"]), (200, None, []))
         self.assertIn("choose the folder where it is installed", res["notes"][0])
-        self.assertNotRegex(res["notes"][0], r"(?i)workshop|github|3829217331")
+        self.assertNotRegex(res["notes"][0], r"(?i)workshop|3829217331")
 
     def test_installed_worlds_are_listed_without_the_generator_with_their_specs(self):
         self.mgr._generator = None
@@ -697,7 +697,8 @@ class Route(GameCase):
         res = self.req("GET", "/api/rnw/files")[1]
         self.assertIsNone(res["generator"])
         self.assertNotIn("hint", res)
-        self.assertNotRegex(json.dumps(res["notes"]), r"(?i)workshop|github")
+        self.assertNotRegex(json.dumps(res["notes"]), r"(?i)workshop")
+        self.assertIn("GitHub version of Random New World includes rnw.cmd", json.dumps(res["notes"]))
 
     def test_a_folder_the_user_chose_is_searched_deeply_for_rnw_cmd(self):
         deep = self.r / "chosen" / "a" / "b" / "c" / "d" / "e" / "f"      # six levels down: past the old three-level limit
@@ -727,9 +728,10 @@ class Route(GameCase):
         res = self.mgr.check_folder(str(d))
         text = " ".join(r["text"] for r in res["report"])
         self.assertIn("no rnw.cmd and no Random New World program", text)
-        self.assertNotRegex(text, r"(?i)workshop|github|steam")
+        self.assertNotRegex(text, r"(?i)workshop|steam")
+        self.assertIn("Only the GitHub version of Random New World includes rnw.cmd", text)     # where rnw.cmd comes from is said plainly
         src = Path(rnw.__file__).read_text(encoding="utf-8")
-        self.assertNotRegex(src[src.index("def check_folder"):src.index("# -- listing --")], r"(?i)workshop|github")
+        self.assertNotRegex(src[src.index("def check_folder"):src.index("# -- listing --")], r"(?i)workshop")
 
     def test_open_starts_only_the_launcher_without_a_shell(self):
         calls = []

@@ -8,7 +8,7 @@ the tab in `static/app.js`, routes in `server.py` (see [12-api.md](12-api.md)).
 Tab **Random New World (beta)** right after **Crash help (beta)**, only when the game is Europa Universalis V.
 - **Generator box:** where Random New World (RNW) was found and how; **Open generator** (its own window), **Choose folder...**
   (a folder with `rnw.cmd` in it; saved as the game's `rnw_dir` setting), **Refresh**. When it is not found the page says
-  asks the user to choose its folder and still lists the worlds in your mod folder.
+  asks the user to choose its folder (and says that only the GitHub version includes `rnw.cmd`, which making maps needs) and still lists the worlds in your mod folder.
 - **Make a new world:** world type (continents, small continents, supercontinent, archipelago, islands, the wall), a seed
   (empty = random) or a pasted world code. One job at a time, with progress, the generator's own messages and Cancel.
 - **Your worlds:** one card per world with name, tag, state (On / Off in this playset, Installed, Kept not installed, Code

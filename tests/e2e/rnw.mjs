@@ -155,11 +155,15 @@ try {
   await page.waitForFunction(() => /none yet/.test(document.querySelector('.rnw-log').textContent));
   assert.match(await page.textContent('.rnw'), /Where is Random New World\?/);
   assert.match(await page.textContent('.rnw'), /The app does not search your whole disk/);
+  assert.match(await page.textContent('.rnw-need'), /GitHub version of Random New World.*only that version includes rnw\.cmd/is);   // says where rnw.cmd comes from
+  assert.equal(await page.locator('.rnw-need a[href*="github.com"]').count(), 1);
+  assert.doesNotMatch(await page.textContent('.rnw'), /workshop/i);
   assert.equal(await page.locator('[data-rnw=new]').isDisabled(), true);                    // cannot make maps until a folder was checked
   // Browse… opens the system's folder window on the server; here the answer is faked (a real window cannot open in a test)
   await page.route('**/api/eu5/rnw/pick', r => r.fulfill({ json: { path: gen, cancelled: false, error: '' } }));
   await page.click('[data-rnw=browse][data-what=generator]');
   await page.waitForFunction(() => /Ready: maps can be made from here/.test(document.querySelector('.rnw-log').textContent));
+  assert.equal(await page.locator('.rnw-need').count(), 0);                                   // rnw.cmd was found: the note is gone
   assert.match(await page.textContent('.rnw-log'), /you chose/);
   assert.equal(await page.locator('[data-rnw=browse][data-what=generator]').isVisible(), true);   // the folder box and Browse… stay on screen once a folder is chosen
   await page.fill('[data-rnwf=gpath]', path.join(root, 'nowhere'));
