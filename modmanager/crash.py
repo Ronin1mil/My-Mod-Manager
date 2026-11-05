@@ -12,7 +12,6 @@ Nothing here can know for certain which mod broke the game. It collects evidence
 Read-only. Mod names, ids and log lines stay on this PC; the Windows user name is replaced by <user>.
 Where each game keeps its logs is partly UNVERIFIED (docs/23-crash-help.md): the file list is shown in the result.
 """
-import math
 import os
 import re
 import time

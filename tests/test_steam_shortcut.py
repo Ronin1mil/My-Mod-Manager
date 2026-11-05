@@ -17,7 +17,7 @@ def game(name, exe, appid):
 
 class Format(unittest.TestCase):
     def test_round_trip_is_byte_for_byte(self):
-        root = [("shortcuts", [("0", game("Some Game", "C:\g.exe", -123456)), ("1", game("Ünïcode ：name", "D:\h.exe", -5))])]
+        root = [("shortcuts", [("0", game("Some Game", r"C:\g.exe", -123456)), ("1", game("Ünïcode ：name", r"D:\h.exe", -5))])]
         data = ss.dumps(root)
         self.assertEqual(ss.parse(data), root)
         self.assertEqual(ss.dumps(ss.parse(data)), data)
