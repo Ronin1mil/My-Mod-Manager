@@ -6,11 +6,11 @@ the tab in `static/app.js`, routes in `server.py` (see [12-api.md](12-api.md)).
 
 ## What the user sees
 Tab **Random New World (beta)** right after **Crash help (beta)**, only when the game is Europa Universalis V.
-- **Generator box:** where Random New World (RNW) was found and how; **Open generator** (its own window), **Choose folder...**
+- **Generator box:** where Random New World (RNW) was found and how; **Choose folder...**
   (a folder with `rnw.cmd` in it; saved as the game's `rnw_dir` setting), **Refresh**. When it is not found the page says
   asks the user to choose its folder (and says that only the GitHub version includes `rnw.cmd`, which making maps needs) and still lists the worlds in your mod folder.
 - **Make a new world:** world type (continents, small continents, supercontinent, archipelago, islands, the wall), a seed
-  (empty = random) or a pasted world code. One job at a time, with progress, the generator's own messages and Cancel.
+  (empty = random) or a pasted world code. A **Settings (optional)** menu (`SETTINGS` in `rnw.py`, sent to the page as `settings` in `rnw/list`) sets Land %, Peasant share %, Historical turbulence and, for the wall, width/position/gaps. The page sends them with `rnw/new {settings: {field_id: number}}`; `raw_settings` validates and converts them (percent -> permille) and `with_changes` writes them into the world code that `world-code` printed (format 2: field number + varint, check bytes recomputed), so RNW's own window is never needed. The old `rnw/open` route still exists but the page has no button for it. One job at a time, with progress, the generator's own messages and Cancel.
 - **Your worlds:** one card per world with name, tag, state (On / Off in this playset, Installed, Kept not installed, Code
   only), type, seed, generator version, game build, age, build time, and an expandable **Settings** list. Buttons:
   **Use this world**, **Turn off**, **Add to game**, **Remove from game**, **Copy code**.

@@ -1622,7 +1622,7 @@ def make_handler(hub):
             if act == "folder":
                 return m.check_folder(b.get("path"))
             if act == "new":
-                return m.new_world(b.get("preset"), b.get("seed"), b.get("code"))
+                return m.new_world(b.get("preset"), b.get("seed"), b.get("code"), b.get("settings"))
             if act == "add":
                 return m.add_world(str(b.get("id", "")))
             if act == "remove":

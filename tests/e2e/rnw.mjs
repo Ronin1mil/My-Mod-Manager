@@ -182,6 +182,20 @@ try {
   assert.match(await page.textContent('.rnw'), /Using/);
   assert.match(await page.textContent('.rnw'), /Command line: rnw\.cmd/);
 
+  // everything is done in this app: there is no button that opens Random New World's own window, and the settings menu is here
+  assert.equal(await page.locator('[data-rnw=open]').count(), 0);
+  assert.doesNotMatch(await page.textContent('.rnw'), /Open generator/);
+  assert.equal(await page.locator('[data-rnwset]').count(), 0);                              // closed until asked for
+  await page.click('[data-rnw=adv]');
+  assert.ok(await page.locator('[data-rnwset="new_world.land_permille"]').isVisible());
+  assert.equal(await page.locator('[data-rnwset="new_world.wall_width_permille"]').count(), 0);   // wall settings only for the Wall type
+  await page.selectOption('[data-rnwf=preset]', 'wall');
+  assert.equal(await page.locator('[data-rnwset="new_world.wall_width_permille"]').count(), 1);
+  await page.fill('[data-rnwset="new_world.land_permille"]', '40');
+  await page.selectOption('[data-rnwf=preset]', 'continents');
+  assert.equal(await page.inputValue('[data-rnwset="new_world.land_permille"]'), '40');      // typed values survive a redraw
+  await page.click('[data-rnw=advclear]');
+  assert.equal(await page.inputValue('[data-rnwset="new_world.land_permille"]'), '');
   // make a world
   await page.selectOption('[data-rnwf=preset]', 'small_continents');
   await page.fill('[data-rnwf=seed]', '42');

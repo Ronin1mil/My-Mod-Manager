@@ -1,5 +1,5 @@
 'use strict';
-let G = null, GI = null, S = null, A = null, C = null, P = null, CR = null, RW = null, RWT = null, RWF = {preset: 'continents', seed: '', code: '', path: ''}, cmpWith = null, drag = null, tab = 'order', sel = null, flt = 'all', q = '', lastMissing = [];
+let G = null, GI = null, S = null, A = null, C = null, P = null, CR = null, RW = null, RWT = null, RWF = {preset: 'continents', seed: '', code: '', path: '', adv: false, set: {}}, cmpWith = null, drag = null, tab = 'order', sel = null, flt = 'all', q = '', lastMissing = [];
 const REPO_LINK = 'https://github.com/Ronin1mil/My-Mod-Manager/';
 const STEAMCMD_URL = 'https://developer.valvesoftware.com/wiki/SteamCMD';   // Valve's own page: download and setup
 const $ = i => document.getElementById(i);
@@ -479,7 +479,7 @@ async function rnwGo(step) {
   if (RW.error) return;
   if (step === 'import') rnwOk(`found ${RW.worlds.length} map${RW.worlds.length === 1 ? '' : 's'}`);
   else rnwOk(RW.generator ? `using ${RW.generator.folder}` : 'none yet. Point me to the folder below and I will check it');
-  if (step === 'make' && RW.generator && !RW.generator.can_run) rnwSay('That folder has no rnw.cmd, so maps cannot be made from here. Only the GitHub version of Random New World includes rnw.cmd. You can still open its window.', true);
+  if (step === 'make' && RW.generator && !RW.generator.can_run) rnwSay('That folder has no rnw.cmd, so maps cannot be made from here. Only the GitHub version of Random New World includes rnw.cmd.', true);
   render();
 }
 // The one place a command is run just to read: the generator's own list (kept and code-only maps). The server stops it after 25 s.
@@ -681,8 +681,7 @@ function viewRnw(p) {
   // The folder box is ALWAYS on this screen (also when a folder is already remembered): a text box and a Browse… button that
   // opens the system's file explorer. The line above it says which folder is in use and what was found there.
   const gstat = g ? `<div class="row static"><span class="nm" style="white-space:normal;cursor:default">Using <code>${esc(g.folder)}</code>
-        <div class="mut">${g.cmd ? 'Command line: ' + esc(g.cmd.split(/[\\/]/).pop()) : 'No command line (rnw.cmd) found: maps cannot be made from here. Get the GitHub version, which includes it.'} · ${g.launcher ? 'Window: ' + esc(g.launcher.split(/[\\/]/).pop()) : 'No window program found.'}</div></span>
-        ${g.can_open ? '<button class="pri sm" data-rnw="open">Open generator</button>' : ''}</div>` : '';
+        <div class="mut">${g.cmd ? 'Command line: ' + esc(g.cmd.split(/[\\/]/).pop()) : 'No command line (rnw.cmd) found: maps cannot be made from here. Get the GitHub version, which includes it.'}</div></span></div>` : '';
   const need = g && g.cmd ? '' : `<div class="rnw-need"><b>To make maps you need the GitHub version of Random New World.</b> Only that version includes <code>rnw.cmd</code>, the command line this app uses to build maps.
         <a href="https://github.com/Sir-Starch/eu5-random-new-world/releases" target="_blank" rel="noopener">Download it from GitHub</a>, unpack it, then press <b>Browse…</b> below and choose its folder.</div>`;
   const gbox = `${need}<div class="rnw-drop"><b>Where is Random New World?</b>
@@ -715,10 +714,23 @@ function viewRnw(p) {
       <label>Seed <input data-rnwf="seed" value="${esc(RWF.seed)}" placeholder="empty = random" inputmode="numeric" size="22"></label>
       <label>or a world code <input data-rnwf="code" value="${esc(RWF.code)}" placeholder="RNW1-…" size="30"></label>
       <button class="pri" data-rnw="new" ${can && !busy ? '' : 'disabled'}>Make map</button></div>
+      ${rnwSettingsHtml()}
       <p class="mut">Takes some minutes and about 7.5 GB of free memory; the map needs about 1.2 GB of disk${R.free_gb != null ? ` (${R.free_gb} GB free here)` : ''}. A world code makes the same map again (with the same game and generator version).</p>`;
   }
   $('view').innerHTML = head + back + say + body + jobbox + rnwMapHtml() + worlds + '</div>';
   if (RWM && RWM.ready && $('rnwmapcv')) $('rnwmapcv').appendChild(RWM.canvas);   // the painted map is kept between redraws
+}
+// The settings menu of the Make screen: everything is done here, Random New World's own window is never opened. A box left empty keeps
+// the world type's own value; the numbers go to the server with Make map, which writes them into the world code.
+function rnwSettingsHtml() {
+  const list = ((RW && RW.settings) || []).filter(x => !x.preset || x.preset === RWF.preset);
+  if (!list.length) return '';
+  const open = RWF.adv;
+  const rows = list.map(x => `<label title="${esc(x.about)}">${esc(x.label)}${x.unit === '%' ? ' (%)' : ''}
+      <input data-rnwset="${esc(x.id)}" value="${esc(RWF.set[x.id] == null ? '' : RWF.set[x.id])}" placeholder="${x.min}–${x.max}" inputmode="numeric" size="8"></label>`).join('');
+  return `<div class="rnw-adv"><button class="lnk" data-rnw="adv">${open ? '▾ Hide settings' : '▸ Settings (optional)'}</button>
+    ${open ? `<div class="mut">Leave a box empty to keep the world type's own value. These are written into the world code, which Random New World then builds; you never open its window.</div>
+    <div class="rnw-form" style="margin-top:6px">${rows}<button class="sm" data-rnw="advclear">Clear all</button></div>` : ''}</div>`;
 }
 async function loadCompare() {
   const others = S.playsets.filter(x => x.id !== S.active);
@@ -1193,7 +1205,8 @@ document.addEventListener('click', guard(async e => {
       const code = RWF.code.trim(); if (!code) return toast('Paste a world code first.', true);
       const r = await api('rnw/import', {code}); RWF.code = ''; rnwSay('Remembered the code: ' + r.preset + ', seed ' + r.seed); rnwOk(); await loadRnw(true); return toast('Code remembered.');
     }
-    if (act === 'open') { await api('rnw/open', {}); return toast('Opening Random New World…'); }
+    if (act === 'adv') { RWF.adv = !RWF.adv; return render(); }
+    if (act === 'advclear') { RWF.set = {}; return render(); }
     if (act === 'folder') { RW.pick = true; return render(); }
     if (act === 'browse') {
       const what = ['generator', 'file'].includes(rb.dataset.what) ? rb.dataset.what : 'map', key = what === 'generator' ? 'gpath' : 'path';
@@ -1215,7 +1228,8 @@ document.addEventListener('click', guard(async e => {
       return rnwCheck(((box && box.value) || RWF.gpath || (RW.generator ? RW.generator.folder : '') || '').trim());
     }
     if (act === 'new') {
-      const r = await api('rnw/new', {preset: RWF.preset, seed: RWF.seed.trim(), code: RWF.code.trim()});
+      const settings = {}; for (const [k, v] of Object.entries(RWF.set || {})) if (String(v).trim() !== '') settings[k] = String(v).trim();
+      const r = await api('rnw/new', {preset: RWF.preset, seed: RWF.seed.trim(), code: RWF.code.trim(), settings});
       RW.job = r.job; render(); rnwPoll(); return toast('Making the world. This takes some minutes; you can keep using the app.');
     }
     if (act === 'cancel') { const r = await api('rnw/cancel', {}); RW.job = r.job; return render(); }
@@ -1794,7 +1808,9 @@ $('game').onchange = guard(async () => {
   await useGame($('game').value, true);
 });
 window.addEventListener('hashchange', () => { const w = location.hash.slice(1); if (GI && w !== G && GI.games.some(g => g.id === w)) useGame(w, true).catch(e => fail(e, 'hash')); });
-document.addEventListener('input', e => { const f = e.target.closest && e.target.closest('[data-rnwf]'); if (f) RWF[f.dataset.rnwf] = f.value; });
+document.addEventListener('input', e => { const f = e.target.closest && e.target.closest('[data-rnwf]'); if (f) RWF[f.dataset.rnwf] = f.value;
+  const g = e.target.closest && e.target.closest('[data-rnwset]'); if (g) RWF.set[g.dataset.rnwset] = g.value; });
+document.addEventListener('change', e => { if (e.target.dataset && e.target.dataset.rnwf === 'preset' && tab === 'rnw') render(); });   // the wall settings belong to the Wall type only
 setInterval(() => { fetch('/api/ping').catch(() => {}); }, 5000);   // "this page is open": lets the app end after its window was closed (see watch_window)
 (async () => {
   try {   // ask for the logo of the game most likely to open while the game list is still on its way

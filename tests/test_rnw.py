@@ -606,6 +606,29 @@ class Route(GameCase):
         self.assertEqual(rec["summary"], {"locations": 123, "land": "35 %"})
         self.assertEqual(rec["changes"]["new_world"]["land_permille"], 350)
 
+    def test_settings_chosen_in_the_app_are_written_into_the_code_that_is_built(self):
+        st, res, _ = self.post("/api/rnw/new", {"preset": "continents", "seed": "42",
+                                                "settings": {"new_world.land_permille": "42", "natives.turbulence_permille": "", "natives.peasant_peak_permille": "55"}})
+        self.assertEqual(st, 200, res)
+        d = rnw.decode_code(res["code"])
+        self.assertEqual(d["changes"]["new_world"], {"land_permille": 420})        # 42 % is 420 permille, replacing the 350 of the base code
+        self.assertEqual(d["changes"]["natives"]["peasant_peak_permille"], 550)
+        self.assertEqual(d["changes"]["natives"]["state_locations"], 7)            # what the base code already said is kept
+        self.assertEqual((d["preset"], d["seed"]), ("continents", 42))
+        self.wait()
+
+    def test_a_setting_the_world_type_does_not_have_or_a_bad_value_is_refused(self):
+        for body in ({"preset": "continents", "settings": {"new_world.wall_width_permille": "10"}},
+                     {"preset": "continents", "settings": {"new_world.land_permille": "200"}},
+                     {"preset": "continents", "settings": {"natives.turbulence_permille": "x"}},
+                     {"preset": "continents", "settings": {"nothing.here": "1"}}):
+            self.assertEqual(self.post("/api/rnw/new", body)[0], 400, body)
+        self.assertIsNone(self.req("GET", "/api/rnw/job")[1]["job"])
+
+    def test_the_list_tells_the_page_which_settings_exist(self):
+        ids = [x["id"] for x in self.req("GET", "/api/rnw/list")[1]["settings"]]
+        self.assertIn("new_world.land_permille", ids)
+
     def active_playset_with_the_generator_on(self):
         mkworkshop(self.ws(), 3829217331, "Random New World")
         mkmod(self.user(), "Refined", "Refined Colonization", stub=False)

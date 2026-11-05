@@ -149,6 +149,86 @@ def _expand(rest):
     return doc
 
 
+# Settings this app lets the user set before a map is made. Each one is a field of the world code (rnw_fields.py); the value the page
+# sends is in the unit shown ("%" is stored in permille, so 35 % is 350). Random New World's command line takes only a world type
+# and a seed, so these are written into the world code, which the command line then builds. Only fields whose name says what they do
+# are offered; Random New World refuses a value it cannot use and its own message is shown.
+SETTINGS = [
+    {"id": "new_world.land_permille", "label": "Land", "unit": "%", "scale": 10, "min": 1, "max": 99,
+     "about": "How much of the new world is land."},
+    {"id": "natives.peasant_peak_permille", "label": "Peasant share", "unit": "%", "scale": 10, "min": 30, "max": 80,
+     "about": "Share of peasants among the native peoples."},
+    {"id": "natives.turbulence_permille", "label": "Historical turbulence", "unit": "", "scale": 1, "min": 0, "max": 1000,
+     "about": "0 is calm, 1000 is very turbulent."},
+    {"id": "new_world.wall_width_permille", "label": "Wall width", "unit": "%", "scale": 10, "min": 0, "max": 100, "preset": "wall",
+     "about": "How wide the barrier is."},
+    {"id": "new_world.wall_position_permille", "label": "Wall position", "unit": "%", "scale": 10, "min": 0, "max": 100, "preset": "wall",
+     "about": "Where the barrier lies."},
+    {"id": "new_world.wall_allow_gaps", "label": "Gaps in the wall", "unit": "yes/no", "scale": 1, "min": 0, "max": 1, "preset": "wall",
+     "about": "1 lets the wall have gaps, 0 keeps it closed."},
+]
+SETTING_BY_ID = {x["id"]: x for x in SETTINGS}
+
+
+def raw_settings(settings, preset=None):
+    """The settings the page sent ({id: number in the shown unit}) -> {id: whole number as stored in the code}. Empty = left alone."""
+    out = {}
+    if not settings:
+        return out
+    if not isinstance(settings, dict):
+        raise ValueError("The settings are not in a form this app understands.")
+    for key, v in settings.items():
+        spec = SETTING_BY_ID.get(key)
+        if spec is None:
+            raise ValueError(f"Unknown setting {str(key)[:40]}.")
+        if v is None or (isinstance(v, str) and not v.strip()):
+            continue
+        try:
+            n = float(str(v).strip().replace(",", "."))
+        except ValueError:
+            raise ValueError(f"{spec['label']} must be a number.") from None
+        if not (spec["min"] <= n <= spec["max"]):
+            raise ValueError(f"{spec['label']} must be from {spec['min']} to {spec['max']}{(' ' + spec['unit']) if spec['unit'] == '%' else ''}.")
+        if spec.get("preset") and preset and spec["preset"] != preset:
+            raise ValueError(f"{spec['label']} is only for the {PRESET_TITLES[spec['preset']]} world type.")
+        out[key] = int(round(n * spec["scale"]))
+    return out
+
+
+def _leb(v):
+    out = bytearray()
+    while True:
+        b, v = v & 0x7F, v >> 7
+        out.append(b | (0x80 if v else 0))
+        if not v:
+            return bytes(out)
+
+
+def with_changes(code, raw):
+    """The same world code with these settings ({"section.field": whole number}) changed. Nothing else in the code is touched."""
+    if not raw:
+        return norm_code(code)
+    d = decode_code(code)
+    body = _base32(norm_code(code)[5:].replace("-", ""))
+    head = list(HEAD.unpack_from(body[:-3]))
+    if head[0] != 2 and d["changes"]:
+        raise ValueError("This world code is in an older form that settings cannot be added to. Make it from a world type and a seed instead.")
+    merged = {}
+    for section, fields in (d["changes"] or {}).items():
+        for field, value in fields.items():
+            merged[f"{section}.{field}"] = value
+    merged.update(raw)
+    items = sorted((CHANGE_FIELDS.index(k), int(v)) for k, v in merged.items())
+    head[0], head[-1] = 2, head[-1] | 1
+    out = HEAD.pack(*head) + bytes([len(items)]) + b"".join(bytes([n]) + _leb(v) for n, v in items)
+    out += hashlib.sha256(out).digest()[:3]
+    bits = len(out) * 8
+    digits = -(-bits // 5)
+    num = int.from_bytes(out, "big") << (digits * 5 - bits)
+    text = "".join(ALPHABET[(num >> (5 * i)) & 31] for i in range(digits - 1, -1, -1))
+    return "-".join(["RNW1"] + [text[i:i + 5] for i in range(0, len(text), 5)])
+
+
 def describe_changes(changes):
     """The settings a code changes from its world type's defaults, in words: [{"field", "label", "value"}]."""
     rows = []
@@ -958,7 +1038,7 @@ class Manager:
             elif not cli["ok"]:
                 notes.append("The generator's own list of worlds could not be read, so only worlds installed in your mod folder "
                              "are shown. " + cli["error"])
-            return {"generator": gen.public() if gen else None, "worlds": worlds, "cli": cli, "cli_used": bool(use_cli and gen and gen.can_run), "notes": notes, "presets": PRESETS,
+            return {"generator": gen.public() if gen else None, "worlds": worlds, "cli": cli, "cli_used": bool(use_cli and gen and gen.can_run), "notes": notes, "presets": PRESETS, "settings": SETTINGS,
                     "hub": {"installed": bool(hub), "enabled": any(h in enabled for h in hub)}, "playset": pid,
                     "game_version": version, "job": job, "free_gb": _free_gb(user_dir), "user_dir": str(user_dir or "")}
         return run
@@ -1021,9 +1101,11 @@ class Manager:
         if free is not None and free < MIN_FREE_BYTES / 1024 ** 3:
             raise ValueError(f"Only {free:.1f} GB are free where your mods are. A world needs about 1.2 GB; free some space first.")
 
-    def new_world(self, preset=None, seed=None, code=None):
-        """Make a world: from a world code, or from a world type and a seed (empty = random). Runs in the background."""
+    def new_world(self, preset=None, seed=None, code=None, settings=None):
+        """Make a world: from a world code, or from a world type and a seed (empty = random), with the settings the user chose
+        (written into the code). Runs in the background."""
         gen = self._need_cli()
+        raw = raw_settings(settings, None if code else preset)
         if code:
             wc = norm_code(code)
         else:
@@ -1040,6 +1122,7 @@ class Manager:
             if not isinstance(data, dict) or not data.get("code"):
                 raise ValueError("Random New World could not make a code: " + _error_text(out, err))
             wc = norm_code(data["code"])
+        wc = with_changes(wc, raw)
         specs = decode_code(wc)
         self._need_space()
         argv = check_args(["world", wc, "--install"])
