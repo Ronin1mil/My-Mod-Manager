@@ -11,28 +11,28 @@
 - [x] M7c **Sort now** by overwrites, choose who wins a clash, Crash help (beta) (1.0.7-1.0.8)
 - [x] M7d Random New World (beta, EU5), Victoria 3 launcher sync (1.1.0-1.1.3)
 - [ ] M8 Confirm Play for Victoria 3 and Bannerlord; saves per playset for VIC3 and EU5
-- [ ] M9 More games (docs/18)
-- [ ] M10 `.7z`/`.rar`; tell the user when a Workshop mod in the active playset was updated (today only on *Check for updates* in the Library)
+- [ ] M9 More games (docs/18): EU4, HOI4, Stellaris, Imperator built in (1.2.0, unverified); Civilization VI and Cities: Skylines not started
+- [ ] M10 `.7z`/`.rar` (the standard library cannot read them; would need 7-Zip on the PC). Done in 1.2.0: the daily Workshop update notice (opt-in)
+- [x] M11 Undo/Redo, restore deleted playsets, notes on mods, backup/restore, playset shortcuts, conflict folder filter and copy, lint in CI (1.2.0)
 
 ## Ideas for later (not planned yet; each needs a decision)
 Grouped by what they help. Nothing here is promised; move an item into a milestone when it is picked.
 
 **Safety and upkeep**
-- Undo for playset edits: keep the last few versions of each playset (the store already writes a rolling `.bak` of the whole file), with an *Undo* next to the play bar.
-- Backup and restore of all app data (playsets, settings, presets) as one file, for moving to a new PC.
-- CI: pin actions to commit SHAs (docs/07 known gap) and move to the Node 24 versions of `actions/checkout` and `actions/setup-python` (CI now warns that Node 20 actions are forced onto Node 24).
-- Lint in CI (`pyflakes`): cheap, catches unused imports and undefined names before a test does.
+- CI: pin actions to commit SHAs (docs/07 known gap). (Moved to the Node 24 versions of the actions in 1.2.0.)
+- Automatic backups: a backup (backup.py) once a day when the app starts, newest few kept, so nobody has to remember.
+- A playset's history: list its Undo steps with what changed in each ("added 3 mods", "renamed"), and jump to one.
 
 **Mods and conflicts**
-- Mod update alerts (M10) using the existing per-mod tracking in `updates.py`, checked at most once a day and only when the user turns it on (decision 11: no network by default).
-- Conflicts: filter by folder (`common/traits`, `gfx`, ...) and export the list as text for a mod author.
-- Remember *why* a mod is disabled (a short note per mod per playset).
+- A compatibility patch from two clashing mods: write a small local mod that loads last and holds the chosen copy of each clashing file (Irony Mod Manager's "merge" does this for whole playsets).
+- Export a playset's Workshop ids as a list someone can paste into Steam, and import such a list.
 - Crash help: confirm on a real PC where each game keeps its logs (partly unverified, docs/23), and add log locations for games added with *Add a game*.
 
 **Playing**
-- Per-playset launch shortcuts: a desktop or Steam entry that starts the game with one playset.
 - Confirm Play for Victoria 3 and Bannerlord on a real PC (M8) and mark them verified.
 
 **Reach**
+- GOG installs: Irony Mod Manager knows the GOG ids of Stellaris (1508702879) and Imperator: Rome (2131232214); finding those installs would cover players without Steam.
+- Confirm the four games added in 1.2.0 (EU4, HOI4, Stellaris, Imperator) on a real PC, then mark them verified.
 - macOS and Linux builds again (the matrix entries are kept as a comment in `ci.yml`; docs/15).
 - UI text in more languages (all text is in `app.js` today; would need a string table first).

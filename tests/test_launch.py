@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from modmanager import launch, scan
+from modmanager import launch
 from modmanager.library import Library
 from modmanager import games
 from modmanager.server import GameApp

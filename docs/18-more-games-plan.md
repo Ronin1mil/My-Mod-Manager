@@ -1,6 +1,6 @@
 # Plan: more games (Imperator: Rome, Stellaris, Civilization VI, Cities: Skylines)
 
-Not built as built-in games yet. Stellaris and Imperator: Rome exist only as unchecked templates in **Add a game (beta)** ([20-v0.9-plan.md](20-v0.9-plan.md)). Every file name and path below is **from memory of other mod managers and must be checked on a real install** before a game is marked as working; each game ships with `verified = False` like Bannerlord did. The games used to prove the app are Crusader Kings III, Europa Universalis V, Victoria 3 and Bannerlord ([22-checked-on-a-real-pc.md](22-checked-on-a-real-pc.md) shows how they were checked).
+**Update (1.2.0):** Europa Universalis IV, Hearts of Iron IV, Stellaris and Imperator: Rome are now built in (`verified=False`), with their folders taken from Irony Mod Manager's code (docs/02). Section 1 below is done except the real-install check; Crusader Kings II is a template in **Add a game (beta)**. Every file name and path below is **from memory of other mod managers and must be checked on a real install** before a game is marked as working; each game ships with `verified = False` like Bannerlord did. The games used to prove the app are Crusader Kings III, Europa Universalis V, Victoria 3 and Bannerlord ([22-checked-on-a-real-pc.md](22-checked-on-a-real-pc.md) shows how they were checked).
 
 ## How to add one (also for a local session on a PC that has the game)
 1. Install the game, run it once, enable two or three mods in its own launcher.

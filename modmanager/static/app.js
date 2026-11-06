@@ -12,10 +12,11 @@ const report = (message, stack, where) => {
     body: JSON.stringify({message: String(message), stack: String(stack || ''), where: where || '', game: G || ''})})
     .then(r => r.json()).then(j => { if (j.log_file) logFile = j.log_file; }).catch(() => {}); } catch (e) { /* nothing more to do */ }
 };
-const call = async (url, b) => {
+const call = async (url, b, raw) => {   // raw: a File/Blob sent as it is (a backup to restore)
   let r, j;
   try {
-    r = await fetch(url, b === undefined ? {} : {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(b)});
+    r = await fetch(url, raw ? {method: 'POST', headers: {'Content-Type': raw.type || 'application/octet-stream'}, body: raw}
+      : b === undefined ? {} : {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(b)});
     j = await r.json();
   } catch (err) {  // server gone, or an answer that is not JSON
     const e = new Error(`Could not reach Ronin Mod Manager (${err.message}). Is its window still open?`);
@@ -46,6 +47,23 @@ function unreadBox() {
   if (!u.length || closedNotes.has(key)) return '';
   return `<div class="warnbox"><button class="sm" data-closenote="${esc(key)}" title="Hide this until the app is restarted" aria-label="Hide this notice" style="float:right">✕</button><b>${u.length} Workshop folder${u.length > 1 ? 's were' : ' was'} found but not shown as a mod.</b> ` +
     u.map(x => `<div><code>${esc(x.id)}</code>: ${x.empty ? 'empty. Steam has not downloaded this item (it may be removed, or still downloading).' : 'has no descriptor.mod or metadata.json, so it is not a mod this app can read. Files: ' + esc(x.files.join(', '))}</div>`).join('') + '</div>';
+}
+// Daily mod update alert (Settings > App, off by default): when a game opens the page asks the server, which asks Steam at
+// most once a day; mods of the active playset with a newer version on Steam are named above the load order.
+let autoUpdG = null;
+function autoModUpdates() {
+  if (!GI.settings.mod_update_alerts || autoUpdG === G || !S || !S.mods.some(m => m.remote_id)) return;
+  const g = G; autoUpdG = g;
+  api('mod-updates', {auto: true}).then(r => { if (g === G && !r.skipped) { U = r.items; render(); } }).catch(() => {});   // quiet: a failed daily check is not worth a message
+}
+function modUpdBox(p) {
+  if (!U || !p) return '';
+  const live = new Set(p.mods.filter(id => !p.disabled.includes(id))), up = U.filter(x => x.status === 'update' && live.has(x.id));
+  const key = 'modupd:' + G + ':' + up.map(x => x.id).join(',');
+  if (!up.length || closedNotes.has(key)) return '';
+  return `<div class="warnbox"><button class="sm" data-closenote="${esc(key)}" title="Hide this until the app is restarted" aria-label="Hide this notice" style="float:right">✕</button>
+    <b>${up.length} mod${up.length === 1 ? '' : 's'} in this playset ${up.length === 1 ? 'has' : 'have'} a newer version on Steam</b>: ${up.slice(0, 8).map(x => esc(x.name)).join(', ')}${up.length > 8 ? ` and ${up.length - 8} more` : ''}.
+    <span class="mut">Steam normally downloads updates itself; if it has not, the Library tab has a button to open each mod's page.</span></div>`;
 }
 function updPanel() {
   if (!U) return '';
@@ -167,7 +185,7 @@ async function load(rescanMsg) {
   }
   setLogo(G); showImportButton(); applyUI();
   document.title = GNAME() + ' · Ronin Mod Manager';
-  render(); analyse(); banner(); pollUpdate();
+  render(); analyse(); banner(); pollUpdate(); autoModUpdates();
   if (S.setup_needed && !setupShown) { setupShown = true; openPaths(true); }
 }
 let polls = 0, setupShown = false;
@@ -262,6 +280,8 @@ function render() {
   document.body.classList.toggle('nomods', !!p.virtual);
   $('title').textContent = p.name;
   $('auto').checked = p.auto_sort;
+  $('undo').disabled = !!p.virtual || !p.can_undo; $('redo').disabled = !!p.virtual || !p.can_redo;
+  $('undo').title = p.can_undo ? `Undo the last change to this playset (Ctrl+Z, ${p.can_undo} step${p.can_undo === 1 ? '' : 's'} back)` : 'Nothing to undo';
   const nIss = visIssues().length, nCon = A && !A.pending ? A.conflicts.filter(x => x.severity !== 'info' && !x.vanilla).length : 0;
   $('tabs').innerHTML = [['order', 'Load order'], ['library', `Library (${S.mods.length})`], ['problems', `Warnings${nIss ? ` (${nIss})` : ''}`], ['conflicts', `Conflicts${A && A.pending ? ' …' : nCon ? ` (${nCon})` : ''}`], ['files', 'Files'], ['compare', 'Compare'], ['presets', 'Presets'], ['crash', 'Crash help (beta)'], ['rnw', 'Random New World (beta)']].filter(([k]) => (k !== 'conflicts' || S.game.has_conflicts) && (k !== 'rnw' || S.game.id === 'eu5'))
     .map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('');
@@ -283,12 +303,12 @@ function viewOrder(p) {
   const live = p.mods.filter(id => !p.disabled.includes(id)).map(M).filter(Boolean);
   const hero = live.length ? `<div class="hero"><div class="hero-t"><b>${live.length} active mod${live.length === 1 ? '' : 's'}</b><span class="mut">${esc(GNAME())}${S.game_version ? ' ' + esc(S.game_version) : ''}</span></div>
     <div class="hero-strip">${live.slice(0, 16).map((m, i) => thumb(m, 'md', i, false)).join('')}${live.length > 16 ? `<span class="more">+${live.length - 16}</span>` : ''}</div></div>` : '';
-  $('view').innerHTML = hero + bar + p.mods.map((id, i) => {
+  $('view').innerHTML = hero + modUpdBox(p) + bar + p.mods.map((id, i) => {
     const m = M(id), off = p.disabled.includes(id), w = worst(id);
     return `<div class="row ${off ? 'off' : ''} ${id === sel ? 'sel' : ''}" data-i="${i}">
       <span class="h" draggable="true">⠿</span><span class="n">${i + 1}</span>
       <label class="tick"><input type="checkbox" data-tog="${esc(id)}" ${off ? '' : 'checked'}></label>${m ? thumb(m, 'sm') : ''}
-      <span class="nm" data-sel="${esc(id)}">${esc(m ? m.name : id + ' (not installed)')}</span>
+      <span class="nm" data-sel="${esc(id)}">${esc(m ? m.name : id + ' (not installed)')}</span>${(p.mod_notes || {})[id] ? `<span class="mnote" title="Your note: ${esc(p.mod_notes[id])}" aria-label="Has a note">✎</span>` : ''}
       ${m ? badges(m, w && !off ? `<span class="b ${w}">${w === 'err' ? 'error' : 'warning'}</span>` : '') : (w && !off ? `<span class="b ${w}">${w === 'err' ? 'error' : 'warning'}</span>` : '')}
       <button class="sm" data-mv="${i},-1">↑</button><button class="sm" data-mv="${i},1">↓</button><button class="sm" data-rm="${esc(id)}">✕</button></div>`;
   }).join('') || '<div class="empty">This playset is empty.<br>Add mods from the Library tab.</div>';
@@ -400,15 +420,37 @@ function pairBox() {
     <p class="mut">Where two mods change the same thing, the one lower in the load order wins. Pick the one you want to win and the load order is changed for you. Hover a line to see example files.</p>${rows}
     ${live.length > 80 ? `<div class="mut">…and ${live.length - 80} more pairs.</div>` : ''}<h3>Every clash</h3></div>`;
 }
+// The script folder a conflict is in ("common/traits", "events", "gfx/models"): the first two parts of its path
+const cfolder = path => { const parts = String(path || '').split('/'); return parts.length > 2 ? parts.slice(0, 2).join('/') : parts[0]; };
+let cfFolder = '';
+function conflictText(list) {   // the shown conflicts as plain text, for a mod author or a forum post
+  const lines = list.map(x => `${x.vanilla ? 'Base game' : KINDS[x.kind]}\t${x.path}\t${x.mods.map(i => nameOf(i) + (i === x.winner ? ' (wins)' : '')).join(' -> ')}`);
+  const p = cur();
+  return [`${GNAME()}${S.game_version ? ' ' + S.game_version : ''}, playset "${p ? p.name : ''}": ${list.length} conflict${list.length === 1 ? '' : 's'}`,
+    'Kind\tPath\tMods in load order (the last one wins)', ...lines].join('\n');
+}
 function viewConflicts() {
   if (!A) return;
   if (A.pending) { $('view').innerHTML = '<div class="empty">Reading mod files to look for conflicts…<br><span class="mut">This can take a little while the first time with many mods.</span></div>'; return; }
   const ct = A.counts || {};
   const chips = [['all', 'All'], ...Object.keys(KINDS).filter(k => ct[k]).map(k => [k, `${KINDS[k]} (${ct[k]})`])]
     .map(([k, l]) => `<button data-f="${k}" class="${flt === k ? 'on' : ''}">${l}</button>`).join('');
-  const rows = A.conflicts.filter(x => flt === 'all' || (flt === 'vanilla' ? x.vanilla : flt === x.kind && !x.vanilla)).map(x => `<div class="row static"><span class="${x.severity}">${x.vanilla ? 'Base game' : KINDS[x.kind]}</span>
+  const kindOk = A.conflicts.filter(x => flt === 'all' || (flt === 'vanilla' ? x.vanilla : flt === x.kind && !x.vanilla));
+  const folders = {};
+  kindOk.forEach(x => { const f = cfolder(x.path); folders[f] = (folders[f] || 0) + 1; });
+  if (cfFolder && !folders[cfFolder]) cfFolder = '';
+  const shown = kindOk.filter(x => !cfFolder || cfolder(x.path) === cfFolder);
+  const tools = kindOk.length ? `<div class="cf-tools"><label>Folder <select id="cf-folder"><option value="">All folders (${kindOk.length})</option>${Object.keys(folders).sort().map(f => `<option value="${esc(f)}" ${f === cfFolder ? 'selected' : ''}>${esc(f)} (${folders[f]})</option>`).join('')}</select></label>
+    <button class="sm" id="cf-copy" title="Copy the conflicts shown here as text (kind, path, mods in load order)">Copy as text</button></div>` : '';
+  const rows = shown.map(x => `<div class="row static"><span class="${x.severity}">${x.vanilla ? 'Base game' : KINDS[x.kind]}</span>
     <span class="nm" style="white-space:normal;cursor:default"><code>${esc(x.path)}</code> — ${x.mods.map(i => (i === x.winner ? `<b class="ok">${esc(nameOf(i))}</b>` : esc(nameOf(i))) + (x.files && x.files[i] ? ` <span class="mut">(${x.files[i].map(f => esc(f.split('/').pop())).join(', ')})</span>` : '')).join(' → ')}</span></div>`).join('');
-  $('view').innerHTML = `<div class="chips">${chips}</div>` + (flt === 'all' ? pairBox() : '') + (rows || `<div class="empty ok">No conflicts.${S.include_vanilla ? '' : '<br><span class="mut">Comparison with the base game is off (Settings → Game folders).</span>'}</div>`) + (A.truncated ? '<div class="mut">List truncated.</div>' : '');
+  $('view').innerHTML = `<div class="chips">${chips}</div>` + tools + (flt === 'all' && !cfFolder ? pairBox() : '') + (rows || `<div class="empty ok">No conflicts.${S.include_vanilla ? '' : '<br><span class="mut">Comparison with the base game is off (Settings → Game folders).</span>'}</div>`) + (A.truncated ? '<div class="mut">List truncated.</div>' : '');
+  if ($('cf-folder')) $('cf-folder').onchange = () => { cfFolder = $('cf-folder').value; render(); };
+  if ($('cf-copy')) $('cf-copy').onclick = () => {
+    const text = conflictText(shown);
+    try { navigator.clipboard.writeText(text).then(() => toast(`${shown.length} conflict${shown.length === 1 ? '' : 's'} copied.`), () => toast('Could not copy. Select the text instead.', true)); }
+    catch (e) { toast('Could not copy. Select the text instead.', true); }
+  };
 }
 
 // Crash help (beta): the server reads the game's logs and ranks the mods that look responsible (crash.py).
@@ -952,6 +994,7 @@ async function openPaths(first) {
         <h3>Updates</h3>
         <p class="desc">${GI.can_self_update ? 'This is the downloaded app. When a newer version exists, update from the banner at the top. Your playsets and settings are kept.' : 'This copy runs from source files, so it cannot replace itself. Update it with Git or download the ZIP again. The downloadable app from the Releases page updates itself.'}</p>
         <label class="srow"><span class="rt"><b>Check for updates on start</b><span class="hint">Off by default. Asks api.github.com for the latest release; nothing is installed until you press Update</span></span><input type="checkbox" class="sw" id="s-auto" ${st.auto_update_check ? 'checked' : ''}></label>
+        <label class="srow"><span class="rt"><b>Tell me when Workshop mods were updated</b><span class="hint">Off by default. Once a day, when a game opens, asks Steam which Workshop mods in it have a newer version than the one on this PC, and says so above the load order</span></span><input type="checkbox" class="sw" id="s-modalerts" ${st.mod_update_alerts ? 'checked' : ''}></label>
         <div class="acts"><button id="s-check">Check for updates now</button></div>
         <div id="s-result"></div>
       </div>
@@ -964,6 +1007,11 @@ async function openPaths(first) {
         <p class="desc">Builds made automatically from the version being worked on, before it becomes a release. They may contain bugs; your playsets and settings are kept. A release only contains what was tried here first. You have: <b>v${esc(GI.version)}${GI.build ? ' · nightly build ' + esc(GI.build) : ' (a normal release)'}</b>. ${GI.build ? 'A copy running a nightly build is offered newer nightly builds first, before any release. To go back to the newest release anyway, press "Go back to the release".' : ''}</p>
         <p class="mut" id="nt-status"></p>
         <div class="acts"><button id="nt-check">Check for a nightly build</button><button id="nt-go" class="danger" disabled>Install the nightly build</button>${GI.build && GI.can_self_update ? '<button id="nt-back">Go back to the release</button>' : ''}</div>
+      </div>
+      <div class="card">
+        <h3>Backup</h3>
+        <p class="desc">One file with everything this app saved: your playsets (with their Undo steps and recently deleted ones), notes, settings, the games you added and your own presets, for every game. Use it to move to a new PC or before trying something. Mods, saves and logos are not in it.</p>
+        <div class="acts"><a class="btn" id="s-backup" href="/api/backup" download>Save a backup</a><button id="s-restore">Restore from a backup…</button><input type="file" id="s-restoref" accept=".zip" hidden><span id="s-bkmsg" class="mut"></span></div>
       </div>
       <div class="card">
         <h3>Erase all data <span class="b warn">experimental</span></h3>
@@ -1049,6 +1097,16 @@ async function openPaths(first) {
     $('nt-go').disabled = true;
     try { await selfUpdate(m => { $('nt-status').textContent = m; }, true, 'nightly'); } finally { $('nt-go').disabled = false; }
   });
+  $('s-restore').onclick = () => $('s-restoref').click();
+  $('s-restoref').onchange = guard(async () => {
+    const f = $('s-restoref').files[0]; $('s-restoref').value = ''; if (!f) return;
+    if (!confirm(`Restore "${f.name}"?\n\nThe playsets and settings in it replace the ones you have now, for every game in the backup. A copy of what you have now is saved first (in the app's data folder, app-backups), so this can be undone.`)) return;
+    $('s-bkmsg').textContent = 'Restoring…';
+    let r;
+    try { r = await call('/api/restore-backup', undefined, f); } catch (e) { $('s-bkmsg').textContent = ''; throw e; }
+    alert(`Restored ${r.restored.length} file${r.restored.length === 1 ? '' : 's'}.\n\nWhat you had before is saved as:\n${r.safety_copy}`);
+    location.reload();
+  });
   $('s-erase').onclick = guard(async () => {
     const t = prompt('This deletes ALL playsets and settings saved by this app, for every game. Your games and mods are not touched.\n\nType ERASE to continue.');
     if (t === null) return;
@@ -1064,6 +1122,11 @@ async function openPaths(first) {
     S = await api('paths', {game_dir: $('p-game').value.trim(), user_dir: $('p-user').value.trim(), workshop_dir: $('p-ws').value.trim(),
       include_vanilla: $('p-van').checked, save_version_check: $('p-svc').checked, steamcmd: $('p-cmd').value.trim(), steam_user: $('p-su').value.trim()});
     d.close(); await load(true);
+  });
+  $('s-modalerts').onchange = guard(async () => {
+    GI.settings = await app('settings', {mod_update_alerts: $('s-modalerts').checked});
+    toast($('s-modalerts').checked ? 'Will ask Steam once a day which Workshop mods were updated.' : 'Mod update alerts are off.');
+    if ($('s-modalerts').checked) autoModUpdates();
   });
   $('s-auto').onchange = guard(async () => { GI.settings = await app('settings', {auto_update_check: $('s-auto').checked}); toast($('s-auto').checked ? 'Will check for updates on start.' : 'Automatic update checks are off.'); });
   $('s-check').onclick = guard(async () => {
@@ -1120,6 +1183,8 @@ function viewPresets() {
     || `<div class="empty">No presets for ${esc(GNAME())}.<br>Save one from a playset's settings, or drop a JSON file in the presets folder.</div>`);
 }
 function drawer() {
+  const typing = $('d-note');
+  if (typing && document.activeElement === typing && typing.dataset.mod === sel) return;   // never redraw under a note being written
   const d = $('drawer'), m = sel && M(sel);
   d.className = m ? 'open' : '';
   if (!m) { d.innerHTML = ''; return; }
@@ -1136,18 +1201,24 @@ function drawer() {
     ${m.supported_version ? `<h3>Made for game version</h3><p>${esc(m.supported_version)}</p>` : ''}
     ${m.tags.length ? `<h3>Tags</h3><p>${m.tags.map(t => `<span class="b">${esc(t)}</span>`).join(' ')}</p>` : ''}
     ${m.remote_id ? `<p><button class="sm" data-dl1="${esc(m.remote_id)}" title="Opens this mod's Steam Workshop page in Steam">Open in Workshop</button></p>` : ''}
+    ${idx >= 0 && !p.virtual ? `<h3>Your note in this playset</h3><textarea id="d-note" data-mod="${esc(m.id)}" maxlength="300" rows="2" placeholder="Why it is here, or why it is switched off (only you see this; it goes with Export)">${esc((p.mod_notes || {})[m.id] || '')}</textarea>` : ''}
     <h3>Dependencies</h3>${deps}
     ${idx >= 0 && note ? `<h3>Why is it here?</h3><p>${esc(note.reason)}</p>` : ''}
     ${issuesOf(m.id).length ? `<h3>Issues</h3>${issuesOf(m.id).map(i => `<p class="${i.severity === 'error' ? 'err' : 'warn'}">${esc(i.message)} ${fixBtn(i)}</p>`).join('')}` : ''}
     <h3>Location</h3><p class="mut"><code>${esc(m.root || '—')}</code></p>
     <h3>Files</h3><div id="d-files"><button class="sm" data-filesof="${esc(m.id)}">Show file tree</button></div>
     ${m.source === 'local' && m.exists ? `<p><button class="danger sm" data-uninstall="${esc(m.id)}">Uninstall (kept in backups)</button></p>` : ''}`;
+  const ta = $('d-note');
+  if (ta) ta.onchange = guard(() => {   // saved when the box loses focus (one Undo step per note)
+    const id = m.id, text = ta.value.trim();
+    return patch(ps => { const n = {...(ps.mod_notes || {})}; if (text) n[id] = text; else delete n[id]; return {mod_notes: n}; });
+  });
 }
 
 // ---- actions ----
 document.addEventListener('click', guard(async e => {
   const t = e.target, p = cur(), ds = t.dataset; if (!p) return;
-  const cn = t.closest('[data-closenote]'); if (cn) { closedNotes.add(cn.dataset.closenote); return viewLibrary(cur()); }
+  const cn = t.closest('[data-closenote]'); if (cn) { closedNotes.add(cn.dataset.closenote); return render(); }
   const starPs = t.closest('[data-favps]'), starMod = t.closest('[data-favmod]');
   if (starPs) { const id = starPs.dataset.favps, ps = S.playsets.find(x => x.id === id); await api(`playsets/${id}/update`, {favorite: !(ps && ps.favorite)}); return load(); }
   if (starMod) { const id = starMod.dataset.favmod, on = !(S.fav_mods || []).includes(id); S.fav_mods = (await api('fav-mod', {id, on})).fav_mods; return render(); }
@@ -1355,6 +1426,25 @@ view.addEventListener('dragend', () => { drag = null; clearDrop(); render(); });
 view.addEventListener('dragleave', e => { if (!view.contains(e.relatedTarget)) clearDrop(); });
 
 $('auto').onchange = guard(() => patch({auto_sort: $('auto').checked}));
+// Undo / Redo: the server keeps the playset as it was before each change (its mods, order, switches, notes and settings)
+async function stepHistory(dir) {
+  const p = cur(); if (!p || p.virtual || !(dir === 'undo' ? p.can_undo : p.can_redo)) return;
+  await patchQ;   // after any change still on its way
+  Object.assign(cur(), await api(`playsets/${p.id}/${dir}`, {}));
+  render(); analyse();
+  if (tab === 'compare') loadCompare();
+  toast(dir === 'undo' ? 'Undone' : 'Redone');
+}
+$('undo').onclick = guard(() => stepHistory('undo'));
+$('redo').onclick = guard(() => stepHistory('redo'));
+document.addEventListener('keydown', e => {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+  const t = e.target, typing = t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+  if (typing || ($('dlg') && $('dlg').open)) return;   // text boxes keep their own undo
+  const k = e.key.toLowerCase();
+  if (k === 'z' && !e.shiftKey) { e.preventDefault(); $('undo').click(); }
+  else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); $('redo').click(); }
+});
 // Sort now: dependencies first, then who overwrites whom (the server reads the mods' files for it). A report says what
 // was decided and why, and which mods overwrite each other with nothing to decide the winner.
 $('sortnow').onclick = guard(async () => {
@@ -1443,12 +1533,19 @@ async function openImport() {
       <div class="acts"><button class="pri" id="lp-go" ${L.playsets.length ? '' : 'disabled'}>Import ${fresh.length ? fresh.length + ' new' : 'selected'}</button><span id="lp-msg" class="mut"></span></div></div>
     <div class="card"><h3>From a file</h3><p class="desc">A playset file someone shared with you (Playset settings → Export).</p>
       <div class="acts"><button id="lp-file">Choose a file…</button></div></div>
+    ${(S.trash || []).length ? `<div class="card"><h3>Recently deleted</h3><p class="desc">The last ${S.trash.length === 1 ? 'playset' : S.trash.length + ' playsets'} you deleted. Restore brings one back as it was.</p>
+      ${S.trash.map(t => `<div class="srow"><span class="rt"><b>${esc(t.name)}</b><span class="hint">${t.mods} mod${t.mods === 1 ? '' : 's'} · deleted ${esc(new Date(t.deleted * 1000).toLocaleString())}</span></span><button class="sm" data-restore="${esc(t.id)}">Restore</button></div>`).join('')}</div>` : ''}
     <div class="card"><h3>Preferences</h3>
       <label class="srow"><span class="rt"><b>Import launcher playsets automatically</b><span class="hint">When the game opens, bring in launcher playsets that were never imported before. One you deleted here does not come back by itself.</span></span><input type="checkbox" class="sw" id="im-auto" ${st.auto_import_launcher ? 'checked' : ''}></label>
       <label class="srow"><span class="rt"><b>Show this Import button</b><span class="hint">Hide it if you do not need it. You can bring it back under Settings → Playing.</span></span><input type="checkbox" class="sw" id="im-show" ${st.show_import_button ? 'checked' : ''}></label></div>
     <div class="dlg-btns"><span></span><button id="lp-close">Close</button></div>`;
   $('lp-close').onclick = () => d.close();
   $('lp-file').onclick = () => { d.close(); $('impf').click(); };
+  d.querySelectorAll('[data-restore]').forEach(b => { b.onclick = guard(async () => {
+    const r = await api(`playsets/${b.dataset.restore}/restore`, {});
+    d.close(); await api(`playsets/${r.id}/activate`, {}); tab = 'order'; await load();
+    toast('Playset restored');
+  }); });
   $('im-auto').onchange = guard(async () => { GI.settings = await app('settings', {auto_import_launcher: $('im-auto').checked}); });
   $('im-show').onchange = guard(async () => { GI.settings = await app('settings', {show_import_button: $('im-show').checked}); showImportButton(); });
   $('lp-go').onclick = guard(async () => {
@@ -1513,7 +1610,7 @@ $('cfg').onclick = () => {
     <label class="chk" style="color:var(--ink);${S.game.has_saves ? '' : 'display:none'}"><input type="checkbox" id="c-saves" ${p.separate_saves ? 'checked' : ''}> Own save folder for this playset (off = it plays with the game's normal saves)
     </label><div class="mut" style="font-size:12px;${S.game.has_saves ? '' : 'display:none'}">The game only sees this playset's saves. Your existing "save games" folder is never deleted: while another playset plays, it waits next to it as "save games (shared)".
       <br><button id="c-home" style="margin-top:6px" title="This playset keeps the game's existing saves; every other playset of this game gets a save folder of its own">Keep the game's saves with this playset only</button></div>
-    <div class="dlg-btns"><span><button id="c-dup">Duplicate</button> <button id="c-exp">Export</button> <button id="c-pre" title="Keep this Workshop mod list as a reusable preset">Save as preset</button> <button id="c-del" class="danger">Delete</button></span>
+    <div class="dlg-btns"><span><button id="c-dup">Duplicate</button> <button id="c-exp">Export</button> <button id="c-lnk" title="A desktop icon that starts the game with this playset straight away, without opening this app" ${S.game.custom ? 'hidden' : ''}>Desktop shortcut</button> <button id="c-pre" title="Keep this Workshop mod list as a reusable preset">Save as preset</button> <button id="c-del" class="danger">Delete</button></span>
     <span><button id="c-cancel">Cancel</button> <button id="c-save" class="pri">Save</button></span></div>`;
   d.showModal();
   $('c-cancel').onclick = () => d.close();
@@ -1529,6 +1626,11 @@ $('cfg').onclick = () => {
   $('c-dup').onclick = guard(async () => {
     const n = prompt('Name for the copy', p.name + ' copy'); if (!n) return;
     const r = await api(`playsets/${p.id}/duplicate`, {name: n}); await api(`playsets/${r.id}/activate`, {}); d.close(); load();
+  });
+  $('c-lnk').onclick = guard(async () => {
+    const r = await api(`playsets/${p.id}/shortcut`, {});
+    if (r.made) toast(`Made "${r.path.split(/[\\/]/).pop()}" on your desktop: it starts ${GNAME()} with this playset.`);
+    else prompt('Shortcuts are made on Windows. On this system, this command starts the game with this playset:', r.command);
   });
   $('c-exp').onclick = guard(async () => {
     const x = await api(`playsets/${p.id}/share`), a = document.createElement('a');

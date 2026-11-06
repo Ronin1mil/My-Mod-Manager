@@ -16,7 +16,8 @@ from modmanager.store import GlobalSettings, Store
 
 ALL = [g for g in games.GAMES.values() if g.kind == "paradox"]  # the games that share the playset/load-file behaviour
 EVERY = list(games.GAMES.values())
-APP_WIDE = ("/api/client-error", "/api/settings", "/api/update-check", "/api/games", "/api/erase-all", "/api/custom-games")
+APP_WIDE = ("/api/client-error", "/api/settings", "/api/update-check", "/api/games", "/api/erase-all", "/api/custom-games",
+            "/api/backup", "/api/restore-backup")
 
 
 def mkmod(user, folder, name=None, deps=(), files=None, incompatible=(), meta_id="", layout=".metadata",
@@ -57,7 +58,7 @@ def mkinstall(lib, game, version="1.2.3", files=None):
     (root / "launcher/launcher-settings.json").write_text(json.dumps({"rawVersion": f"v{version}", "version": "x"}))
     (Path(lib) / "steamapps/workshop/content" / game.app_id).mkdir(parents=True, exist_ok=True)
     for rel, txt in (files or {}).items():
-        p = root / "game" / rel
+        p = root / game.vanilla_dir_name / rel   # EU4, HOI4 and Stellaris keep their content in the install folder itself
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(txt)
     return root

@@ -1,5 +1,4 @@
 """Finding installs, Workshop folders, versions, logos and config folders - for every game."""
-import json
 import os
 import tempfile
 import unittest
@@ -36,9 +35,10 @@ class Detect(unittest.TestCase):
     def test_pasted_paths_resolve_to_the_install_root(self):
         for g in ALL:
             root = mkinstall(self.r / g.id, g)
-            deep = root / "game" / g.install_marker[1] / "a" / "b" / "c"
+            marker = root.joinpath(*g.install_marker)
+            deep = marker / "a" / "b" / "c"
             deep.mkdir(parents=True)
-            for p in (root, root / "game", root / "game" / g.install_marker[1], deep):
+            for p in (root, marker.parent, marker, deep):
                 self.assertEqual(detect.find_install_root(p, g), root, (g.id, p))
             self.assertIsNone(detect.find_install_root(self.r / "nope", g))
             self.assertIsNone(detect.find_install_root("", g))

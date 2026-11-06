@@ -20,7 +20,11 @@ class Library:
         except (OSError, ValueError):
             pass
 
+    retired = False   # see Store.retired
+
     def save(self):
+        if self.retired:
+            return
         tmp = self.path.with_suffix(f".{uuid.uuid4().hex[:8]}.tmp")
         tmp.write_text(json.dumps(self.data, indent=1), encoding="utf-8")
         tmp.replace(self.path)

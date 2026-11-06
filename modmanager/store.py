@@ -15,18 +15,28 @@ LEGACY_SHARE = {"vic3mm-playset": "vic3", "eu5mm-playset/1": "eu5"}  # files fro
 
 MAX_NAME, MAX_NOTES, MAX_MODS = 60, 2000, 5000
 DEFAULTS = {"notes": "", "launch_args": [], "auto_sort": True, "separate_saves": False, "favorite": False,
-            "winners": []}   # [[winner id, loser id]]: "this mod must load after that one" chosen in the Conflicts tab
+            "winners": [],   # [[winner id, loser id]]: "this mod must load after that one" chosen in the Conflicts tab
+            "mod_notes": {}}   # {mod id: why it is here, or why it is switched off}: the user's own words, per playset
+MAX_MOD_NOTE, MAX_MOD_NOTES = 300, 2000
 
+
+# Undo: the fields of a playset that an edit can change. Before each edit they are kept (per playset, newest last), so
+# Undo puts the playset back as it was; Redo goes forward again until a new edit is made.
+UNDO_FIELDS = ("name", "mods", "disabled", "notes", "launch_args", "auto_sort", "separate_saves", "favorite", "winners", "mod_notes")
+UNDO_DEPTH = 30
+TRASH_DEPTH = 10   # deleted playsets kept so Restore can bring them back
 
 # per-game settings (folders + base-game comparison); app-wide ones live in GlobalSettings
 SETTINGS_DEFAULTS = {"game_dir": "", "user_dir": "", "workshop_dir": "", "include_vanilla": True,
                      "setup_done": False, "steamcmd": "", "steam_user": "", "save_version_check": True,
-                     "ui_scheme": "default", "ui_text": "normal", "ui_img": "normal", "rnw_dir": ""}
+                     "ui_scheme": "default", "ui_text": "normal", "ui_img": "normal", "rnw_dir": "",
+                     "mod_updates_checked": 0}   # when the daily mod update check last asked Steam (unix time)
 UI_SCHEMES = ("default", "midnight", "parchment", "forest", "slate", "rose", "contrast")
 UI_TEXT = ("small", "normal", "large", "xlarge")
 UI_IMG = UI_TEXT
 GLOBAL_DEFAULTS = {"auto_update_check": False, "dismissed_update": "", "last_game": "", "fetch_logos": True,
-                   "auto_import_launcher": True, "show_import_button": True, "shortcut_asked": False, "update_first": False}
+                   "auto_import_launcher": True, "show_import_button": True, "shortcut_asked": False, "update_first": False,
+                   "mod_update_alerts": False}   # ask Steam once a day which Workshop mods were updated (off: no network by default)
 
 
 def _defaults():
@@ -44,6 +54,19 @@ def _id_list(v, what):
     if not isinstance(v, list) or len(v) > MAX_MODS or not all(isinstance(x, str) and len(x) < 300 for x in v):
         raise ValueError(f"'{what}' must be a list of mod ids.")
     return list(dict.fromkeys(v))  # de-duplicate, keep order
+
+
+def validate_mod_notes(v):
+    """{mod id: note}. Empty notes are dropped."""
+    if not isinstance(v, dict) or len(v) > MAX_MOD_NOTES:
+        raise ValueError("'mod_notes' must be an object of mod id -> note.")
+    out = {}
+    for k, t in v.items():
+        if not isinstance(k, str) or not k or len(k) > 300 or not isinstance(t, str) or len(t) > MAX_MOD_NOTE:
+            raise ValueError(f"A mod note can be at most {MAX_MOD_NOTE} characters.")
+        if t.strip():
+            out[k] = t.strip()
+    return out
 
 
 def _atomic_write(path, text):
@@ -91,7 +114,11 @@ class Store:
         self.save()
         return self.settings()
 
+    retired = False   # set when Erase all data or Restore replaced the file under this object: it must never write again
+
     def save(self):
+        if self.retired:   # a request that started before the restore/erase finishes on this old copy: its data is gone
+            return
         if self.path.is_file():  # one rolling backup so a bad edit is recoverable
             shutil.copyfile(self.path, self.path.with_suffix(".bak"))
         _atomic_write(self.path, json.dumps(self.data, indent=2))
@@ -104,7 +131,7 @@ class Store:
         self.data["playsets"][pid] = ps
         if extra:
             try:
-                self.update(pid, **extra)
+                self.update(pid, record=False, **extra)
             except ValueError:
                 del self.data["playsets"][pid]
                 raise
@@ -137,7 +164,10 @@ class Store:
             ps.setdefault(k, v)
         return ps
 
-    def update(self, pid, **fields):
+    def update(self, pid, record=True, **fields):
+        """Change a playset. Every field is validated first; nothing changes unless all are valid. With `record`, the
+        playset as it was is kept for Undo (an action that saves twice, like an edit followed by its auto-sort, records
+        only the first)."""
         if pid == NO_MODS_ID:
             raise ValueError("The built-in 'No mods' playset cannot be changed. Press + New to make a playset of your own.")
         ps = self.get(pid)
@@ -165,19 +195,80 @@ class Store:
                 if not isinstance(fields[k], bool):
                     raise ValueError(f"'{k}' must be true or false.")
                 clean[k] = fields[k]
+        if "mod_notes" in fields:
+            clean["mod_notes"] = validate_mod_notes(fields["mod_notes"])
+        if record and any(ps.get(k) != v for k, v in clean.items()):
+            self._remember(pid, "undo", ps)
+            self._history(pid)["redo"] = []
         ps.update(clean)  # nothing is applied unless every field validated
         self.save()
         return ps
 
+    # ---- undo / redo / restore ----
+    def _history(self, pid):
+        return self.data.setdefault("history", {}).setdefault(pid, {"undo": [], "redo": []})
+
+    def _remember(self, pid, stack, ps):
+        h = self._history(pid)[stack]
+        h.append({k: json.loads(json.dumps(ps.get(k, DEFAULTS.get(k)))) for k in UNDO_FIELDS})
+        del h[:-UNDO_DEPTH]
+
+    def with_history(self, ps):
+        """A copy of the playset with `can_undo` / `can_redo` (how many steps), for the page's Undo and Redo buttons."""
+        h = self.data.get("history", {}).get(ps.get("id"), {})
+        return {**ps, "can_undo": len(h.get("undo", [])), "can_redo": len(h.get("redo", []))}
+
+    def step(self, pid, direction):
+        """Undo ("undo") or redo ("redo") the last change of a playset. -> the playset."""
+        if direction not in ("undo", "redo"):
+            raise ValueError("Unknown direction.")
+        if pid == NO_MODS_ID:
+            raise ValueError("The built-in 'No mods' playset cannot be changed, so there is nothing to undo.")
+        ps = self.get(pid)
+        h = self._history(pid)
+        if not h[direction]:
+            raise ValueError("Nothing to undo." if direction == "undo" else "Nothing to redo.")
+        snap = h[direction].pop()
+        self._remember(pid, "redo" if direction == "undo" else "undo", ps)
+        ps.update({k: v for k, v in snap.items() if k in UNDO_FIELDS})
+        self.save()
+        return ps
+
+    def trash(self):
+        """Deleted playsets that can be brought back, newest first: [{id, name, deleted, mods}]."""
+        return [{"id": t["playset"]["id"], "name": t["playset"]["name"], "deleted": t["deleted"], "mods": len(t["playset"]["mods"])}
+                for t in reversed(self.data.get("trash", []))]
+
+    def restore(self, pid):
+        """Bring back a deleted playset (under a new id if that one is taken again). -> its id."""
+        trash = self.data.get("trash", [])
+        for i, t in enumerate(trash):
+            if t["playset"]["id"] == pid:
+                ps = dict(t["playset"])
+                if ps["id"] in self.data["playsets"]:
+                    ps["id"] = uuid.uuid4().hex[:8]
+                self.data["playsets"][ps["id"]] = ps
+                del trash[i]
+                self.data["active"] = self.data["active"] or ps["id"]
+                self.save()
+                return ps["id"]
+        raise KeyError(pid)
+
     def duplicate(self, pid, name):
         src = self.get(pid)
         return self.create(name, src["mods"], src["disabled"], notes=src["notes"],
-                           launch_args=src["launch_args"], auto_sort=src["auto_sort"], winners=src.get("winners", []))
+                           launch_args=src["launch_args"], auto_sort=src["auto_sort"], winners=src.get("winners", []),
+                           mod_notes=src.get("mod_notes", {}))
 
     def delete(self, pid):
         if pid == NO_MODS_ID:
             raise ValueError("The built-in 'No mods' playset cannot be deleted.")
-        self.data["playsets"].pop(pid, None)
+        gone = self.data["playsets"].pop(pid, None)
+        if gone is not None:   # kept for Restore (Import menu)
+            trash = self.data.setdefault("trash", [])
+            trash.append({"deleted": int(time.time()), "playset": gone})
+            del trash[:-TRASH_DEPTH]
+            self.data.get("history", {}).pop(pid, None)
         if self.data["active"] == pid:
             self.data["active"] = next(iter(self.data["playsets"]), None)
         self.save()
@@ -246,8 +337,10 @@ class Store:
         for mid in ps["mods"]:
             m = mods.get(mid)
             rid = (m["remote_id"] if m else None) or (mid[3:] if mid.startswith("ws:") else None)
-            items.append({"name": m["name"] if m else mid, "remote_id": rid,
-                          "enabled": mid not in ps["disabled"]})
+            item = {"name": m["name"] if m else mid, "remote_id": rid, "enabled": mid not in ps["disabled"]}
+            if ps.get("mod_notes", {}).get(mid):
+                item["note"] = ps["mod_notes"][mid]
+            items.append(item)
         return {"format": SHARE_FORMAT, "version": 1, "game": game_id, "name": ps["name"], "notes": ps["notes"],
                 "launch_args": ps["launch_args"], "auto_sort": ps["auto_sort"], "mods": items}
 
@@ -267,7 +360,7 @@ class Store:
             raise ValueError("Playset file has an invalid mod list.")
         by_rid = {str(m["remote_id"]): m["id"] for m in mods.values() if m["remote_id"]}
         by_name = {m["name"]: m["id"] for m in mods.values()}
-        order, off, missing = [], [], []
+        order, off, missing, notes = [], [], [], {}
         for it in items:
             rid, nm = it.get("remote_id"), it.get("name")
             if not (rid is None or isinstance(rid, (str, int))) or not (nm is None or isinstance(nm, str)) \
@@ -280,7 +373,11 @@ class Store:
             order.append(mid)
             if not it.get("enabled", True):
                 off.append(mid)
+            if isinstance(it.get("note"), str) and it["note"].strip():
+                notes[mid] = it["note"][:MAX_MOD_NOTE]
         extra = {k: data[k] for k in ("notes", "launch_args", "auto_sort") if k in data}
+        if notes:
+            extra["mod_notes"] = notes
         return self.create(data.get("name") or "Imported", order, off, **extra), missing
 
 

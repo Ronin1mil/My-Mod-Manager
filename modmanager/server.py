@@ -16,7 +16,7 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import APP_NAME, BUILD, __version__, collections, compare, crash, detect, games as gamesmod, install, launch, order, presets, rnw, saves, scan, smartsort, update, updates
+from . import APP_NAME, BUILD, __version__, backup, collections, compare, crash, detect, games as gamesmod, install, launch, order, presets, rnw, saves, scan, smartsort, update, updates
 from . import launcher, bootworker, thumbs, customgames, errorlog, gamelog, launcherdb, launchersync, perflog, selfupdate, shortcut, steamshortcut, workshop
 from .library import Library
 from .paths import LOGO_TYPES, config_dir, fetch_best_logo, find_first, find_logo, game_version, launcher_exe, user_dirs, workshop_dirs
@@ -33,7 +33,8 @@ CSP = ("default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline';
 
 MAX_TREE, MAX_RESULT = 5000, 30000
 LIVE_SYNC = ("ck3", "vic3")   # games whose own files follow every change to the active playset (others: at Play)
-SYNC_ACTIONS = ("update", "activate", "autosort", "smartsort", "winner", "enable", "enable_all", "disable_all", "prune", "delete", "merge", "duplicate")
+SYNC_ACTIONS = ("update", "activate", "autosort", "smartsort", "winner", "enable", "enable_all", "disable_all", "prune", "delete", "merge", "duplicate",
+                "undo", "redo", "restore")
 RESULT_CACHE = 64   # conflict answers kept per game (one per load order recently looked at)
 
 
@@ -284,7 +285,7 @@ class GameApp:
         dlc_load.json is written (a game started directly reads it), and the Paradox launcher's database gets a playset
         of the same name with the same mods, made its active one (starting from Steam goes through the launcher, which
         writes its own active playset over dlc_load.json). Never raises; the result is shown next to Play."""
-        if not self.live_sync or not self.user_dir:
+        if not self.live_sync or not self.user_dir or self.store.retired:
             return None
         pid = self.store.data["active"]
         res = {"at": int(time.time()), "playset": ""}
@@ -471,7 +472,7 @@ class GameApp:
         s = self.store.settings()
         mods = [{**m, "change": self.library.change(m["id"])} for m in self.mods.values()]
         return {"game": self.game.public(), "mods": mods, "removed": self.library.removed(), "tag_counts": self.library.tag_counts(), "diff": self.diff, "scan_gen": self.scan_gen,
-                "playsets": list(d["playsets"].values()), "no_mods": self.store.no_mods(), "fav_mods": list(self.store.data.get("fav_mods", [])), "active": d["active"],
+                "playsets": [self.store.with_history(ps) for ps in d["playsets"].values()], "trash": self.store.trash(), "no_mods": self.store.no_mods(), "fav_mods": list(self.store.data.get("fav_mods", [])), "active": d["active"],
                 "user_dir": str(self.user_dir or ""), "workshop_dir": str(self.workshop_dir or ""),
                 "game_root": str(self.game_root or ""), "game_version": self.game_version,
                 "game_log": str(gamelog.log_path(self.game.id)), "unread": getattr(self, "unread", []), "has_logo": bool(self.logo), "logo_pending": self.logo_pending, "include_vanilla": s["include_vanilla"],
@@ -593,8 +594,8 @@ class GameApp:
     def update(self, pid, fields):
         ps = self.store.update(pid, **fields)
         if ps["auto_sort"] and {"mods", "disabled", "auto_sort"} & set(fields):
-            ps = self.store.update(pid, mods=order.sort_playset(self.mods, ps["mods"], ps["disabled"],
-                                                                self.game_version))
+            ps = self.store.update(pid, record=False, mods=order.sort_playset(self.mods, ps["mods"], ps["disabled"],
+                                                                              self.game_version))   # part of the same edit for Undo
         if {"mods", "disabled"} & set(fields) and "winners" not in fields:
             ps = self._prune_winners(pid, ps)
         return ps
@@ -607,7 +608,7 @@ class GameApp:
             return ps
         pos = {m: i for i, m in enumerate(m for m in ps["mods"] if m not in ps["disabled"])}
         keep = [x for x in win if x[0] in pos and x[1] in pos and pos[x[0]] > pos[x[1]]]
-        return self.store.update(pid, winners=keep) if len(keep) != len(win) else ps
+        return self.store.update(pid, record=False, winners=keep) if len(keep) != len(win) else ps
 
     def choose_winners(self, pid, pairs, forget=False):
         """"This mod should win over that one": the winner is moved to load right after the loser (only as far as needed),
@@ -752,8 +753,23 @@ class GameApp:
         doc = collections.import_collection(self.game, text, post or collections.default_post)
         return presets.save_user_preset(self.game, doc)
 
-    def mod_updates(self, post=None):
-        return updates.check(self.mods, self.workshop_dir, self.game.app_id, post or collections.default_post)
+    MOD_UPDATE_EVERY = 20 * 3600   # the daily check asks Steam at most this often per game
+
+    def mod_updates(self, post=None, auto=False, now=None):
+        """Which Workshop mods Steam has a newer version of. `auto` is the daily check the page makes when a game opens
+        (only with the setting "Tell me when Workshop mods were updated" on): it asks at most once per MOD_UPDATE_EVERY
+        and answers {"skipped": true} in between, else {"items": [...]}. Pressing the button always asks."""
+        now = time.time() if now is None else now
+        if auto:
+            last = self.store.settings()["mod_updates_checked"]
+            if 0 <= now - last < self.MOD_UPDATE_EVERY:
+                return {"skipped": True, "items": []}
+        items = updates.check(self.mods, self.workshop_dir, self.game.app_id, post or collections.default_post)
+        if auto:
+            with self.state_lock or self.lock:
+                self.store.update_settings(mod_updates_checked=int(now))
+            return {"skipped": False, "items": items}
+        return items
 
     def _files_of(self, mid):
         m = self.mods.get(mid)
@@ -873,7 +889,7 @@ class GameApp:
             raise ValueError(f"{self.game.name} keeps its saves itself; this app does not switch them.")
         self.store.get(pid)
         for other in list(self.store.data["playsets"]):
-            self.store.update(other, separate_saves=other != pid)
+            self.store.update(other, record=False, separate_saves=other != pid)
         return {"home": pid, "own": [p for p in self.store.data["playsets"] if p != pid]}
 
     def check_save_version(self, pid):
@@ -975,6 +991,32 @@ class GameApp:
         saves.record_launch(self.cfg, self.saves_location(pid)[1], self.game_version)
         return {"written": len(ids), "file": f.name, "saves": saves_note, "partial": only is not None,
                 "problems": problems, **res}
+
+
+def find_playset(store, wanted):
+    """A playset by its id or, failing that, its name (any letter case). -> id. Raises ValueError naming the choices."""
+    wanted = str(wanted or "").strip()
+    if wanted in store.data["playsets"]:
+        return wanted
+    by_name = [k for k, ps in store.data["playsets"].items() if ps["name"].casefold() == wanted.casefold()]
+    if len(by_name) == 1:
+        return by_name[0]
+    names = ", ".join(sorted(repr(ps["name"]) for ps in store.data["playsets"].values())) or "none"
+    raise ValueError(f"No playset {wanted!r}{' (more than one has that name)' if by_name else ''}. Playsets: {names}.")
+
+
+def play_playset(game_id, wanted, overrides=None, hub=None):
+    """`--game <id> --play <playset>` (a playset's own shortcut): write what the game needs and start it, without
+    opening the app's window. -> what launch() answered. Raises ValueError / SaveVersionWarning with a readable message."""
+    hub = hub or Hub(overrides=overrides)
+    app = hub.app(game_id)
+    pid = find_playset(app.store, wanted)
+    with hub.lock:
+        res = app.launch(pid)
+        app.store.data["active"] = pid   # the app opens on the playset that was played last
+        app.store.save()
+    hub.settings.update(last_game=game_id)
+    return {**res, "playset": app.store.get(pid)["name"]}
 
 
 def module_list_argument(module_ids):
@@ -1112,7 +1154,7 @@ class Hub:
         targets = [base / g for g in self.games] + [self.settings.path, base / "parse-cache.json.gz"]
         erased, failed = [], []
         with self.lock:
-            self.apps.clear()  # GameApps are rebuilt (and rescan) on first use
+            self._retire_apps()  # GameApps are rebuilt (and rescan) on first use
             self.settings.data = {}
             for gid in list(self.custom.defs):
                 self.games.pop(gid, None)
@@ -1129,6 +1171,52 @@ class Hub:
                 except OSError as e:
                     failed.append(f"{t.name} ({e.strerror or e})")
         return {"erased": erased, "failed": failed}
+
+    def playset_shortcut(self, app, pid, run=None):
+        """A desktop shortcut that starts the game with this playset straight away (`--game <id> --play <playset id>`),
+        without opening the app. Windows only; elsewhere the answer gives the command line to use instead."""
+        ps = app.store.get(pid)
+        if ps.get("virtual"):
+            raise ValueError("Make a playset of your own first; the built-in 'No mods' playset has no shortcut.")
+        if app.game.custom:
+            raise ValueError("Playset shortcuts are not made for games you added yourself (yet).")
+        extra = shortcut.play_args(app.game.id, pid)
+        if not shortcut.supported():
+            return {"made": False, "command": shortcut.command(config_dir(), extra)}
+        lnk = shortcut.create(config_dir(), run=run, extra=extra, name=shortcut.playset_name(app.game.name, ps["name"]),
+                              description=f"Start {app.game.name} with the playset {ps['name']} (Ronin Mod Manager)")
+        gamelog.log(app.game.id, f"made a desktop shortcut for playset {ps['name']!r}: {lnk}")
+        return {"made": True, "path": str(lnk)}
+
+    def _retire_apps(self):
+        """Forget every GameApp after its files were replaced (Restore) or deleted (Erase). A request still running on one
+        (a window-focus rescan that read the mods outside the lock, say) finishes on it, but it can no longer write its
+        old playsets or library over the new files."""
+        for a in self.apps.values():
+            for part in (getattr(a, "store", None), getattr(a, "library", None)):
+                if part is not None:
+                    part.retired = True
+        self.apps.clear()
+
+    def make_backup(self):
+        """Settings > App: one .zip of this app's data (backup.py). -> (bytes, file name)"""
+        with self.lock:
+            data, _ = backup.make(config_dir())
+        return data, backup.filename()
+
+    def restore_backup(self, data):
+        """Put a backup's data in place (a copy of the current data is saved first), then start every game afresh from
+        it, as after Erase all data: playsets, settings and added games are read again on first use."""
+        with self.lock:
+            res = backup.restore(config_dir(), data)
+            self._retire_apps()
+            self.settings = GlobalSettings(self.settings.path)
+            if self.custom.path is not None:
+                for gid in list(self.custom.defs):
+                    self.games.pop(gid, None)
+                self.custom = customgames.CustomGames(self.custom.path)
+                self.games.update({g.id: g for g in self.custom.games()})
+        return {**res, "games": [g.public() for g in self.games.values()]}
 
     def check_update(self, force=False):
         """One GitHub request per 10 minutes at most. Network I/O happens outside the request lock."""
@@ -1179,6 +1267,12 @@ def make_handler(hub):
 
         def _send(self, code, body, ctype="application/json", headers=()):
             app, self._sync_app = getattr(self, "_sync_app", None), None
+            hist, self._hist_app = getattr(self, "_hist_app", None), None
+            if hist is not None and code < 400 and isinstance(body, dict):   # a changed playset says whether Undo/Redo can be used
+                if "mods" in body and body.get("id") in hist.store.data["playsets"]:
+                    body = hist.store.with_history(body)
+                elif isinstance(body.get("playset"), dict):
+                    body = {**body, "playset": hist.store.with_history(body["playset"])}
             if app is not None and code < 400:
                 app.sync_game()   # before the answer, so the page's next request already sees the result
             self._status = code
@@ -1389,7 +1483,8 @@ def make_handler(hub):
                 self._drain()
                 return self._send(403, {"error": "cross-site request"})
             parts = self.path.strip("/").split("/")
-            if parts[-1] in ("install", "update-check", "downloads", "import-collection", "mod-updates", "self-update", "full-rescan", "smartsort"):
+            if parts[-1] in ("install", "update-check", "downloads", "import-collection", "mod-updates", "self-update", "full-rescan", "smartsort",
+                             "restore-backup"):
                 return self._post()  # slow network/disk work must not hold the lock
             if len(parts) == 3 and parts[0] == "api" and parts[1] in hub.games and parts[2] == "rescan":
                 return self._rescan(parts[1])
@@ -1409,6 +1504,9 @@ def make_handler(hub):
                     return self._send(200, dict(hub.rescan_progress or {"step": 0, "of": 0, "text": ""}))
                 if parts == ["api", "self-update"]:
                     return self._send(200, hub.updater.status())
+                if parts == ["api", "backup"]:
+                    data, name = hub.make_backup()
+                    return self._send(200, data, "application/zip", [("Content-Disposition", f'attachment; filename="{name}"')])
                 if parts == ["api", "nightly"]:
                     return self._send(200, update.check_nightly(BUILD, hub.update_fetch))
                 if app is not None:
@@ -1490,11 +1588,13 @@ def make_handler(hub):
             if not self._host_ok() or (origin and origin.split("//", 1)[-1] != host):
                 self._drain()
                 return self._send(403, {"error": "bad origin"})
-            self._sync_app = None
+            self._sync_app = self._hist_app = None
             try:
                 parts, app = self._route()
                 new_set = parts in (["api", "playsets"], ["api", "import"], ["api", "launcher", "import"]) or (
                     parts[:2] == ["api", "presets"] and parts[-1:] in (["apply"], ["import-collection"]))   # a playset was made or brought in
+                if app is not None and len(parts) == 4 and parts[1] == "playsets":
+                    self._hist_app = app
                 if app is not None and app.live_sync and (new_set or (len(parts) == 4 and parts[:2] == ["api", "playsets"] and parts[3] in SYNC_ACTIONS)):
                     self._sync_app = app   # just before the answer goes out: the game's own files get the change (see GameApp.sync_game)
                 if app is None:  # app-wide routes
@@ -1525,6 +1625,12 @@ def make_handler(hub):
                         return self._send(200, full_rescan(hub, lambda t: perflog.log("rescan: " + t)))
                     if parts == ["api", "erase-all"]:
                         return self._send(200, hub.erase_all(self._body().get("confirm")))
+                    if parts == ["api", "restore-backup"]:   # the raw .zip is the body (read here, outside the lock)
+                        n = self._length(backup.MAX_TOTAL)
+                        data = self.rfile.read(n)
+                        if len(data) != n:
+                            raise ValueError("The backup file was cut off.")
+                        return self._send(200, hub.restore_backup(data))
                     return self._send(404, {"error": "not found"})
                 if parts == ["api", "install"]:
                     return self._send(200, self._install(app))
@@ -1563,7 +1669,10 @@ def make_handler(hub):
                 if parts == ["api", "presets", "import-collection"]:
                     return self._send(200, app.import_collection(str(b.get("url", "")), getattr(self.server, "collection_post", None)))
                 if parts == ["api", "mod-updates"]:
-                    return self._send(200, app.mod_updates(getattr(self.server, "collection_post", None)))
+                    auto = b.get("auto") is True
+                    if auto and not hub.settings.get()["mod_update_alerts"]:
+                        return self._send(200, {"skipped": True, "items": []})   # the setting is off: no network
+                    return self._send(200, app.mod_updates(getattr(self.server, "collection_post", None), auto=auto))
                 if parts == ["api", "downloads"]:
                     return self._send(200, app.download(b.get("ids"), str(b.get("method", "steam"))))
                 if parts == ["api", "downloads", "retry"]:
@@ -1581,6 +1690,12 @@ def make_handler(hub):
                     if act == "delete":
                         app.store.delete(pid)
                         return self._send(200, {})
+                    if act == "shortcut":
+                        return self._send(200, hub.playset_shortcut(app, pid))
+                    if act in ("undo", "redo"):
+                        return self._send(200, app.store.step(pid, act))
+                    if act == "restore":   # pid is a deleted playset's id (state.trash)
+                        return self._send(200, {"id": app.store.restore(pid)})
                     if act == "activate":
                         app.store.get(pid)
                         app.store.data["active"] = pid

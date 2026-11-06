@@ -1,6 +1,6 @@
 # Ronin Mod Manager
 
-One mod manager for **Crusader Kings III**, **Europa Universalis V**, **Victoria 3** and **Mount & Blade II: Bannerlord** (and games you add yourself, beta). Pick a playset, see *why* two mods fight, press **Play**, and the game starts with exactly that playset's mods.
+One mod manager for **Crusader Kings III**, **Europa Universalis V**, **Victoria 3** and **Mount & Blade II: Bannerlord**, plus **Europa Universalis IV**, **Hearts of Iron IV**, **Stellaris** and **Imperator: Rome** (new, not yet tried on a real PC) and games you add yourself (beta). Pick a playset, see *why* two mods fight, press **Play**, and the game starts with exactly that playset's mods.
 
 Python standard library only (3.8+), no exe: it runs a small local server and shows it in its own Edge/Chrome window.
 
@@ -36,6 +36,7 @@ Right-click a playset for Open, Rename, Duplicate, Favourite, Settings and Delet
 | Europa Universalis V | **confirmed** | puts the mods into the game's own active playset (`playsets.json`) |
 | Victoria 3 | not yet | file format checked on a real PC; Play not yet tried |
 | Bannerlord | not yet | modules and dependencies checked on a real PC; Play not yet tried |
+| Europa Universalis IV, Hearts of Iron IV, Stellaris, Imperator: Rome | not yet | folders and files taken from [Irony Mod Manager](https://github.com/bcssov/IronyModManager)'s code; nothing tried on a real PC |
 | Games you add | beta | never marked verified |
 
 Everything else is tested against fake installs and a stub game ([docs/08-testing.md](docs/08-testing.md)). What a real PC showed, and what was fixed because of it: [docs/22-checked-on-a-real-pc.md](docs/22-checked-on-a-real-pc.md). Five-minute checks for the rest: [docs/13-verification-checklist.md](docs/13-verification-checklist.md).
@@ -53,11 +54,15 @@ Your Windows user name is replaced by `<user>` in these files. Settings → Prob
 
 ## Features
 - **Playsets**: unlimited, each with its own mods, order, notes, launch arguments and (optionally) its own save folder; duplicate, export/import to share.
+- **Undo and Redo** (buttons above the list, or Ctrl+Z / Ctrl+Y) for every change to a playset, 30 steps back, kept across restarts; a deleted playset can be brought back from *Import → Recently deleted*.
+- **Notes on mods**: write why a mod is in a playset, or why it is switched off, in its details panel; a ✎ marks it in the list, and the note goes with Export.
+- **A desktop shortcut per playset** (Playset settings → Desktop shortcut, Windows): starts the game with that playset straight away, without opening the app.
+- **Backup and restore** (Settings → App): one file with all your playsets, notes and settings for every game; restoring keeps a copy of what was there before.
 - **Pictures**: every mod shows its own `thumbnail.png` on a card (or a coloured tile when it has none); a loading screen covers start-up and switching games.
-- **Library**: local and Workshop mods, flagged new / updated / removed; **Rescan** redoes start-up's work while the app runs.
+- **Library**: local and Workshop mods, flagged new / updated / removed; **Rescan** redoes start-up's work while the app runs. Optional: *Tell me when Workshop mods were updated* (Settings → App, off by default) asks Steam once a day and names the playset's mods that have a newer version.
 - **Auto-sort** from dependencies with a "why is it here?" per mod.
 - **Problems with one-click fixes**: missing/disabled dependency, wrong order, loops, incompatible mods, duplicate names, wrong game version, missing files, damaged metadata.
-- **Conflicts with the winner shown**: whole-file overrides, same definition in different files (`REPLACE:` marked intentional, `INJECT:` listed as patches), `replace_path`, duplicate localization keys; and what each mod changes in the base game.
+- **Conflicts with the winner shown** (filter by folder such as `common/traits`, and *Copy as text* for a mod author): whole-file overrides, same definition in different files (`REPLACE:` marked intentional, `INJECT:` listed as patches), `replace_path`, duplicate localization keys; and what each mod changes in the base game.
 - **Compare playsets** side by side (*Compare* tab).
 - **Import the launcher's playsets** ([docs/16](docs/16-launcher-import.md)).
 - **Presets** from Workshop collections ([docs/11](docs/11-presets-and-downloads.md)); **getting Workshop mods** via *Open in Steam* or optional `steamcmd` (no password is ever handled by the app).
@@ -68,8 +73,8 @@ Your Windows user name is replaced by `<user>` in these files. Settings → Prob
 - **Random New World** (beta, Europa Universalis V): make, import, preview and switch generated maps from the app ([docs/25](docs/25-random-new-world.md)).
 - **Desktop icon and Add to Steam** (Windows): start the app from the desktop or your Steam library.
 - **Saves per playset**: a playset made now gets its own save folder, so the game's save list shows only that playset's saves.
-- **Add your own game** (beta, Stellaris and Imperator: Rome templates included, unchecked): [docs/20](docs/20-v0.9-plan.md).
-- **Updates** from this repository's Releases, and an optional test channel ([docs/19](docs/19-nightly-builds-and-releases.md)). Checks are manual unless you turn on "check when the manager starts".
+- **Add your own game** (beta, a Crusader Kings II template included, unchecked): [docs/20](docs/20-v0.9-plan.md).
+- **Updates** from this repository's Releases, and optional nightly builds ([docs/19](docs/19-nightly-builds-and-releases.md)). Checks are manual unless you turn on "check when the manager starts".
 
 ## What differs per game
 | | Crusader Kings III | Europa Universalis V | Victoria 3 | Bannerlord |

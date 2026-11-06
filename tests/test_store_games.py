@@ -8,7 +8,6 @@ from pathlib import Path
 from unittest import mock
 
 from modmanager import games, scan
-from modmanager.server import GameApp
 from modmanager.store import GlobalSettings, Store, mod_entry, write_load_file
 from tests.helpers import ALL, mkmod, mkworkshop
 
@@ -210,7 +209,8 @@ class StoreBasics(Base):
     def test_global_settings(self):
         g = GlobalSettings(self.r / "g.json")
         self.assertEqual(g.get(), {"auto_update_check": False, "dismissed_update": "", "last_game": "", "fetch_logos": True,
-                                   "auto_import_launcher": True, "show_import_button": True, "shortcut_asked": False, "update_first": False})
+                                   "auto_import_launcher": True, "show_import_button": True, "shortcut_asked": False, "update_first": False,
+                               "mod_update_alerts": False})
         g.update(last_game="eu5")
         self.assertEqual(GlobalSettings(self.r / "g.json").get()["last_game"], "eu5")
         for bad in ({"x": 1}, {"auto_update_check": "y"}, {"last_game": "z" * 50}):

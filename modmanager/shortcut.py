@@ -4,6 +4,7 @@ Asked about once at start-up (and offered in Settings > App & updates). The shor
 WScript.Shell through PowerShell; the paths go in through environment variables, never into the command text.
 """
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -14,7 +15,9 @@ ICON = Path(__file__).resolve().parent / "icon.ico"   # the app's own icon (same
 
 _PS = ("$s = (New-Object -ComObject WScript.Shell).CreateShortcut($env:RMM_LNK); $s.TargetPath = $env:RMM_EXE; "
        "$s.Arguments = $env:RMM_ARGS; $s.WorkingDirectory = $env:RMM_DIR; $s.IconLocation = $env:RMM_ICON; "
-       "$s.Description = 'Ronin Mod Manager: mods and playsets for your games'; $s.Save()")
+       "$s.Description = $env:RMM_DESC; $s.Save()")
+DESCRIPTION = "Ronin Mod Manager: mods and playsets for your games"
+_SAFE = re.compile(r'[<>:"/\\|?*\x00-\x1f]+')
 
 
 def supported():
@@ -71,14 +74,36 @@ def target(cfg):
     return str(exe), "-m modmanager", str(src), f"{icon},0"
 
 
-def create(cfg, run=None):
-    """Write the desktop shortcut (replacing one of the same name). -> its path."""
+def play_args(game_id, playset_id):
+    """The arguments that start a game with one playset (`--game <id> --play <playset id>`); both are plain ids."""
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,40}", game_id) or not re.fullmatch(r"[A-Za-z0-9]{1,40}", playset_id):
+        raise ValueError("Bad game or playset id.")
+    return f"--game {game_id} --play {playset_id}"
+
+
+def playset_name(game_name, playset_name):
+    """'Crusader Kings III - My playset.lnk', with characters Windows does not allow in a file name left out."""
+    text = re.sub(r"\s+", " ", _SAFE.sub(" ", f"{game_name} - {playset_name}")).strip(" .")[:80].rstrip(" .") or "Playset"
+    return text + ".lnk"
+
+
+def command(cfg, extra):
+    """The command line a shortcut runs, as text (shown on systems where no shortcut file is made)."""
+    exe, args, folder, _ = target(cfg)
+    q = lambda s: f'"{s}"' if " " in s and not s.startswith('"') else s
+    return " ".join(x for x in (q(exe), args, extra) if x)
+
+
+def create(cfg, run=None, extra="", name=None, description=None):
+    """Write a desktop shortcut (replacing one of the same name). `extra` adds arguments (a playset's shortcut). -> its path."""
     if not supported():
         raise ValueError("Desktop shortcuts are only made on Windows.")
     exe, args, folder, icon = target(cfg)
-    lnk = path()
+    args = " ".join(x for x in (args, extra) if x)
+    lnk = desktop() / name if name else path()
     lnk.parent.mkdir(parents=True, exist_ok=True)
-    env = dict(os.environ, RMM_LNK=str(lnk), RMM_EXE=exe, RMM_ARGS=args, RMM_DIR=folder, RMM_ICON=icon)
+    env = dict(os.environ, RMM_LNK=str(lnk), RMM_EXE=exe, RMM_ARGS=args, RMM_DIR=folder, RMM_ICON=icon,
+               RMM_DESC=description or DESCRIPTION)
     r = (run or subprocess.run)(["powershell", "-NoProfile", "-NonInteractive", "-Command", _PS], env=env,
                                 capture_output=True, text=True, timeout=30, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     if r.returncode != 0 or not lnk.is_file():

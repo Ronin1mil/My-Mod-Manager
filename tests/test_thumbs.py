@@ -1,5 +1,4 @@
 """A mod's own picture: found in the mod folder only, served by the app, never followed through a link."""
-import http.client
 import os
 import tempfile
 import unittest

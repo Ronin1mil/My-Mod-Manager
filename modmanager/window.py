@@ -60,10 +60,11 @@ def _native_ok():
     if pywebview_module() is None:
         return False, "pywebview is not installed"
     try:
+        import importlib   # loading the module is the check: it fails when WebView2/.NET (or WebKit) is missing
         if sys.platform == "win32":
-            from webview.platforms import winforms  # noqa: F401
+            importlib.import_module("webview.platforms.winforms")
         elif sys.platform == "darwin":
-            from webview.platforms import cocoa  # noqa: F401
+            importlib.import_module("webview.platforms.cocoa")
         return True, ""
     except Exception as e:
         return False, f"{type(e).__name__}: {e}"

@@ -23,6 +23,7 @@ ap.add_argument("--check-update", action="store_true", help="check GitHub for a 
 ap.add_argument("--list-games", action="store_true", help="list supported games and exit")
 ap.add_argument("--version", action="store_true", help="print the version and exit")
 ap.add_argument("--update-first", action="store_true", help="install a newer release before opening, if the 'install new versions when it starts' setting is on")
+ap.add_argument("--play", metavar="PLAYSET", help="with --game: start the game with this playset (id or name) and exit, without opening the app")
 ap.add_argument("--no-browser", action="store_true", help="only run the server; open nothing")
 ap.add_argument("--browser", action="store_true", help="open the page in the default browser instead of the app window")
 ap.add_argument("--probe-window", metavar="FILE", help=argparse.SUPPRESS)
@@ -58,6 +59,25 @@ if a.fetch_logo:
 
 from modmanager import errorlog
 from modmanager.server import serve
+
+if a.play:   # a playset's own shortcut: play it and leave; the app's window is not opened
+    if not a.game:
+        ap.error("--play needs --game")
+    errorlog.install_hooks()
+    from modmanager import window
+    from modmanager.server import play_playset
+    try:
+        r = play_playset(a.game, a.play, overrides={a.game: per_game})
+        print(f"Started {games.get(a.game).name if a.game in games.GAMES else a.game} with playset {r['playset']!r} ({r['written']} mods).")
+        raise SystemExit(0)
+    except SystemExit:
+        raise
+    except Exception as e:
+        errorlog.write_exception("play", e)
+        text = f"{APP_NAME} could not start the game: {getattr(e, 'message', None) or e}\nOpen {APP_NAME} to see more."
+        print(text)
+        window.message(APP_NAME, text)
+        raise SystemExit(1)
 
 errorlog.install_hooks()
 from modmanager import selfupdate

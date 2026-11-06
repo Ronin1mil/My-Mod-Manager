@@ -1,6 +1,5 @@
 """Games the user adds in the app (beta): the form is checked, the game works like a built-in one, and the list is kept."""
 import json
-from pathlib import Path
 
 from modmanager import customgames, games
 from tests.helpers import GameCase, mkmod
@@ -105,7 +104,7 @@ class AddedGameWorks(GameCase):
         self.assertTrue(mine[0]["custom"])
         self.assertEqual(idx["custom_games"][gid]["name"], "Stellaris")
         self.assertTrue(len(idx["game_templates"]) >= 3)
-        self.assertEqual(self.addgames(idx), {"ck3", "eu5", "vic3", "bannerlord", gid})
+        self.assertEqual(self.addgames(idx), set(games.GAMES) | {gid})
         # edit
         self.add({**STELLARIS, "name": "Stellaris 2"}, gid)
         self.assertEqual(self.req("GET", "/api/games")[1]["custom_games"][gid]["name"], "Stellaris 2")

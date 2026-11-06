@@ -13,8 +13,9 @@ JSON over HTTP on `127.0.0.1` (default port 8765). Everything is same-origin onl
 | `POST /api/self-update` · `GET /api/self-update` | start the checksum-verified update · its progress |
 | `POST /api/full-rescan` | **Rescan**: start-up's work again for every game |
 | `GET /api/ping` | the page is still open (keeps an app that runs in a browser window alive); no lock, no work |
-| `GET /api/nightly` | the newest nightly build (`test-build` prerelease) for Settings -> Test builds |
+| `GET /api/nightly` | the newest nightly build, for Settings -> Nightly builds |
 | `POST /api/install-launcher` | Settings -> Install on this PC (Windows, Python edition): copy the app file to `%LOCALAPPDATA%` and write the start `.bat`; turns on install-on-start |
+| `GET /api/backup` · `POST /api/restore-backup` | Settings -> App: the app's data as one `.zip` (download) · restore one (raw `.zip` body; every file checked first; the current data is saved in `app-backups/` before) -> `{restored, safety_copy, games}` |
 | `GET /api/rescan-progress` | While Rescan runs: `{step, of, text}` for the progress bar |
 | `POST /api/desktop-shortcut` · `POST /api/add-to-steam` | make the desktop icon (`{make: true}`) · add the app to Steam's non-Steam games (Steam closed) |
 | `POST /api/erase-all` | Settings -> Erase all data (needs the typed word) |
@@ -37,12 +38,15 @@ JSON over HTTP on `127.0.0.1` (default port 8765). Everything is same-origin onl
 | `POST paths` | `{game_dir?, user_dir?, workshop_dir?, include_vanilla?, steamcmd?, steam_user?}` (validated; sets `setup_done`) |
 | `POST skip-setup` · `POST rescan` | remember "skip" · rescan mods (body `{"light": true}`, sent when the window gets focus: keeps everything already worked out if no mod changed; `state.scan_gen` grows whenever the mods changed) |
 | `POST playsets` | `{name, mods?}` -> `{id}` |
-| `POST playsets/<id>/` `update` `duplicate` `delete` `activate` `autosort` `smartsort` `winner` `enable` `enable_all` `disable_all` `prune` `save-preset` `launch` | playset actions (`update` takes name, mods, disabled, notes, launch_args, auto_sort, separate_saves; with auto-sort on, mods are re-sorted; `autosort` is the dependency sort alone; `smartsort` also orders mods that overwrite each other and answers `{playset, report}`; `winner` takes `{pairs: [[winner, loser]], forget?}`, see docs/23) |
+| `POST playsets/<id>/` `update` `duplicate` `delete` `activate` `autosort` `smartsort` `winner` `enable` `enable_all` `disable_all` `prune` `save-preset` `launch` `undo` `redo` `shortcut` | playset actions (`update` takes name, mods, disabled, notes, launch_args, auto_sort, separate_saves; with auto-sort on, mods are re-sorted; `autosort` is the dependency sort alone; `smartsort` also orders mods that overwrite each other and answers `{playset, report}`; `winner` takes `{pairs: [[winner, loser]], forget?}`, see docs/23) |
+| `POST playsets/<id>/undo` · `redo` | one step back or forward in that playset's changes (400 when there is none) -> the playset. Every answer that is a playset carries `can_undo` / `can_redo` (steps available); so does each playset in `GET state` |
+| `POST playsets/<deleted id>/restore` | bring back a deleted playset (`state.trash` lists the last 10: `{id, name, deleted, mods}`) -> `{id}` |
+| `POST playsets/<id>/shortcut` | Windows: a desktop shortcut that runs `--game <id> --play <playset id>` -> `{made: true, path}`; elsewhere `{made: false, command}` |
 | `POST import` | a shared playset document (game-checked) -> `{id, missing}` |
 | `GET rnw/files` · `GET rnw/list` · `GET rnw/job` · `GET rnw/map/<key>[.png]` · `POST rnw/<action>` | Random New World (beta, **EU5 only**, others answer 400). `files` reads the mod folder and looks for the generator but starts **no program**; `list` is the same plus the generator's own `worlds` command (25 s limit) -> `{generator, hint, worlds[], cli, cli_used, notes, presets, hub, playset, job, free_gb}`; `job` -> `{job}` (polled); `map/<key>` -> the data of an imported `.rnworld` map (locations as columns, countries, vocabulary, `summary`), `map/<key>.png` -> its label picture (docs/25); actions `open` · `pick {what: generator|map|file, start?}` -> `{path, cancelled, error}` (opens the system's folder or file window; waits for the user) · `folder {path}` -> `{ok, generator, report[{ok, text}]}` (looks only in that folder; empty path forgets it) · `new {preset, seed?, code?}` · `import {path}` (a `.rnworld` file or a folder of them: remembered at once -> `{worlds[]}`; a map folder, or a folder of several: copied into the mod folder as a job -> `{job}`) or `import {code}` (remember a world code) · `add {id}` · `remove {id}` · `cancel` · `use {playset, folder, on?}` -> `{playset, did[]}` (docs/25) |
 | `GET launcher` · `POST launcher/import` | the game launcher's playsets · import the chosen ones |
 | `POST presets/import-collection` | turn a Steam Workshop collection into a preset |
-| `POST mod-updates` · `POST downloads/retry` | check Workshop mods for updates · retry a failed or rate-limited download |
+| `POST mod-updates` · `POST downloads/retry` | check Workshop mods for updates (`{auto: true}`: the daily check, only with the setting on, at most once a day per game -> `{skipped, items}`) · retry a failed or rate-limited download |
 | `POST playsets/<id>/merge` · `saves-home` | merge playsets · make this playset the one that keeps the game's own saves |
 | `POST fav-mod` · `POST ui` | favourite mods · remembered view settings |
 | `POST install` | raw `.zip` body, `X-Filename` header (streamed, 1 GB cap) |

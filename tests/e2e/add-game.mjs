@@ -35,15 +35,15 @@ try {
   const opts = await page.locator('#game option').allTextContents();
   assert.match(opts[opts.length - 1], /Add a game \(beta\)/);
 
-  // add Stellaris from its template; the user folder is made to exist first so its mod is found
-  const user = path.join(root, 'Documents', 'Paradox Interactive', 'Stellaris');
+  // add Crusader Kings II from its template; the user folder is made to exist first so its mod is found
+  const user = path.join(root, 'Documents', 'Paradox Interactive', 'Crusader Kings II');
   write(path.join(user, 'mod', 'Cool', '.metadata', 'metadata.json'), JSON.stringify({ name: 'Cool Mod', version: '1' }));
   write(path.join(user, 'mod', 'Cool.mod'), 'name="Cool Mod"\npath="mod/Cool"\n');
   await page.selectOption('#game', '__add');
   await page.waitForSelector('#gf-name');
   assert.equal(await page.locator('#game').inputValue(), 'ck3', 'the list keeps showing the game you are on');
-  await page.selectOption('#gf-tpl', { label: 'Stellaris (unverified)' });
-  assert.equal(await page.inputValue('#gf-name'), 'Stellaris');
+  await page.selectOption('#gf-tpl', { label: 'Crusader Kings II (unverified)' });
+  assert.equal(await page.inputValue('#gf-name'), 'Crusader Kings II');
   assert.equal(await page.inputValue('#gf-content_dir'), '');
   assert.equal(await page.isVisible('#gf-exe_rel'), false, 'module-only fields are hidden for a Paradox game');
   // a field that would climb out of its folder is refused with a readable message and nothing is added
@@ -51,15 +51,15 @@ try {
   await page.click('#gf-save');
   await page.waitForFunction(() => document.getElementById('gf-msg').textContent.length > 0);
   assert.match(await page.textContent('#gf-msg'), /plain folder name/);
-  assert.equal((await (await fetch(`${base}/api/games`)).json()).games.length, 4);
+  assert.equal((await (await fetch(`${base}/api/games`)).json()).games.length, 8);
   await page.fill('#gf-install_marker', 'common');
-  await page.fill('#gf-user_dir_name', 'Stellaris');
+  await page.fill('#gf-user_dir_name', 'Crusader Kings II');
   await page.click('#gf-save');
-  await page.waitForFunction(() => /Stellaris/.test(document.querySelector('#game').selectedOptions[0].textContent));
+  await page.waitForFunction(() => /Crusader Kings II/.test(document.querySelector('#game').selectedOptions[0].textContent));
   await page.waitForFunction(() => S && S.game && S.game.custom);   // loaded: Settings reads this state
-  assert.match(await page.locator('#game').evaluate(s => s.selectedOptions[0].textContent), /Stellaris \(beta\)/);
+  assert.match(await page.locator('#game').evaluate(s => s.selectedOptions[0].textContent), /Crusader Kings II \(beta\)/);
   const gid = await page.locator('#game').inputValue();
-  assert.match(gid, /^cg-stellaris/);
+  assert.match(gid, /^cg-crusader-kings-ii/);
   // its own first-run setup shows; point its user folder at the fake Documents folder
   await page.waitForSelector('#dlg[open]');
   await page.click('[data-st=store]');
@@ -83,16 +83,16 @@ try {
   // edit: change the name
   await page.click('#cg-edit');
   await page.waitForSelector('#gf-name');
-  await page.fill('#gf-name', 'Stellaris Two');
+  await page.fill('#gf-name', 'Crusader Kings Two');
   await page.click('#gf-save');
-  await page.waitForFunction(() => /Stellaris Two/.test(document.querySelector('#game').selectedOptions[0].textContent));
-  await page.waitForFunction(() => S && S.game && S.game.name === 'Stellaris Two');   // the game finished loading (Settings needs its state)
+  await page.waitForFunction(() => /Crusader Kings Two/.test(document.querySelector('#game').selectedOptions[0].textContent));
+  await page.waitForFunction(() => S && S.game && S.game.name === 'Crusader Kings Two');   // the game finished loading (Settings needs its state)
 
   // remove: back to the built-in games
   await page.click('#appcfg');
   await page.click('#cg-remove');
-  await page.waitForFunction(() => document.querySelectorAll('#game option').length === 5);
-  assert.equal((await (await fetch(`${base}/api/games`)).json()).games.length, 4);
+  await page.waitForFunction(() => document.querySelectorAll('#game option').length === 9);
+  assert.equal((await (await fetch(`${base}/api/games`)).json()).games.length, 8);
   assert.ok(confirms.some(m => /never touched/.test(m)));
   assert.ok(fs.existsSync(path.join(user, 'mod', 'Cool.mod')), 'the game\'s own files are never touched');
   assert.deepEqual(errors, []);

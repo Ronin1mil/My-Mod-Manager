@@ -2,7 +2,6 @@
 import json
 import os
 import subprocess
-import sys
 import tempfile
 import time
 import unittest
@@ -10,7 +9,7 @@ from pathlib import Path
 from unittest import mock
 
 from modmanager import games, presets, scan, workshop
-from tests.helpers import GameCase, mkmod, mkworkshop
+from tests.helpers import GameCase, mkworkshop
 
 
 def doc(**kw):

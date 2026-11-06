@@ -2,7 +2,6 @@ import io
 import tarfile
 import tempfile
 import unittest
-import zipfile
 from pathlib import Path
 
 from modmanager import games, install, scan

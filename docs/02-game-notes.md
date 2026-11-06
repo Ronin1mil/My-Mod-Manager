@@ -2,13 +2,13 @@
 
 Legend: **[known]** documented or confirmed by the working standalone managers' behaviour on the files they read; **[assumed]** best knowledge, not confirmed on a real install; **[verify]** a specific check in [13-verification-checklist.md](13-verification-checklist.md). The values below are exactly what `modmanager/games.py` encodes and `tests/test_games.py` pins. **CK3 and EU5 are marked `verified`** (Play confirmed on a real install). What was read from a real PC for every game is in [22-checked-on-a-real-pc.md](22-checked-on-a-real-pc.md).
 
-## Shared (the Paradox games: CK3, EU5, VIC3)
+## Shared (the Paradox games: CK3, EU5, VIC3, EU4, HOI4, Stellaris, Imperator)
 - User dir: `Documents/Paradox Interactive/<Game>` (Windows, OneDrive-redirected Documents is handled), `~/.local/share/Paradox Interactive/<Game>` (Linux), `~/Library/Application Support/Paradox Interactive/<Game>` (macOS). **[known]**
 - Local mods: `<user dir>/mod/<name>/` plus an optional `<user dir>/mod/<name>.mod` stub with `path="mod/<name>"`. A bare folder with its own metadata also counts. **[known]**
 - Workshop mods: `<steam library>/steamapps/workshop/content/<app id>/<id>/`. Every library in `libraryfolders.vdf`, the Windows registry and common hand-made libraries (`G:\SteamLibrary`) are searched. A `ugc_<id>.mod` stub in `mod/` for a Workshop mod we already found is ignored. **[known]**
 - Mod metadata, first hit wins: `.metadata/metadata.json`, `metadata/metadata.json`, `metadata.json`; falling back to `descriptor.mod` (Clausewitz `key="value"`, `key={ "a" "b" }`, `#` comments, `#` inside quotes is text). Metadata fields: `name`, `id`, `version`, `supported_game_version`, `tags`, `short_description`, `relationships[]` (`rel_type` or `type`: `dependency`, `incompatible`; `display_name`/`name`, `id`), `game_custom_data.{replace_paths,multiplayer_synchronized}`. **[assumed]** for EU5; **[known]** shape for CK3/VIC3 descriptors. Wrong-typed fields are ignored, damaged JSON becomes a warning on the mod.
 - Dependencies are matched by metadata id first, then by **name**, a Workshop id or `ugc_<id>`. Names are not unique; duplicates are reported.
-- Game version: `<install>/launcher/launcher-settings.json` (`rawVersion`, else `version`, first `1.2.3`-style number); a game without that file (EU5) uses the last `game version 1.2.3` in `<user dir>/logs/debug.log`. Unknown version = no version warnings. **[known]** on a real CK3, VIC3 and EU5
+- Game version: `<install>/launcher/launcher-settings.json` (or `<install>/launcher-settings.json` for EU4, HOI4 and Stellaris) (`rawVersion`, else `version`, first `1.2.3`-style number); a game without that file (EU5) uses the last `game version 1.2.3` in `<user dir>/logs/debug.log`. Unknown version = no version warnings. **[known]** on a real CK3, VIC3 and EU5
 - Play: when `launcher/launcher-settings.json` names an `exePath` (CK3, VIC3), that exe is started directly with its `exeArgs` and the playset's arguments. Going through Steam opens the Paradox launcher, which writes its own playset over the load file when you press Play there. Games without that file (EU5) still start through Steam. **[known]** for CK3, **[verify]** for VIC3
 - Load order: later mods override earlier ones. Same relative path: the whole file is replaced. **[known]**
 - Definitions: top-level `key = {` in the game's script folders is a definition. Two mods defining the same key **in the same script folder** (`common/traits`) but different files both load; the later wins (*definition* conflict). The same key in *different* folders is not a clash. `REPLACE:`/`TRY_REPLACE:`/`REPLACE_OR_CREATE:` are intentional overrides (info); `INJECT:`/`TRY_INJECT:`/`INJECT_OR_CREATE:` merge into the target and are listed as *patches*. **[known]** for the prefixes; per-folder merge rules beyond this are not modelled.
@@ -50,6 +50,23 @@ EU5 has no `launcher` folder, so Play still starts it through Steam. The playset
 | Extras | `multiplayer_synchronized` from `game_custom_data` shows an "MP-unsafe" badge |
 | Launch arguments | passed to `binaries/victoria3.exe` after `-gdpr-compliant` |
 | Play | starts `binaries/victoria3.exe` directly with `SteamAppId` set; **not yet confirmed** in a game |
+
+## Europa Universalis IV (`eu4`), Hearts of Iron IV (`hoi4`), Stellaris (`stellaris`), Imperator: Rome (`imperator`)
+Built in since 1.2.0, **not tried on a real PC** (`verified=False`). Every value below comes from [Irony Mod Manager](https://github.com/bcssov/IronyModManager)'s code (`src/IronyModManager.Shared/Constants.cs`, `src/IronyModManager.Services/Registrations/GameRegistration.cs`, `src/IronyModManager.IO/Mods/Exporter/JsonExporter.cs`), which supports these games.
+
+| | EU4 | HOI4 | Stellaris | Imperator |
+|---|---|---|---|---|
+| Steam app id | 236850 | 394360 | 281990 | 859580 |
+| User folder (in `Paradox Interactive`) | `Europa Universalis IV` | `Hearts of Iron IV` | `Stellaris` | `Imperator` |
+| Load file | `dlc_load.json` `enabled_mods: ["mod/<name>.mod"]` | same | same | same |
+| Mods | `.mod` descriptors (no metadata.json) | same | same | same |
+| Base content | install folder itself | install folder itself | install folder itself | `game/` |
+| `launcher-settings.json` | install folder | install folder | install folder | `launcher/` |
+| Install marker (a folder only this game has) | `missions` | `portraits` | `prescripted_countries` | `game/setup` |
+| Definition folders | `common`, `events`, `decisions`, `missions` | `common`, `events` | `common`, `events` | `common`, `events`, `decisions` |
+| Compared with the base game | `common`, `customizable_localization`, `decisions`, `events`, `history`, `interface`, `localisation`, `map`, `missions` | `common`, `events`, `history`, `interface`, `localisation`, `map` | `common`, `events`, `flags`, `interface`, `localisation`, `map`, `prescripted_countries` | everything under `game/` |
+
+Not done for these games: the Paradox launcher's database is only read (Import), never written; no presets. Irony also writes the old launcher's `game_data.json` / `mod_registry.json` for these games; this app does not, because the game itself reads `dlc_load.json` **[verify]**. Steam folder names (`install_dir_name`) are the store's usual names; a renamed folder is still found through `appmanifest_<app id>.acf`.
 
 ## Mount & Blade II: Bannerlord (`bannerlord`)
 Not a Paradox game: modules with a `SubModule.xml`, started with a module list, no load file, no conflict analysis. Everything is in [17-bannerlord.md](17-bannerlord.md).

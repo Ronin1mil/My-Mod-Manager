@@ -30,6 +30,8 @@ for (const [folder, name, deps] of [['Lib', 'Core Library', []], ['A', 'Alpha', 
 }
 write(path.join(user, 'mod/A/common/goods/x.txt'), 'g = { }');
 write(path.join(user, 'mod/B/common/goods/x.txt'), 'g = { }');
+write(path.join(user, 'mod/A/events/e.txt'), 'namespace = a');   // a second conflict, in another folder (folder filter)
+write(path.join(user, 'mod/B/events/e.txt'), 'namespace = b');
 const exe = path.join(root, 'game/stub.sh');
 write(exe, `#!/bin/sh\nprintf '%s\\n' "$@" > "$(dirname "$0")/args.txt"\ncp "${user}/${LOADFILE}" "$(dirname "$0")/load.json"\n`);
 fs.chmodSync(exe, 0o755);
@@ -79,6 +81,18 @@ try {
   await page.click('[data-tab=library]');
   await page.click('[data-add="local:B"]');
   await page.click('[data-tab=conflicts]');
+  await page.waitForSelector('text=common/goods/x.txt');
+  // folder filter and Copy as text
+  await page.waitForSelector('#cf-folder');
+  assert.deepEqual(await page.locator('#cf-folder option').allTextContents(), ['All folders (2)', 'common/goods (1)', 'events (1)']);
+  await page.selectOption('#cf-folder', 'events');
+  await page.waitForFunction(() => !document.getElementById('view').textContent.includes('common/goods/x.txt'));
+  await page.evaluate(() => { window.__copied = ''; navigator.clipboard.writeText = t => { window.__copied = t; return Promise.resolve(); }; });
+  await page.click('#cf-copy');
+  const copied = await page.evaluate(() => window.__copied);
+  assert.match(copied, /1 conflict\n/);
+  assert.match(copied, /File\tevents\/e\.txt\t.* -> .*\(wins\)/);
+  await page.selectOption('#cf-folder', '');
   await page.waitForSelector('text=common/goods/x.txt');
 
   // Install a zip through the file input

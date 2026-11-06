@@ -101,7 +101,49 @@ BANNERLORD = Game(
            "--acc": "#cfa84a", "--accink": "#1a1405", "--p1": "#4d6b3a", "--p2": "#65884a", "--p3": "#3a5229",
            "--mut": "#97a38f"})
 
-GAMES = {g.id: g for g in (CK3, EU5, VIC3, BANNERLORD)}
+# Four more Paradox games, added as data. Their folders, files and Steam ids come from Irony Mod Manager's game
+# registrations (src/IronyModManager.Shared/Constants.cs, Services/Registrations/GameRegistration.cs and
+# IO/Mods/Exporter/JsonExporter.cs), not from a real install of ours, so they are verified=False until Play is confirmed:
+# - all four read `mod/*.mod` descriptors and take their enabled mods from dlc_load.json `enabled_mods` (like CK3);
+# - Imperator keeps its content under game/ like CK3; EU4, HOI4 and Stellaris keep it straight in the install folder;
+# - the install marker is a folder only that game has in Irony's folder list for it.
+EU4 = Game(
+    id="eu4", name="Europa Universalis IV", app_id="236850", user_dir_name="Europa Universalis IV",
+    install_dir_name="Europa Universalis IV", install_marker=("missions",),
+    load_file="dlc_load.json", load_style="descriptor", def_dirs=("common", "events", "decisions", "missions"),
+    content_dir="", vanilla_only=("common", "customizable_localization", "decisions", "events", "history", "interface",
+                                  "localisation", "map", "missions"),
+    theme={**_COMMON, "--bg": "#0d1418", "--side": "#0a1014", "--panel": "#131d23", "--line": "#29404b",
+           "--acc": "#7fb8c9", "--accink": "#061218", "--p1": "#2a5566", "--p2": "#356c80", "--p3": "#1f4150",
+           "--mut": "#8fa2a9"})
+
+HOI4 = Game(
+    id="hoi4", name="Hearts of Iron IV", app_id="394360", user_dir_name="Hearts of Iron IV",
+    install_dir_name="Hearts of Iron IV", install_marker=("portraits",),
+    load_file="dlc_load.json", load_style="descriptor", def_dirs=("common", "events"),
+    content_dir="", vanilla_only=("common", "events", "history", "interface", "localisation", "map"),
+    theme={**_COMMON, "--bg": "#11120d", "--side": "#0d0e0a", "--panel": "#191b14", "--line": "#363a2a",
+           "--acc": "#c9b26a", "--accink": "#171305", "--p1": "#5b5f3a", "--p2": "#717648", "--p3": "#45482b",
+           "--mut": "#a09d8a"})
+
+STELLARIS = Game(
+    id="stellaris", name="Stellaris", app_id="281990", user_dir_name="Stellaris",
+    install_dir_name="Stellaris", install_marker=("prescripted_countries",),
+    load_file="dlc_load.json", load_style="descriptor", def_dirs=("common", "events"),
+    content_dir="", vanilla_only=("common", "events", "flags", "interface", "localisation", "map", "prescripted_countries"),
+    theme={**_COMMON, "--bg": "#0a0f1a", "--side": "#080c15", "--panel": "#111a2a", "--line": "#253552",
+           "--acc": "#6fc3e8", "--accink": "#04121a", "--p1": "#27507a", "--p2": "#30659a", "--p3": "#1d3d5e",
+           "--mut": "#8e9bb0"})
+
+IMPERATOR = Game(
+    id="imperator", name="Imperator: Rome", app_id="859580", user_dir_name="Imperator",
+    install_dir_name="ImperatorRome", install_marker=("game", "setup"),
+    load_file="dlc_load.json", load_style="descriptor", def_dirs=("common", "events", "decisions"),
+    theme={**_COMMON, "--bg": "#140d0c", "--side": "#100a09", "--panel": "#1c1312", "--line": "#3d2724",
+           "--acc": "#d9a35a", "--accink": "#1a1004", "--p1": "#7a3a2a", "--p2": "#934733", "--p3": "#5c2b1f",
+           "--mut": "#a8958c"})
+
+GAMES = {g.id: g for g in (CK3, EU5, VIC3, BANNERLORD, EU4, HOI4, STELLARIS, IMPERATOR)}
 DEFAULT_GAME = "ck3"
 
 

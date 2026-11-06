@@ -285,7 +285,7 @@ class NoEmptyDefaults(unittest.TestCase):
 
     def test_empty_default_playsets_left_by_older_versions_are_removed(self):
         a = self.store.create("Default")
-        b = self.store.create("Default")
+        self.store.create("Default")
         keep = self.store.create("My list", ["ws:1"])
         self.assertEqual(self.store.prune_empty_defaults(), 2)
         self.assertEqual(list(self.store.data["playsets"]), [keep])

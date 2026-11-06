@@ -5,14 +5,23 @@ from modmanager import games
 
 class Registry(unittest.TestCase):
     def test_supported_games_and_their_pinned_facts(self):
-        self.assertEqual(list(games.GAMES), ["ck3", "eu5", "vic3", "bannerlord"])
+        self.assertEqual(list(games.GAMES), ["ck3", "eu5", "vic3", "bannerlord", "eu4", "hoi4", "stellaris", "imperator"])
         got = {g.id: (g.app_id, g.load_file, g.load_style, g.install_marker) for g in games.GAMES.values()}
         self.assertEqual(got, {
             "ck3": ("1158310", "dlc_load.json", "descriptor", ("game", "common")),
             "eu5": ("3450310", "dlc_load.json", "path", ("game", "in_game")),
             "vic3": ("529340", "content_load.json", "enabled_paths", ("game", "common")),
             "bannerlord": ("261550", "(command line)", "modules", ("Modules", "Native")),
+            # from Irony Mod Manager's game registrations (verified=False until Play is confirmed on a real PC)
+            "eu4": ("236850", "dlc_load.json", "descriptor", ("missions",)),
+            "hoi4": ("394360", "dlc_load.json", "descriptor", ("portraits",)),
+            "stellaris": ("281990", "dlc_load.json", "descriptor", ("prescripted_countries",)),
+            "imperator": ("859580", "dlc_load.json", "descriptor", ("game", "setup")),
         })
+        # where the base content is: under game/ for the newer games, the install folder itself for the older ones
+        self.assertEqual({g.id: g.vanilla_dir_name for g in games.GAMES.values()},
+                         {"ck3": "game", "eu5": "game", "vic3": "game", "bannerlord": "Modules", "eu4": "", "hoi4": "",
+                          "stellaris": "", "imperator": "game"})
 
     def test_ids_are_url_safe_and_unique_and_app_ids_numeric(self):
         for g in games.GAMES.values():
@@ -45,8 +54,9 @@ class Registry(unittest.TestCase):
 
     def test_get_unknown_game(self):
         with self.assertRaises(ValueError):
-            games.get("hoi4")
+            games.get("ck2")
         self.assertIs(games.get("eu5"), games.EU5)
+        self.assertIs(games.get("hoi4"), games.HOI4)
 
 
 if __name__ == "__main__":

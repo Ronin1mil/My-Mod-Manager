@@ -5,7 +5,7 @@
 ## Modules (`modmanager/`)
 | Module | Job |
 |---|---|
-| `games.py` | the `Game` profiles (CK3, EU5, VIC3, Bannerlord): app id, folders, load file/style, definition folders, theme |
+| `games.py` | the `Game` profiles (CK3, EU5, VIC3, Bannerlord, and EU4, HOI4, Stellaris, Imperator from Irony Mod Manager's data): app id, folders, load file/style, definition folders, theme |
 | `customgames.py` | turns the "Add a game (beta)" form into a `Game` |
 | `paths.py` | config dirs (`MODMANAGER_CONFIG_DIR`), user dirs, Steam libraries (registry, vdf, drive guesses), Workshop dirs, game version, logos |
 | `detect.py` | find/describe installs for a game (`install_marker`, `appmanifest` renames, pasted paths) |
@@ -17,7 +17,8 @@
 | `pickfolder.py` | The system's folder window (PowerShell on Windows, tkinter elsewhere) for "point me to the folder". |
 | `rnw.py`, `rnw_fields.py` | Random New World (beta, EU5): finds the generator, runs its command line, lists worlds with their settings (own files, world code, library, this app's records), turns one world on in a playset. `rnw_fields.py` is data from RNW's source (MPL-2.0) |
 | `smartsort.py` | Sort now: extra "A before B" rules from overwrites (replace_path, patch/compatch names, bigger mod first), never against a dependency |
-| `store.py` | playsets (validated, atomic JSON, rolling `.bak`), share/import, global settings, the load-file writer and EU5's `playsets.json` writer |
+| `store.py` | playsets (validated, atomic JSON, rolling `.bak`), Undo/Redo steps and recently deleted playsets, per-mod notes, share/import, global settings, the load-file writer and EU5's `playsets.json` writer |
+| `backup.py` | Settings > App: one `.zip` of the app's own data, and restoring one (every file checked first; the current data is saved before it is replaced) |
 | `collections.py` | turn a Steam Workshop collection into a preset |
 | `updates.py` | per-mod update tracking for Workshop mods |
 | `selfupdate.py` | replace the running packaged app with a newer release (checksum-verified) |
@@ -26,7 +27,7 @@
 | `thumbs.py` | find a mod's own picture (`thumbnail.png` and the like) inside its folder |
 | `launchersync.py` | CK3 and VIC3: write the active playset (and the app's playsets the launcher lacks) into the Paradox launcher's database after every change |
 | `launcher.py` | Windows start file for the Python edition (Settings > Install on this PC): copies the `.pyzw` and writes `Ronin Mod Manager.bat` |
-| `shortcut.py`, `steamshortcut.py` | desktop icon, and listing the app in Steam as a non-Steam game (Windows) |
+| `shortcut.py`, `steamshortcut.py` | desktop icon (also one per playset, which runs `--game <id> --play <playset>`), and listing the app in Steam as a non-Steam game (Windows) |
 | `bootworker.py` | worker processes that work out conflicts at start-up |
 | `window.py` | the app window (Edge/Chrome app mode, default browser fallback) |
 | `presets.py` | curated playsets: validate, load (built-in + yours), apply, save |

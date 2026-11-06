@@ -1,5 +1,4 @@
 import unittest
-from unittest import mock
 
 from modmanager import collections, games, presets
 

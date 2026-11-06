@@ -38,10 +38,18 @@ try {
 
   const openErase = async () => { await page.click('#appcfg'); await page.click('[data-st=app]'); };
   await openErase();
-  // the experimental test-build button is there; with no network (or no release yet) it just says so
+  // the nightly-build button is there; with no network (or no release yet) it just says so
   await page.click('#nt-check');
   await page.waitForFunction(() => document.getElementById('nt-status').textContent.length > 0 && document.getElementById('nt-status').textContent !== 'Checking…', null, { timeout: 20000 });
   assert.equal(await page.isDisabled('#nt-go'), true);
+  // save a backup first (it is restored after the erase below). An empty playset called "Default" is tidied away whenever a
+  // game opens (older versions made one by themselves), so the playset gets a name of its own first.
+  const ps0 = JSON.parse(fs.readFileSync(file, 'utf8')).active;
+  await fetch(`${base}/api/ck3/playsets/${ps0}/update`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Kept' }) });
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#s-backup')]);
+  assert.match(dl.suggestedFilename(), /^RoninModManager-backup-\d{4}-\d\d-\d\d\.zip$/);
+  const bk = path.join(root, 'backup.zip');
+  await dl.saveAs(bk);
   await page.click('#s-erase');
   await page.waitForTimeout(600);
   assert.ok(fs.existsSync(file), 'a wrong answer deletes nothing');
@@ -53,6 +61,15 @@ try {
   assert.equal(await page.textContent('#title'), 'No mods');
   assert.equal(await page.locator('#pslist .ps').count(), 0);
   assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(file, 'utf8')).playsets), [], 'no playset is left (the file is rewritten empty when the page picks "No mods")');
+
+  // restore the backup: the playset comes back, and what was there before is kept as a safety copy
+  await page.waitForSelector('#dlg[open]', { timeout: 3000 }).then(() => page.click('#p-cancel')).catch(() => {});   // a fresh start asks for the folders again
+  await page.waitForFunction(() => !document.getElementById('dlg').open);
+  await openErase();
+  await page.setInputFiles('#s-restoref', bk);
+  await page.waitForSelector('#pslist .ps', { timeout: 10000 });
+  assert.equal(await page.locator('#pslist .ps').count(), 1);
+  assert.ok(fs.readdirSync(path.join(root, 'cfg', 'app-backups')).some(f => /^before-restore-.*\.zip$/.test(f)));
   assert.deepEqual(errors, []);
   console.log('erase e2e ok');
 } finally {

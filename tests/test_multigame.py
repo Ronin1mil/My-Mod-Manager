@@ -1,5 +1,4 @@
 """The same user-visible behaviour, for every game, through one running server."""
-import http.client
 import json
 import os
 import unittest
@@ -27,7 +26,7 @@ class AllGames(GameCase):
 
     def test_games_index_lists_all_three_with_themes(self):
         s, idx, _ = self.req("GET", "/api/games")
-        self.assertEqual((s, [g["id"] for g in idx["games"]]), (200, ["ck3", "eu5", "vic3", "bannerlord"]))
+        self.assertEqual((s, [g["id"] for g in idx["games"]]), (200, list(games.GAMES)))
         self.assertTrue(all(g["theme"]["--acc"] for g in idx["games"]))
         self.assertEqual(idx["settings"]["auto_update_check"], False)
 
@@ -99,9 +98,9 @@ class AllGames(GameCase):
         self.assertEqual(self.req("GET", "/api/state", game=games.EU5)[1]["playsets"], [])
 
     def test_unknown_game_and_routes(self):
-        for path in ("/api/hoi4/state", "/api/ck3/nope", "/api/nope", "/api/ck3", "/api/"):
+        for path in ("/api/ck2/state", "/api/ck3/nope", "/api/nope", "/api/ck3", "/api/"):
             self.assertEqual(self.req("GET", path)[0], 404, path)
-        self.assertEqual(self.post("/api/hoi4/playsets", {"name": "x"})[0], 404)
+        self.assertEqual(self.post("/api/ck2/playsets", {"name": "x"})[0], 404)
         self.assertEqual(self.post("/api/ck3/mods/x/nope")[0], 404)
 
     def test_bulk_actions_for_every_game(self):

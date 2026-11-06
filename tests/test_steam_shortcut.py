@@ -3,7 +3,6 @@ is closed, with the old file backed up."""
 import tempfile
 import unittest
 from pathlib import Path
-from unittest import mock
 
 from modmanager import steamshortcut as ss
 from tests import REAL_STEAM_ROOT

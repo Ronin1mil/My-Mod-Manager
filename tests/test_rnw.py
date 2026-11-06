@@ -287,7 +287,6 @@ class Pick(unittest.TestCase):
     """The system's folder window (pickfolder.py), with a fake program instead of a window."""
 
     def run_with(self, out, code=0, start=""):
-        import tempfile
         from types import SimpleNamespace
         from modmanager import pickfolder
         seen = {}
@@ -466,7 +465,7 @@ class Route(GameCase):
         self.assertIn("already", res["error"])
 
     def test_importing_a_folder_that_holds_several_worlds(self):
-        a, b = self.make_source("rnw_exp_world_aaaaa11111"), self.make_source("rnw_exp_world_bbbbb22222")
+        a, _ = self.make_source("rnw_exp_world_aaaaa11111"), self.make_source("rnw_exp_world_bbbbb22222")
         self.assertEqual(self.post("/api/rnw/import", {"path": str(a.parent)})[0], 200)
         self.assertEqual(self.wait()["result"]["imported"], ["rnw_exp_world_aaaaa11111", "rnw_exp_world_bbbbb22222"])
 

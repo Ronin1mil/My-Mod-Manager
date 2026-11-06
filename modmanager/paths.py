@@ -122,12 +122,22 @@ _LOGGED_VERSION = re.compile(r"game version (\d+\.\d+\.\d+)")
 _LAUNCHER_ARG = re.compile(r"^-[A-Za-z0-9_.\-]{1,63}$")
 
 
+def _launcher_settings_at(root):
+    """(the Paradox launcher's launcher-settings.json, the folder it is in). Newer games (CK3, VIC3, Imperator) keep it in
+    <install>/launcher; older ones (EU4, HOI4, Stellaris) at the install root (Irony Mod Manager's game registrations).
+    `exePath` in it is relative to that folder. ({}, None) when there is none."""
+    for folder in (Path(root) / "launcher", Path(root)):
+        try:
+            d = json.loads((folder / "launcher-settings.json").read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError):
+            continue
+        if isinstance(d, dict):
+            return d, folder
+    return {}, None
+
+
 def _launcher_settings(root):
-    try:
-        d = json.loads((Path(root) / "launcher" / "launcher-settings.json").read_text(encoding="utf-8-sig"))
-    except (OSError, ValueError):
-        return {}
-    return d if isinstance(d, dict) else {}
+    return _launcher_settings_at(root)[0]
 
 
 def _logged_version(user_dir):
@@ -159,16 +169,16 @@ def game_version(root, game=None, user_dir=None):
 
 def launcher_exe(root):
     """(game executable, its arguments) as the Paradox launcher starts it (launcher-settings.json `exePath`, relative to
-    the launcher folder, and `exeArgs`), or (None, []) when the install has no such file or the path leaves the install.
+    the folder that file is in, and `exeArgs`), or (None, []) when the install has no such file or the path leaves the install.
     Starting this directly keeps the launcher from writing its own playset over the load file."""
     if not root:
         return None, []
-    d = _launcher_settings(root)
+    d, folder = _launcher_settings_at(root)
     rel = d.get("exePath")
     if not isinstance(rel, str) or not rel:
         return None, []
     base = Path(root).resolve()
-    exe = (base / "launcher" / rel).resolve()
+    exe = (folder.resolve() / rel).resolve()
     if base not in exe.parents or not exe.is_file():
         return None, []
     args = d.get("exeArgs")

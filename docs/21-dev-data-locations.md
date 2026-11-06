@@ -21,13 +21,14 @@ Folder: `%APPDATA%\Ronin Mod Manager\` (that is `C:\Users\<you>\AppData\Roaming\
 | `settings.json` | app-wide settings |
 | `custom_games.json` | games added with "Add a game (beta)" |
 | `parse-cache.json.gz` | what was read from mod files (definition names), so a restart does not read them all again; safe to delete |
-| `<game>\playsets.json` | playsets and per-game settings (folders, colour scheme, text size, favourites) |
+| `<game>\playsets.json` | playsets and per-game settings (folders, colour scheme, text size, favourites), each playset's notes on its mods, the Undo/Redo steps of each playset (`history`, 30 each) and the last 10 deleted playsets (`trash`) |
 | `<game>\library.json` | the mod library: tags, sources, what is new or updated |
 | `<game>\backups\` | mods moved aside when uninstalled or upgraded |
 | `<game>\presets\`, `<game>\logo.*` | your own presets, downloaded logo |
 | `window\` | the app window's own browser profile |
+| `app-backups\before-restore-<time>.zip` | what the app had saved just before a backup was restored (the newest 10); restore one of these to undo a restore |
 
-`<game>` is `ck3`, `eu5`, `vic3`, `bannerlord`, or `cg-<name>` for an added game. "Settings -> Erase all data" empties this whole folder (except `window`) after typing ERASE.
+`<game>` is `ck3`, `eu5`, `vic3`, `bannerlord`, `eu4`, `hoi4`, `stellaris`, `imperator`, or `cg-<name>` for an added game. **Settings -> App -> Save a backup** puts `settings.json`, `custom_games.json` and every game's `playsets.json`, `library.json` and `presets\*.json` in one `.zip` (backup.py). "Settings -> Erase all data" empties this whole folder (except `window`) after typing ERASE.
 
 ## The games' own files (read by the app; only the load file is written)
 | Game | Documents folder | Load file written by Play | Launcher data read for Import |
@@ -36,6 +37,7 @@ Folder: `%APPDATA%\Ronin Mod Manager\` (that is `C:\Users\<you>\AppData\Roaming\
 | Victoria 3 | `Documents\Paradox Interactive\Victoria 3\` | `content_load.json` (`enabledMods`, absolute paths) | `launcher-v2.sqlite` |
 | Europa Universalis V | `Documents\Paradox Interactive\Europa Universalis V\` | `dlc_load.json` (and the active playset in `playsets.json`, which is what EU5 really uses) | `playsets.json` |
 | Mount & Blade II: Bannerlord | `Documents\Mount and Blade II Bannerlord\` | none (modules go on the command line) | `Configs\LauncherData.xml` |
+| Europa Universalis IV, Hearts of Iron IV, Stellaris, Imperator: Rome (unverified) | `Documents\Paradox Interactive\<Europa Universalis IV, Hearts of Iron IV, Stellaris, Imperator>\` | `dlc_load.json` (`enabled_mods: ["mod/<name>.mod"]`) | `launcher-v2.sqlite` |
 
 Local mods: `<Documents folder>\mod\<mod>\` with a `mod\<mod>.mod` stub (Paradox games); Bannerlord modules: `<install>\Modules\<ModuleId>\`.
 
@@ -43,6 +45,7 @@ Local mods: `<Documents folder>\mod\<mod>\` with a `mod\<mod>.mod` stub (Paradox
 | What | Where |
 |---|---|
 | Desktop icon | `Ronin Mod Manager.lnk` on the Desktop (asked once at first start; Settings > App & updates) |
+| A playset's shortcut | `<Game> - <playset>.lnk` on the Desktop (Playset settings > Desktop shortcut); it runs the app with `--game <id> --play <playset id>`, which starts the game with that playset without opening the app |
 | Add to Steam | `<Steam>\userdata\<account>\config\shortcuts.vdf`, backed up next to it as `shortcuts.vdf.ronin-backup-<time>` |
 
 ## Steam

@@ -3,7 +3,6 @@ coming back to the window costs nothing when no mod changed, and what was parsed
 import os
 import tempfile
 import threading
-import time
 import unittest
 from pathlib import Path
 from unittest import mock
