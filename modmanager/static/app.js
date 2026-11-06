@@ -1531,8 +1531,12 @@ async function openImport() {
     <div class="card"><h3>From the ${esc(GNAME())} launcher</h3>
       ${L.error ? `<p class="warn">${esc(L.error)}</p>` : !L.found ? `<p class="desc">${esc(L.message)}</p>` : L.playsets.length ? `<p class="desc">Playsets already in the game's own launcher. Switch off the ones you do not want. The launcher itself is only read, never changed.</p>${rows}` : '<p class="desc">The launcher has no playsets yet.</p>'}
       <div class="acts"><button class="pri" id="lp-go" ${L.playsets.length ? '' : 'disabled'}>Import ${fresh.length ? fresh.length + ' new' : 'selected'}</button><span id="lp-msg" class="mut"></span></div></div>
-    <div class="card"><h3>From a file</h3><p class="desc">A playset file someone shared with you (Playset settings → Export).</p>
+    <div class="card"><h3>From a file</h3><p class="desc">A playset file someone shared with you (Playset settings → Export), or a text file with one mod per line.</p>
       <div class="acts"><button id="lp-file">Choose a file…</button></div></div>
+    <div class="card"><h3>From a list</h3><p class="desc">Paste a mod list: one mod per line, as a Steam Workshop link, a Workshop id or the mod's name. Lines starting with # are skipped; <code>[off]</code> in front adds a mod switched off.</p>
+      <input id="lt-name" placeholder="Playset name" maxlength="60" style="width:100%;margin-bottom:6px">
+      <textarea id="lt-text" rows="6" style="width:100%" placeholder="https://steamcommunity.com/sharedfiles/filedetails/?id=2217567218&#10;2216670956  Community Flavor Pack&#10;My local mod"></textarea>
+      <div class="acts"><button id="lt-go">Import list</button></div></div>
     ${(S.trash || []).length ? `<div class="card"><h3>Recently deleted</h3><p class="desc">The last ${S.trash.length === 1 ? 'playset' : S.trash.length + ' playsets'} you deleted. Restore brings one back as it was.</p>
       ${S.trash.map(t => `<div class="srow"><span class="rt"><b>${esc(t.name)}</b><span class="hint">${t.mods} mod${t.mods === 1 ? '' : 's'} · deleted ${esc(new Date(t.deleted * 1000).toLocaleString())}</span></span><button class="sm" data-restore="${esc(t.id)}">Restore</button></div>`).join('')}</div>` : ''}
     <div class="card"><h3>Preferences</h3>
@@ -1541,6 +1545,11 @@ async function openImport() {
     <div class="dlg-btns"><span></span><button id="lp-close">Close</button></div>`;
   $('lp-close').onclick = () => d.close();
   $('lp-file').onclick = () => { d.close(); $('impf').click(); };
+  $('lt-go').onclick = guard(async () => {
+    const text = $('lt-text').value;
+    if (!text.trim()) { $('lt-text').focus(); return; }
+    d.close(); await importDone(await api('import', {text, name: $('lt-name').value.trim() || 'Imported'}));
+  });
   d.querySelectorAll('[data-restore]').forEach(b => { b.onclick = guard(async () => {
     const r = await api(`playsets/${b.dataset.restore}/restore`, {});
     d.close(); await api(`playsets/${r.id}/activate`, {}); tab = 'order'; await load();
@@ -1564,10 +1573,16 @@ async function openImport() {
 $('impf').onchange = guard(async e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
   if (f.size > 1024 * 1024) throw new Error('That file is too large to be a playset.');
-  const r = await api('import', JSON.parse(await f.text()));
-  await api(`playsets/${r.id}/activate`, {}); await load();
-  toast(r.missing.length ? `Imported. Not installed (skipped): ${r.missing.join(', ')}` : 'Imported.');
+  const t = await f.text();
+  let doc;   // a playset file (Export) is JSON; anything else is read as a text list, one mod per line
+  try { doc = JSON.parse(t); } catch (err) { doc = null; }
+  if (!doc || typeof doc !== 'object' || Array.isArray(doc)) doc = {text: t, name: f.name.replace(/\.[^.]*$/, '').replace(/[._]+/g, ' ').trim() || 'Imported'};
+  await importDone(await api('import', doc));
 });
+async function importDone(r) {
+  await api(`playsets/${r.id}/activate`, {}); await load();
+  toast(r.missing.length ? `Imported. Not installed (skipped): ${r.missing.join(', ')}` : 'Imported.', r.missing.length > 0);
+}
 $('installbtn').onclick = () => $('installf').click();
 $('installf').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) install(f); };
 const install = guard(async f => {
@@ -1610,7 +1625,7 @@ $('cfg').onclick = () => {
     <label class="chk" style="color:var(--ink);${S.game.has_saves ? '' : 'display:none'}"><input type="checkbox" id="c-saves" ${p.separate_saves ? 'checked' : ''}> Own save folder for this playset (off = it plays with the game's normal saves)
     </label><div class="mut" style="font-size:12px;${S.game.has_saves ? '' : 'display:none'}">The game only sees this playset's saves. Your existing "save games" folder is never deleted: while another playset plays, it waits next to it as "save games (shared)".
       <br><button id="c-home" style="margin-top:6px" title="This playset keeps the game's existing saves; every other playset of this game gets a save folder of its own">Keep the game's saves with this playset only</button></div>
-    <div class="dlg-btns"><span><button id="c-dup">Duplicate</button> <button id="c-exp">Export</button> <button id="c-lnk" title="A desktop icon that starts the game with this playset straight away, without opening this app" ${S.game.custom ? 'hidden' : ''}>Desktop shortcut</button> <button id="c-pre" title="Keep this Workshop mod list as a reusable preset">Save as preset</button> <button id="c-del" class="danger">Delete</button></span>
+    <div class="dlg-btns"><span><button id="c-dup">Duplicate</button> <button id="c-exp" title="A playset file another copy of this app can import">Export</button> <button id="c-txt" title="The mod list as plain text: one mod per line, readable by people and by Import">Export as text</button> <button id="c-lnk" title="A desktop icon that starts the game with this playset straight away, without opening this app" ${S.game.custom ? 'hidden' : ''}>Desktop shortcut</button> <button id="c-pre" title="Keep this Workshop mod list as a reusable preset">Save as preset</button> <button id="c-del" class="danger">Delete</button></span>
     <span><button id="c-cancel">Cancel</button> <button id="c-save" class="pri">Save</button></span></div>`;
   d.showModal();
   $('c-cancel').onclick = () => d.close();
@@ -1636,6 +1651,11 @@ $('cfg').onclick = () => {
     const x = await api(`playsets/${p.id}/share`), a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([JSON.stringify(x, null, 2)], {type: 'application/json'}));
     a.download = x.name.replace(/[^\w.-]+/g, '_') + `.${G}playset.json`; a.click();
+  });
+  $('c-txt').onclick = guard(async () => {
+    const x = await api(`playsets/${p.id}/share-text`), a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([x.text], {type: 'text/plain'}));
+    a.download = x.name.replace(/[^\w.-]+/g, '_') + '.txt'; a.click();
   });
   $('c-pre').onclick = guard(async () => {
     const n = prompt('Preset name', p.name); if (!n) return;

@@ -1,6 +1,7 @@
 """Playset persistence (JSON), sharing, and export to the game's load file (dlc_load.json / content_load.json)."""
 import json
 import os
+import re
 import shutil
 import time
 import uuid
@@ -348,7 +349,7 @@ class Store:
         """Create a playset from share() output (or a standalone-manager file). Returns (id, [names not installed])."""
         if not isinstance(data, dict):
             raise ValueError("Not a playset file")
-        fmt = data.get("format")
+        fmt = data.get("format", SHARE_FORMAT if isinstance(data.get("mods"), list) else None)   # hand-made files may leave it out
         legacy_game = LEGACY_SHARE.get(fmt)
         if fmt != SHARE_FORMAT and legacy_game is None:
             raise ValueError("Not a playset file")
@@ -356,17 +357,23 @@ class Store:
         if game_id and file_game and file_game != game_id:
             raise ValueError(f"This playset is for '{file_game}', not '{game_id}'. Open that game first.")
         items = data.get("mods")
-        if not isinstance(items, list) or len(items) > MAX_MODS or not all(isinstance(i, dict) for i in items):
+        if not isinstance(items, list) or len(items) > MAX_MODS or not all(isinstance(i, (dict, str)) for i in items):
             raise ValueError("Playset file has an invalid mod list.")
+        items = [i if isinstance(i, dict) else _text_item(i[:1000]) for i in items]   # a plain string: a link, id or name
+        items = [i for i in items if i]
         by_rid = {str(m["remote_id"]): m["id"] for m in mods.values() if m["remote_id"]}
         by_name = {m["name"]: m["id"] for m in mods.values()}
+        by_lower = {}
+        for m in mods.values():
+            by_lower.setdefault(m["name"].strip().lower(), m["id"])
         order, off, missing, notes = [], [], [], {}
         for it in items:
-            rid, nm = it.get("remote_id"), it.get("name")
+            rid, nm = it.get("remote_id", it.get("workshop_id")), it.get("name")
             if not (rid is None or isinstance(rid, (str, int))) or not (nm is None or isinstance(nm, str)) \
                     or not isinstance(it.get("enabled", True), bool):
                 raise ValueError("Playset file has an invalid mod entry.")
-            mid = (by_rid.get(str(rid)) if rid is not None else None) or by_name.get(nm)
+            mid = (by_rid.get(str(rid)) if rid is not None else None) or by_name.get(nm) \
+                or (by_lower.get(nm.strip().lower()) if nm else None)
             if mid is None:
                 missing.append(it.get("name") or str(it.get("remote_id")))
                 continue
@@ -379,6 +386,74 @@ class Store:
         if notes:
             extra["mod_notes"] = notes
         return self.create(data.get("name") or "Imported", order, off, **extra), missing
+
+
+MAX_TEXT = 512 * 1024
+_WS_LINK = re.compile(r"(?:steamcommunity\.com/(?:sharedfiles|workshop)/filedetails/\S*?[?&]id=|steam://url/CommunityFilePage/)(\d{4,20})", re.I)
+_WS_ID = re.compile(r"^(\d{6,20})(?:\s+(.*))?$")
+_BULLET = re.compile(r"^(?:[-*\u2022]\s+|\d{1,4}[.)]\s+)")
+_OFF = re.compile(r"^\[off\]\s*", re.I)
+
+
+def _text_item(line):
+    """One line of a text mod list (or one plain string in a playset file's "mods") as a share() mod entry."""
+    line = _BULLET.sub("", line.strip(), count=1)
+    off = bool(_OFF.match(line))
+    line = _OFF.sub("", line, count=1).strip()
+    if not line:
+        return None
+    link, wid = _WS_LINK.search(line), _WS_ID.match(line)
+    if link:
+        item = {"remote_id": link.group(1), "name": None}
+    elif wid:
+        item = {"remote_id": wid.group(1), "name": (wid.group(2) or "").strip() or None}
+    else:
+        item = {"remote_id": None, "name": line[:300]}
+    item["enabled"] = not off
+    return item
+
+
+def text_to_shared(text, name="Imported"):
+    """A plain text mod list (one mod per line) as a share() document, so import_shared() can bring it in.
+
+    Each line is a Steam Workshop link, a Workshop id (optionally followed by the mod's name) or a mod name. Blank lines
+    and lines starting with # are skipped; list bullets ("- ", "* ", "1. ") are ignored; "[off]" in front keeps the mod
+    in the playset switched off. The first "# Playset: <name>" comment names the playset."""
+    if not isinstance(text, str) or len(text) > MAX_TEXT:
+        raise ValueError("That text is too long to be a mod list.")
+    items, game = [], ""
+    for raw in text.splitlines():
+        line = raw.strip().lstrip("\ufeff")
+        if not line:
+            continue
+        if line.startswith("#"):
+            m = re.match(r"#\s*playset:\s*(.+)", line, re.I)
+            if m and name == "Imported":
+                name = m.group(1).strip()
+            m = re.match(r"#\s*game:\s*([a-z0-9_-]{1,40})\s*$", line, re.I)
+            if m and not game:
+                game = m.group(1).lower()
+            continue
+        item = _text_item(line)
+        if item is None:
+            continue
+        items.append(item)
+        if len(items) > MAX_MODS:
+            raise ValueError(f"A playset can hold at most {MAX_MODS} mods.")
+    if not items:
+        raise ValueError("No mods found in that text. Put one Workshop link, Workshop id or mod name on each line.")
+    return {"format": SHARE_FORMAT, "version": 1, "game": game, "name": (name or "Imported").strip()[:MAX_NAME] or "Imported",
+            "mods": items}
+
+
+def shared_to_text(doc):
+    """share() output as a text list that text_to_shared() reads back (and that people can read)."""
+    out = [f"# Playset: {doc['name']}", f"# Game: {doc.get('game') or ''}".rstrip(),
+           "# One mod per line: Workshop id and name, or the name of a local mod. [off] = in the playset, switched off.", ""]
+    for it in doc["mods"]:
+        line = f"{it['remote_id']}  {it['name']}" if it.get("remote_id") else it["name"]
+        out.append(("[off] " if not it.get("enabled", True) else "") + line)
+    return "\n".join(out) + "\n"
 
 
 class GlobalSettings:

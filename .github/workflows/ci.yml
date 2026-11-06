@@ -89,6 +89,7 @@ jobs:
       - run: node tests/e2e/library-sort.mjs
       - run: node tests/e2e/add-game.mjs
       - run: node tests/e2e/undo.mjs
+      - run: node tests/e2e/textimport.mjs
 
   build:
     name: Build app (${{ matrix.name }})

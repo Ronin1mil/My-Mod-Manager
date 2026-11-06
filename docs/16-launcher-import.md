@@ -17,7 +17,8 @@ In this order: its Workshop id, its descriptor name (`mod/ugc_<id>.mod`, `mod/<n
 
 ## Import menu (sidebar, **Import**)
 - **From the launcher**: lists its playsets with a switch each (new ones are on). **Import** creates them. Pressing it again skips playsets already here, brings back one you deleted, and picks up new ones.
-- **From a file**: the shared playset files made by *Export*.
+- **From a file**: the shared playset files made by *Export*, a hand-made JSON file, or a `.txt` mod list (docs/26).
+- **From a list**: paste a mod list, one Workshop link, Workshop id or mod name per line (docs/26).
 - **Preferences**: *Import launcher playsets automatically* (default on) and *Show the Import button* (default on). Both are also in Settings → Playing.
 
 ## Automatic import

@@ -20,7 +20,7 @@ from . import APP_NAME, BUILD, __version__, backup, collections, compare, crash,
 from . import launcher, bootworker, thumbs, customgames, errorlog, gamelog, launcherdb, launchersync, perflog, selfupdate, shortcut, steamshortcut, workshop
 from .library import Library
 from .paths import LOGO_TYPES, config_dir, fetch_best_logo, find_first, find_logo, game_version, launcher_exe, user_dirs, workshop_dirs
-from .store import GlobalSettings, Store, mod_entry, write_load_file
+from .store import GlobalSettings, Store, mod_entry, shared_to_text, text_to_shared, write_load_file
 
 STATIC = Path(__file__).parent / "static"
 STATIC_TYPES = {"index.html": "text/html; charset=utf-8", "app.js": "text/javascript; charset=utf-8",
@@ -725,6 +725,8 @@ class GameApp:
         return self.store.update(pid, mods=keep, disabled=[m for m in ps["disabled"] if m in keep])
 
     def import_playset(self, doc):
+        if isinstance(doc, dict) and "text" in doc and "format" not in doc:   # a plain text mod list (pasted or a .txt file)
+            doc = text_to_shared(doc["text"], str(doc.get("name") or "Imported"))
         pid, missing = self.store.import_shared(doc, self.mods, self.game.id)
         if self.store.get(pid)["auto_sort"]:
             self.update(pid, {"auto_sort": True})
@@ -1524,6 +1526,9 @@ def make_handler(hub):
                     if parts[:2] == ["api", "playsets"] and len(parts) == 4 and parts[3] == "share":
                         doc = app.store.share(parts[2], app.mods, app.game.id)
                         return self._send(200, doc)
+                    if parts[:2] == ["api", "playsets"] and len(parts) == 4 and parts[3] == "share-text":
+                        doc = app.store.share(parts[2], app.mods, app.game.id)
+                        return self._send(200, {"name": doc["name"], "text": shared_to_text(doc)})
                     if parts == ["api", "launcher"]:
                         return self._send(200, app.launcher_info())
                     if parts == ["api", "diagnose"]:

@@ -64,7 +64,7 @@ Your Windows user name is replaced by `<user>` in these files. Settings → Prob
 - **Problems with one-click fixes**: missing/disabled dependency, wrong order, loops, incompatible mods, duplicate names, wrong game version, missing files, damaged metadata.
 - **Conflicts with the winner shown** (filter by folder such as `common/traits`, and *Copy as text* for a mod author): whole-file overrides, same definition in different files (`REPLACE:` marked intentional, `INJECT:` listed as patches), `replace_path`, duplicate localization keys; and what each mod changes in the base game.
 - **Compare playsets** side by side (*Compare* tab).
-- **Import the launcher's playsets** ([docs/16](docs/16-launcher-import.md)).
+- **Import the launcher's playsets** ([docs/16](docs/16-launcher-import.md)), or a **mod list** you pasted or wrote by hand, as text or JSON ([docs/26](docs/26-playset-files.md)). **Export as text** writes one back.
 - **Presets** from Workshop collections ([docs/11](docs/11-presets-and-downloads.md)); **getting Workshop mods** via *Open in Steam* or optional `steamcmd` (no password is ever handled by the app).
 - **Install `.zip`/`.tar*` mods** by drag and drop (checked for unsafe contents); uninstall and upgrades keep the old version in a backup folder.
 - **CK3 and Victoria 3 changes reach the game at once**: starting CK3 from Steam opens the Paradox launcher, which writes its own active playset over the app's. So after every change to the active playset the app also writes it into the launcher's playset of the same name and makes that the launcher's active one (only while the launcher is closed; the database is backed up once a day first).
@@ -177,6 +177,7 @@ This project was written with the help of an AI coding assistant (see the note a
 | [docs/22-checked-on-a-real-pc.md](docs/22-checked-on-a-real-pc.md) | What a real PC showed, and the fixes |
 | [docs/23-crash-help.md](docs/23-crash-help.md) | Choosing which mod wins a clash, and Crash help (beta) |
 | [docs/24-random-new-world-plan.md](docs/24-random-new-world-plan.md) | Plan: Random New World support for Europa Universalis V |
+| [docs/26-playset-files.md](docs/26-playset-files.md) | Writing playset files by hand (text list or JSON), or with another AI |
 | [docs/25-random-new-world.md](docs/25-random-new-world.md) | Random New World (beta): what 1.1.0 does, where the settings come from, what is not yet checked |
 
 ## License
