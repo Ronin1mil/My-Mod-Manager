@@ -72,7 +72,7 @@ Your Windows user name is replaced by `<user>` in these files. Settings → Prob
 - **Crash help** (beta): reads the game's logs after a crash, names known causes and ranks suspect mods ([docs/23](docs/23-crash-help.md)).
 - **Random New World** (beta, Europa Universalis V): make, import, preview and switch generated maps from the app ([docs/25](docs/25-random-new-world.md)).
 - **Desktop icon and Add to Steam** (Windows): start the app from the desktop or your Steam library.
-- **Saves per playset**: a playset made now gets its own save folder, so the game's save list shows only that playset's saves.
+- **Saves per playset** (the games themselves cannot do this): *+ New* asks where a playset's saves go: **no saves** (a save folder of its own, so the game's save list shows only that playset's saves), **a folder you choose** (Browse…, for example on another drive), or **your existing saves**. Nothing is deleted: the game's save folder waits next to it as `save games (shared)` and comes back when a playset that uses it plays. Works for the Paradox games and Bannerlord (`Game Saves`), when the game is started from the app. Change it later in Playset settings.
 - **Add your own game** (beta, a Crusader Kings II template included, unchecked): [docs/20](docs/20-v0.9-plan.md).
 - **Updates** from this repository's Releases, and optional nightly builds ([docs/19](docs/19-nightly-builds-and-releases.md)). Checks are manual unless you turn on "check when the manager starts".
 

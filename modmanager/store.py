@@ -17,13 +17,14 @@ LEGACY_SHARE = {"vic3mm-playset": "vic3", "eu5mm-playset/1": "eu5"}  # files fro
 MAX_NAME, MAX_NOTES, MAX_MODS = 60, 2000, 5000
 DEFAULTS = {"notes": "", "launch_args": [], "auto_sort": True, "separate_saves": False, "favorite": False,
             "winners": [],   # [[winner id, loser id]]: "this mod must load after that one" chosen in the Conflicts tab
-            "mod_notes": {}}   # {mod id: why it is here, or why it is switched off}: the user's own words, per playset
+            "mod_notes": {},   # {mod id: why it is here, or why it is switched off}: the user's own words, per playset
+            "saves_folder": ""}   # with separate_saves: a folder the user chose for this playset's saves ("" = the app's own)
 MAX_MOD_NOTE, MAX_MOD_NOTES = 300, 2000
 
 
 # Undo: the fields of a playset that an edit can change. Before each edit they are kept (per playset, newest last), so
 # Undo puts the playset back as it was; Redo goes forward again until a new edit is made.
-UNDO_FIELDS = ("name", "mods", "disabled", "notes", "launch_args", "auto_sort", "separate_saves", "favorite", "winners", "mod_notes")
+UNDO_FIELDS = ("name", "mods", "disabled", "notes", "launch_args", "auto_sort", "separate_saves", "favorite", "winners", "mod_notes", "saves_folder")
 UNDO_DEPTH = 30
 TRASH_DEPTH = 10   # deleted playsets kept so Restore can bring them back
 
@@ -55,6 +56,16 @@ def _id_list(v, what):
     if not isinstance(v, list) or len(v) > MAX_MODS or not all(isinstance(x, str) and len(x) < 300 for x in v):
         raise ValueError(f"'{what}' must be a list of mod ids.")
     return list(dict.fromkeys(v))  # de-duplicate, keep order
+
+
+def validate_saves_folder(v):
+    """A folder the user chose for a playset's saves: "" (the app's own folder) or a full path."""
+    if not isinstance(v, str) or len(v) > 1000 or any(ord(c) < 32 for c in v):
+        raise ValueError("The save folder must be a folder path.")
+    v = v.strip().strip('"').strip()
+    if v and not (os.path.isabs(v) or re.match(r"^[A-Za-z]:[\\/]", v)):
+        raise ValueError("The save folder must be a full path, for example D:\\Saves\\My campaign.")
+    return v
 
 
 def validate_mod_notes(v):
@@ -198,6 +209,8 @@ class Store:
                 clean[k] = fields[k]
         if "mod_notes" in fields:
             clean["mod_notes"] = validate_mod_notes(fields["mod_notes"])
+        if "saves_folder" in fields:
+            clean["saves_folder"] = validate_saves_folder(fields["saves_folder"])
         if record and any(ps.get(k) != v for k, v in clean.items()):
             self._remember(pid, "undo", ps)
             self._history(pid)["redo"] = []

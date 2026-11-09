@@ -953,7 +953,7 @@ async function openPaths(first) {
       <div class="card">
         <h3>Before you play</h3>
         <p class="desc">Checks the manager runs for you.</p>
-        <label class="srow" style="${S.game.has_saves ? '' : 'display:none'}"><span class="rt"><b>Warn about save versions</b><span class="hint">Warn if the saves were made on a different game release, for example 1.14 saves with 1.15 installed</span></span><input type="checkbox" class="sw" id="p-svc" ${S.save_version_check ? 'checked' : ''}></label>
+        <label class="srow" style="${S.game.has_saves && S.game.kind === 'paradox' ? '' : 'display:none'}"><span class="rt"><b>Warn about save versions</b><span class="hint">Warn if the saves were made on a different game release, for example 1.14 saves with 1.15 installed</span></span><input type="checkbox" class="sw" id="p-svc" ${S.save_version_check ? 'checked' : ''}></label>
         <label class="srow" style="${S.game.has_conflicts ? '' : 'display:none'}"><span class="rt"><b>Compare mods with the base game</b><span class="hint">Shows what each mod overrides from the original game files</span></span><input type="checkbox" class="sw" id="p-van" ${S.include_vanilla ? 'checked' : ''}></label>
       </div>
       <div class="card">
@@ -1510,9 +1510,60 @@ $('updbtn').onclick = guard(async () => {
     await selfUpdate(undefined, true, u.build ? 'nightly' : 'stable');
   } finally { b.disabled = false; }
 });
+// Where a playset's saves are: the game's normal folder, a new empty folder the app keeps, or a folder the user chooses.
+// Used by the New playset window and Playset settings. `p` is the playset (or null for a new one).
+function savesChoice(p) {
+  const sd = esc(S.game.saves_dir || 'save games');
+  const mode = !p ? 'own' : !p.separate_saves ? 'shared' : p.saves_folder ? 'folder' : 'own';
+  const opt = (v, title, hint) => `<label class="srow"><span class="rt"><b>${title}</b><span class="hint">${hint}</span></span><input type="radio" name="sv-mode" value="${v}" ${mode === v ? 'checked' : ''}></label>`;
+  return `<div class="card" id="sv-card"><h3>Saves</h3>
+    ${opt('own', p ? 'Its own saves' : 'Start with no saves', 'A save folder of its own, kept by this app (empty at first). The game shows only the saves made with this playset.')}
+    ${opt('folder', 'Its own saves, in a folder I choose', 'The same, but the saves are kept in a folder you pick, for example on another drive. A folder that already holds saves brings them with it.')}
+    <div id="sv-pick" class="acts" style="margin:4px 0 8px;${mode === 'folder' ? '' : 'display:none'}"><input id="sv-path" style="flex:1;min-width:0" placeholder="Folder path, for example D:\\Saves\\My campaign" value="${esc(p && p.saves_folder || '')}"><button id="sv-browse">Browse…</button></div>
+    ${opt('shared', 'Use my existing saves', `The game's normal "${sd}" folder, like playing without this app.`)}
+    <p class="mut" style="font-size:12px">Nothing is ever deleted: while a playset with its own saves plays, your "${sd}" folder waits next to it as "${sd} (shared)" and comes back when a playset that uses it plays. Applies when the game is started from this app.</p></div>`;
+}
+function wireSavesChoice() {
+  const sync = () => { $('sv-pick').style.display = savesMode() === 'folder' ? '' : 'none'; };
+  document.querySelectorAll('[name=sv-mode]').forEach(r => r.onchange = sync);
+  $('sv-browse').onclick = guard(async () => {
+    $('sv-browse').disabled = true;
+    try {
+      const r = await api('pick-saves-folder', {start: $('sv-path').value.trim()});
+      if (r.error) toast(r.error, true);
+      else if (r.path) $('sv-path').value = r.path;
+    } finally { $('sv-browse').disabled = false; }
+  });
+}
+function savesMode() { const r = document.querySelector('[name=sv-mode]:checked'); return r ? r.value : 'own'; }
+function savesFields() {   // -> {separate_saves, saves_folder} from the choice; throws when a folder is wanted but not given
+  const m = savesMode(), path = $('sv-path').value.trim();
+  if (m === 'folder' && !path) { $('sv-path').focus(); throw new Error('Choose the folder for this playset\'s saves (Browse…), or pick another option.'); }
+  return {separate_saves: m !== 'shared', saves_folder: m === 'folder' ? path : ''};
+}
+
+// New playset: a name, and (for games whose saves this app can switch) which saves it starts with.
 $('new').onclick = guard(async () => {
-  const n = prompt('Playset name'); if (!n) return;
-  const r = await api('playsets', {name: n}); await api(`playsets/${r.id}/activate`, {}); load();
+  if (!S.game.has_saves) {
+    const n = prompt('Playset name'); if (!n) return;
+    const r = await api('playsets', {name: n}); await api(`playsets/${r.id}/activate`, {}); return load();
+  }
+  const d = $('dlg'); d.className = 'menu';
+  d.innerHTML = `<h2>New playset</h2>
+    <div class="card"><label class="rt"><b>Name</b></label><input id="np-name" maxlength="60" style="width:100%;margin-top:6px" placeholder="Playset name"></div>
+    ${savesChoice(null)}
+    <div class="dlg-btns"><span></span><span><button id="np-cancel">Cancel</button> <button id="np-go" class="pri">Create</button></span></div>`;
+  d.showModal();
+  wireSavesChoice();
+  $('np-name').focus();
+  $('np-cancel').onclick = () => d.close();
+  const go = guard(async () => {
+    const n = $('np-name').value.trim(); if (!n) { $('np-name').focus(); return; }
+    const r = await api('playsets', {name: n, ...savesFields()});
+    d.close(); await api(`playsets/${r.id}/activate`, {}); load();
+  });
+  $('np-go').onclick = go;
+  $('np-name').onkeydown = e => { if (e.key === 'Enter') go(); };
 });
 $('imp').onclick = guard(() => openImport());
 function showImportButton() { $('imp').hidden = GI.settings.show_import_button === false; }
@@ -1622,19 +1673,18 @@ $('cfg').onclick = () => {
     <label>Name</label><input type="text" id="c-name" maxlength="60" value="${esc(p.name)}">
     <label>Notes</label><textarea id="c-notes" maxlength="2000">${esc(p.notes)}</textarea>
     <label>Extra launch arguments (one per line, e.g. -debug_mode)</label><textarea id="c-args">${esc(p.launch_args.join('\n'))}</textarea>
-    <label class="chk" style="color:var(--ink);${S.game.has_saves ? '' : 'display:none'}"><input type="checkbox" id="c-saves" ${p.separate_saves ? 'checked' : ''}> Own save folder for this playset (off = it plays with the game's normal saves)
-    </label><div class="mut" style="font-size:12px;${S.game.has_saves ? '' : 'display:none'}">The game only sees this playset's saves. Your existing "save games" folder is never deleted: while another playset plays, it waits next to it as "save games (shared)".
-      <br><button id="c-home" style="margin-top:6px" title="This playset keeps the game's existing saves; every other playset of this game gets a save folder of its own">Keep the game's saves with this playset only</button></div>
+    ${S.game.has_saves ? savesChoice(p) + `<div class="mut" style="font-size:12px"><button id="c-home" title="This playset keeps the game's existing saves; every other playset of this game gets a save folder of its own">Keep the game's saves with this playset only</button></div>` : ''}
     <div class="dlg-btns"><span><button id="c-dup">Duplicate</button> <button id="c-exp" title="A playset file another copy of this app can import">Export</button> <button id="c-txt" title="The mod list as plain text: one mod per line, readable by people and by Import">Export as text</button> <button id="c-lnk" title="A desktop icon that starts the game with this playset straight away, without opening this app" ${S.game.custom ? 'hidden' : ''}>Desktop shortcut</button> <button id="c-pre" title="Keep this Workshop mod list as a reusable preset">Save as preset</button> <button id="c-del" class="danger">Delete</button></span>
     <span><button id="c-cancel">Cancel</button> <button id="c-save" class="pri">Save</button></span></div>`;
   d.showModal();
+  if (S.game.has_saves) wireSavesChoice();
   $('c-cancel').onclick = () => d.close();
-  $('c-home').onclick = guard(async () => {
+  if ($('c-home')) $('c-home').onclick = guard(async () => {
     if (!confirm(`"${p.name}" will play with the game's existing saves. Every other playset gets a save folder of its own (empty until you save there). Nothing is moved or deleted.`)) return;
     await api(`playsets/${p.id}/saves-home`, {}); d.close(); load();
   });
   $('c-save').onclick = guard(async () => {
-    await patch({name: $('c-name').value, notes: $('c-notes').value, separate_saves: $('c-saves').checked,
+    await patch({name: $('c-name').value, notes: $('c-notes').value, ...(S.game.has_saves ? savesFields() : {}),
       launch_args: $('c-args').value.split('\n').map(s => s.trim()).filter(Boolean)});
     d.close();
   });
@@ -1706,7 +1756,7 @@ document.addEventListener('contextmenu', e => {
     if (k === 'fav') { await api(`playsets/${p.id}/update`, {favorite: !p.favorite}); return load(); }
     if (k === 'cfg') { await open(); return $('cfg').click(); }
     if (k === 'del') {
-      if (!confirm(`Delete playset "${p.name}"? Mods are not touched.` + (p.separate_saves ? '\n\nIts own saves stay on disk in the app folder.' : ''))) return;
+      if (!confirm(`Delete playset "${p.name}"? Mods are not touched.` + (p.separate_saves ? `\n\nIts own saves stay on disk${p.saves_folder ? ' in ' + p.saves_folder : ' in the app folder'}.` : ''))) return;
       await api(`playsets/${p.id}/delete`, {}); toast(`Deleted "${p.name}".`); return load();
     }
   });

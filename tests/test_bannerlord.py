@@ -168,7 +168,8 @@ class Playing(GameCase):
 
     def test_state_says_what_this_game_does_not_have(self):
         s = self.req("GET", "/api/state")[1]
-        self.assertEqual((s["game"]["kind"], s["game"]["has_conflicts"], s["game"]["has_saves"]), ("modules", False, False))
+        self.assertEqual((s["game"]["kind"], s["game"]["has_conflicts"], s["game"]["has_saves"]), ("modules", False, True))
+        self.assertEqual(s["game"]["saves_dir"], "Game Saves")
         self.assertEqual(s["game_version"], "1.2.9")
         self.assertEqual(len(s["mods"]), 10)
 
@@ -200,6 +201,25 @@ class Playing(GameCase):
         self.assertEqual((res["via"], res["written"], res["modules"]), ("exe", 4, ["Native", "SandBoxCore", "Bannerlord.Harmony", "MyMod"]))
         # the Paradox load file is not written for this game
         self.assertFalse(list(self.user().glob("*load*.json")))
+
+    def test_each_playset_can_have_its_own_game_saves(self):
+        fresh = self.post("/api/playsets", {"name": "Fresh", "separate_saves": True})[1]["id"]
+        mine = self.post("/api/playsets", {"name": "Mine", "separate_saves": False})[1]["id"]
+        exe = self.root / "bin/Win64_Shipping_Client/Bannerlord.exe"
+        exe.parent.mkdir(parents=True)
+        exe.write_bytes(b"")
+        game_saves = self.user() / "Game Saves"
+        (game_saves / "Native").mkdir(parents=True)
+        (game_saves / "Native/old.sav").write_text("my campaign")
+        with mock.patch("modmanager.launch.subprocess.Popen"):
+            res = self.post(f"/api/playsets/{fresh}/launch")[1]
+            self.assertTrue(res["saves"].startswith("linked_after_moving"), res)
+            self.assertEqual(list(game_saves.iterdir()), [], "a fresh playset sees no saves")
+            (game_saves / "new.sav").write_text("fresh run")
+            self.assertEqual(self.post(f"/api/playsets/{mine}/launch")[1]["saves"].split(":")[0], "unlinked")
+            self.assertEqual((game_saves / "Native/old.sav").read_text(), "my campaign", "the old saves are back, untouched")
+            self.post(f"/api/playsets/{fresh}/launch")
+            self.assertEqual([p.name for p in game_saves.iterdir()], ["new.sav"])
 
     def test_a_disabled_module_is_left_out_and_a_partial_launch_uses_the_subset(self):
         pid = self.post("/api/playsets", {"name": "P", "mods": self.L("Native", "SandBoxCore", "Bannerlord.Harmony", "MyMod")})[1]["id"]

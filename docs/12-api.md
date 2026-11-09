@@ -38,7 +38,7 @@ JSON over HTTP on `127.0.0.1` (default port 8765). Everything is same-origin onl
 | `POST paths` | `{game_dir?, user_dir?, workshop_dir?, include_vanilla?, steamcmd?, steam_user?}` (validated; sets `setup_done`) |
 | `POST skip-setup` · `POST rescan` | remember "skip" · rescan mods (body `{"light": true}`, sent when the window gets focus: keeps everything already worked out if no mod changed; `state.scan_gen` grows whenever the mods changed) |
 | `POST playsets` | `{name, mods?}` -> `{id}` |
-| `POST playsets/<id>/` `update` `duplicate` `delete` `activate` `autosort` `smartsort` `winner` `enable` `enable_all` `disable_all` `prune` `save-preset` `launch` `undo` `redo` `shortcut` | playset actions (`update` takes name, mods, disabled, notes, launch_args, auto_sort, separate_saves; with auto-sort on, mods are re-sorted; `autosort` is the dependency sort alone; `smartsort` also orders mods that overwrite each other and answers `{playset, report}`; `winner` takes `{pairs: [[winner, loser]], forget?}`, see docs/23) |
+| `POST playsets/<id>/` `update` `duplicate` `delete` `activate` `autosort` `smartsort` `winner` `enable` `enable_all` `disable_all` `prune` `save-preset` `launch` `undo` `redo` `shortcut` | playset actions (`update` takes name, mods, disabled, notes, launch_args, auto_sort, separate_saves, saves_folder; with auto-sort on, mods are re-sorted; `autosort` is the dependency sort alone; `smartsort` also orders mods that overwrite each other and answers `{playset, report}`; `winner` takes `{pairs: [[winner, loser]], forget?}`, see docs/23) |
 | `POST playsets/<id>/undo` · `redo` | one step back or forward in that playset's changes (400 when there is none) -> the playset. Every answer that is a playset carries `can_undo` / `can_redo` (steps available); so does each playset in `GET state` |
 | `POST playsets/<deleted id>/restore` | bring back a deleted playset (`state.trash` lists the last 10: `{id, name, deleted, mods}`) -> `{id}` |
 | `POST playsets/<id>/shortcut` | Windows: a desktop shortcut that runs `--game <id> --play <playset id>` -> `{made: true, path}`; elsewhere `{made: false, command}` |
@@ -48,6 +48,8 @@ JSON over HTTP on `127.0.0.1` (default port 8765). Everything is same-origin onl
 | `GET launcher` · `POST launcher/import` | the game launcher's playsets · import the chosen ones |
 | `POST presets/import-collection` | turn a Steam Workshop collection into a preset |
 | `POST mod-updates` · `POST downloads/retry` | check Workshop mods for updates (`{auto: true}`: the daily check, only with the setting on, at most once a day per game -> `{skipped, items}`) · retry a failed or rate-limited download |
+| `POST playsets` | `{name, mods?, separate_saves?, saves_folder?}` makes a playset; `separate_saves` (default `true`) = it starts with a save folder of its own (no saves); `false` = it plays with the game's existing saves; `saves_folder` (a full path) = its own saves live in that folder (refused when it is, holds or is inside the game's save folder) |
+| `POST pick-saves-folder` | `{start?}` opens the system's folder window (waits for the user) -> `{path, cancelled, error}` |
 | `POST playsets/<id>/merge` · `saves-home` | merge playsets · make this playset the one that keeps the game's own saves |
 | `POST fav-mod` · `POST ui` | favourite mods · remembered view settings |
 | `POST install` | raw `.zip` body, `X-Filename` header (streamed, 1 GB cap) |

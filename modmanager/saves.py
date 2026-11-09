@@ -114,8 +114,19 @@ def activate(game_saves, profile_saves):
     return f"{note}:{aside}"
 
 
+def check_target(game_saves, folder):
+    """Refuse a playset save folder that would loop or hide the game's own saves: the game's save folder itself, a folder
+    inside it (or inside the shared one), or a folder that holds it."""
+    g = os.path.normcase(os.path.realpath(str(game_saves)))
+    s = os.path.normcase(os.path.realpath(str(shared_dir(game_saves))))
+    f = os.path.normcase(os.path.realpath(str(folder)))
+    if f in (g, s) or f.startswith(g + os.sep) or f.startswith(s + os.sep) or g.startswith(f + os.sep):
+        raise ValueError(f"Choose another folder for this playset's saves: {folder} is, holds or is inside the game's own save folder.")
+
+
 def deactivate(game_saves, managed_root):
-    """Back to the game's normal, shared save folder: the link this app made (one pointing into `managed_root`) is
+    """Back to the game's normal, shared save folder: the link this app made (one pointing into `managed_root`, a list:
+    the app's own folder of playset saves first, then folders the user chose) is
     removed and `save games (shared)` is renamed back. A real folder or someone else's link is left alone. Returns
     'unchanged' | 'restored' | 'unlinked:<folder the playset's saves stay in>'."""
     game_saves = Path(game_saves)
@@ -128,8 +139,10 @@ def deactivate(game_saves, managed_root):
     if not is_link(game_saves):
         return "unchanged"
     target = link_target(game_saves)
-    managed = os.path.normcase(os.path.realpath(str(managed_root)))
-    if not target or not os.path.normcase(os.path.realpath(target)).startswith(managed + os.sep):
+    roots = managed_root if isinstance(managed_root, (list, tuple)) else [managed_root]
+    real = os.path.normcase(os.path.realpath(target)) if target else ""
+    if not real or not any(real.startswith(r + os.sep) or (i > 0 and real == r)   # the app's folder holds playset folders;
+                           for i, r in enumerate(os.path.normcase(os.path.realpath(str(x))) for x in roots)):   # chosen ones are linked as they are
         return "unchanged"
     _remove_link(game_saves)
     if shared.is_dir() and not is_link(shared):

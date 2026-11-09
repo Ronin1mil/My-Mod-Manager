@@ -23,7 +23,9 @@ If the same module id exists in both places the `Modules` copy wins, as in the g
 Not used: version ranges (`DependentVersion`, `version=`), `RequiredGameVersion` and `LoadAfterModules` (its direction is ambiguous). No game-version warnings are raised for this game.
 
 ## Playsets
-A new playset starts with the official modules that are installed (`Native`, `SandBoxCore`, `BirthAndDeath`, `CustomBattle`, `Sandbox`, `StoryMode`, `NavalDLC`), in that order, which follows their own dependencies. **Auto-sort** keeps dependencies first and official modules ahead of the rest; your own order is kept wherever no rule applies. The Conflicts tab, base-game comparison and the save-version/own-save-folder features are not offered: modules do not share script folders, and their saves are handled by the game.
+A new playset starts with the official modules that are installed (`Native`, `SandBoxCore`, `BirthAndDeath`, `CustomBattle`, `Sandbox`, `StoryMode`, `NavalDLC`), in that order, which follows their own dependencies. **Auto-sort** keeps dependencies first and official modules ahead of the rest; your own order is kept wherever no rule applies. The Conflicts tab and base-game comparison are not offered: modules do not share script folders.
+
+**Saves per playset** work as for the Paradox games: the game's `Documents/Mount and Blade II Bannerlord/Game Saves` folder is swapped for the playset's own folder when the app starts the game (the real folder waits next to it as `Game Saves (shared)`; nothing is deleted). The folder name was seen on a real PC; the switching itself is **unverified** there. It only applies when the game is started from the app (Play or the playset's desktop shortcut), not from Steam or the official launcher.
 
 **Presets:** eight built-in presets made from Steam Workshop collections ([11-presets-and-downloads.md](11-presets-and-downloads.md)); a playset made from one starts with the installed official modules.
 

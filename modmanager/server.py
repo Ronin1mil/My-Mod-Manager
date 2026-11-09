@@ -17,7 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from . import APP_NAME, BUILD, __version__, backup, collections, compare, crash, detect, games as gamesmod, install, launch, order, presets, rnw, saves, scan, smartsort, update, updates
-from . import launcher, bootworker, thumbs, customgames, errorlog, gamelog, launcherdb, launchersync, perflog, selfupdate, shortcut, steamshortcut, workshop
+from . import launcher, bootworker, pickfolder, thumbs, customgames, errorlog, gamelog, launcherdb, launchersync, perflog, selfupdate, shortcut, steamshortcut, workshop
 from .library import Library
 from .paths import LOGO_TYPES, config_dir, fetch_best_logo, find_first, find_logo, game_version, launcher_exe, user_dirs, workshop_dirs
 from .store import GlobalSettings, Store, mod_entry, shared_to_text, text_to_shared, write_load_file
@@ -592,6 +592,8 @@ class GameApp:
 
     # ---- playsets ----
     def update(self, pid, fields):
+        if isinstance(fields.get("saves_folder"), str):
+            self.check_saves_folder(fields["saves_folder"].strip().strip('"').strip())
         ps = self.store.update(pid, **fields)
         if ps["auto_sort"] and {"mods", "disabled", "auto_sort"} & set(fields):
             ps = self.store.update(pid, record=False, mods=order.sort_playset(self.mods, ps["mods"], ps["disabled"],
@@ -877,10 +879,10 @@ class GameApp:
 
     def saves_location(self, pid):
         """(folder the game will read saves from, key for the launch record)."""
-        if self.store.get(pid)["separate_saves"]:
-            d = self.cfg / "saves" / pid
-            return d, f"playset:{pid}"
-        game_saves = self.user_dir / saves.SAVES_DIR_NAME
+        ps = self.store.get(pid)
+        if ps["separate_saves"]:
+            return self.playset_saves_dir(pid, ps), f"playset:{pid}"
+        game_saves = self.user_dir / self.game.saves_dir_name
         aside = saves.shared_dir(game_saves)   # the game's own saves wait here while another playset's are linked in
         return (aside if saves.is_link(game_saves) and aside.is_dir() else game_saves), "shared"
 
@@ -938,6 +940,26 @@ class GameApp:
                            if i["severity"] == "error")
         return ids, problems
 
+    def playset_saves_dir(self, pid, ps):
+        """Where a playset with its own saves keeps them: the folder the user chose, else one in the app's data folder."""
+        return Path(ps["saves_folder"]) if ps.get("saves_folder") else self.cfg / "saves" / pid
+
+    def check_saves_folder(self, folder):
+        """Refuse a chosen save folder that would loop into the game's own save folder (checked when it is set and at Play)."""
+        if folder and self.game.has_saves and self.user_dir:
+            saves.check_target(self.user_dir / self.game.saves_dir_name, folder)
+
+    def _switch_saves(self, pid, ps):
+        """Point the game's save folder at this playset's own folder, or back at the game's normal one."""
+        if not self.game.has_saves or not self.user_dir:
+            return None
+        game_saves = self.user_dir / self.game.saves_dir_name
+        chosen = [p["saves_folder"] for p in self.store.data["playsets"].values() if p.get("saves_folder")]
+        if ps["separate_saves"]:
+            self.check_saves_folder(ps.get("saves_folder"))
+            return saves.activate(game_saves, self.playset_saves_dir(pid, ps))
+        return saves.deactivate(game_saves, [self.cfg / "saves", *chosen])   # shared: undo a playset link left by an earlier launch
+
     def _launch_modules(self, pid, ps, only):
         """Bannerlord-style start: no load file; the game is run with the module list on its command line."""
         if not self.game_root:
@@ -953,9 +975,10 @@ class GameApp:
         gamelog.log(self.game.id, f"PLAY: playset {ps['name']!r}, {len(modules)} modules", [
             f"{i}. {mid}  {self.mods[mid]['name']!r}  {self.mods[mid]['root']}" for i, mid in enumerate(ids, 1) if mid in self.mods
         ] + [f"start: {exe} {' '.join(args)}"])
+        saves_note = self._switch_saves(pid, ps)
         res = launch.start(self.game, str(exe), args)
-        gamelog.log(self.game.id, f"started the game: {res}")
-        return {"written": len(modules), "file": "command line", "saves": None, "partial": only is not None,
+        gamelog.log(self.game.id, f"started the game: {res}; saves: {saves_note or 'shared'}")
+        return {"written": len(modules), "file": "command line", "saves": saves_note, "partial": only is not None,
                 "problems": problems, "modules": modules, **res}
 
     def launch(self, pid, only=None, ack_version=False):
@@ -978,11 +1001,7 @@ class GameApp:
                 f = write_load_file(self.game, self.user_dir, self.mods, ids, ps["name"])
             gamelog.log(gid, f"wrote {f.name}" + (f" and {self.game.playsets_file} (playset {ps['name']!r} made the active one)" if self.game.playsets_file else ""),
                         gamelog.snapshot(self.game, self.user_dir))
-            saves_note = None
-            if ps["separate_saves"]:
-                saves_note = saves.activate(self.user_dir / saves.SAVES_DIR_NAME, self.cfg / "saves" / pid)
-            else:  # shared: all playsets use the game's normal folder, so undo a playset link left by an earlier launch
-                saves_note = saves.deactivate(self.user_dir / saves.SAVES_DIR_NAME, self.cfg / "saves")
+            saves_note = self._switch_saves(pid, ps)
             exe, base_args = self._play_exe()
             res = launch.start(self.game, exe, [*base_args, *launch.validate_launch_args(ps["launch_args"])])
         except Exception as e:
@@ -1486,7 +1505,7 @@ def make_handler(hub):
                 return self._send(403, {"error": "cross-site request"})
             parts = self.path.strip("/").split("/")
             if parts[-1] in ("install", "update-check", "downloads", "import-collection", "mod-updates", "self-update", "full-rescan", "smartsort",
-                             "restore-backup"):
+                             "restore-backup", "pick-saves-folder"):
                 return self._post()  # slow network/disk work must not hold the lock
             if len(parts) == 3 and parts[0] == "api" and parts[1] in hub.games and parts[2] == "rescan":
                 return self._rescan(parts[1])
@@ -1660,7 +1679,11 @@ def make_handler(hub):
                     app.rescan()
                     return self._send(200, app.state())
                 if parts == ["api", "playsets"]:
-                    pid = app.store.create(b.get("name") or "New playset", app.starting_mods(b.get("mods")))
+                    extra = {"separate_saves": b["separate_saves"]} if isinstance(b.get("separate_saves"), bool) else {}
+                    if b.get("saves_folder"):
+                        app.check_saves_folder(str(b["saves_folder"]).strip().strip('"').strip())
+                        extra.update(separate_saves=True, saves_folder=b["saves_folder"])
+                    pid = app.store.create(b.get("name") or "New playset", app.starting_mods(b.get("mods")), **extra)
                     return self._send(200, {"id": pid})
                 if parts == ["api", "import"]:
                     return self._send(200, app.import_playset(b))
@@ -1673,6 +1696,9 @@ def make_handler(hub):
                     return self._send(200, app.apply_preset(parts[2]))
                 if parts == ["api", "presets", "import-collection"]:
                     return self._send(200, app.import_collection(str(b.get("url", "")), getattr(self.server, "collection_post", None)))
+                if parts == ["api", "pick-saves-folder"]:   # the system's folder window; waits for the user (no lock)
+                    return self._send(200, (getattr(self.server, "pick_folder", None) or pickfolder.pick_folder)(
+                        "Choose the folder for this playset's saves", str(b.get("start") or "")))
                 if parts == ["api", "mod-updates"]:
                     auto = b.get("auto") is True
                     if auto and not hub.settings.get()["mod_update_alerts"]:

@@ -97,6 +97,24 @@ class AllGames(GameCase):
         self.assertIn("ck3", res["error"])
         self.assertEqual(self.req("GET", "/api/state", game=games.EU5)[1]["playsets"], [])
 
+    def test_a_new_playset_starts_with_no_saves_unless_asked_to_share(self):
+        for g in self.each():
+            st = lambda pid: next(p for p in self.req("GET", "/api/state", game=g)[1]["playsets"] if p["id"] == pid)
+            self.assertTrue(st(self.post("/api/playsets", {"name": "a"}, game=g)[1]["id"])["separate_saves"])
+            self.assertFalse(st(self.post("/api/playsets", {"name": "b", "separate_saves": False}, game=g)[1]["id"])["separate_saves"])
+            self.assertTrue(st(self.post("/api/playsets", {"name": "c", "separate_saves": "no"}, game=g)[1]["id"])["separate_saves"])
+
+    def test_a_new_playset_can_keep_its_saves_in_a_chosen_folder(self):
+        folder = str(self.r / "chosen saves")
+        asked = []
+        self.srv.pick_folder = lambda title, start: asked.append((title, start)) or {"path": folder, "cancelled": False, "error": ""}
+        st, r, _ = self.post("/api/pick-saves-folder", {"start": "x"}, game=games.CK3)
+        self.assertEqual((st, r["path"], asked[0][1]), (200, folder, "x"))
+        pid = self.post("/api/playsets", {"name": "a", "separate_saves": False, "saves_folder": folder}, game=games.CK3)[1]["id"]
+        ps = next(p for p in self.req("GET", "/api/state", game=games.CK3)[1]["playsets"] if p["id"] == pid)
+        self.assertEqual((ps["separate_saves"], ps["saves_folder"]), (True, folder))
+        self.assertEqual(self.post("/api/playsets", {"name": "b", "saves_folder": "not/full"}, game=games.CK3)[0], 400)
+
     def test_unknown_game_and_routes(self):
         for path in ("/api/ck2/state", "/api/ck3/nope", "/api/nope", "/api/ck3", "/api/"):
             self.assertEqual(self.req("GET", path)[0], 404, path)

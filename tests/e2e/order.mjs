@@ -239,11 +239,44 @@ try {
   assert.equal(await page.locator('#auto').isChecked(), false, 'auto-sort setting persisted');
 
   // --- two playsets keep independent orders
-  page.removeAllListeners('dialog');
-  page.on('dialog', d => d.accept('Second'));
+  // the New playset window asks for a name and which saves the playset starts with
   await page.click('#new');
+  await page.waitForSelector('#np-name');
+  assert.equal(await page.isChecked('[name=sv-mode][value=own]'), true, 'a new playset starts with no saves by default');
+  await page.fill('#np-name', 'Second');
+  await page.check('[name=sv-mode][value=shared]');
+  await page.press('#np-name', 'Enter');
   await page.waitForSelector('#title:has-text("Second")');
   assert.equal(await page.locator('#view .row').count(), 0);
+  const second = (await (await fetch(`${base}/api/vic3/state`)).json()).playsets.find(p => p.name === 'Second');
+  assert.equal(second.separate_saves, false, 'Use my existing saves was chosen');
+
+  // a folder of its own choosing: the path box shows with that option, an empty one is refused, Playset settings keeps it
+  const chosen = path.join(root, 'my saves');
+  await page.click('#new');
+  await page.waitForSelector('#np-name');
+  assert.equal(await page.isVisible('#sv-path'), false);
+  await page.fill('#np-name', 'Third');
+  await page.check('[name=sv-mode][value=folder]');
+  await page.waitForSelector('#sv-path', { state: 'visible' });
+  await page.click('#np-go');
+  await page.waitForFunction(() => document.getElementById('toast').textContent.includes('Choose the folder'));
+  await page.fill('#sv-path', chosen);
+  await page.click('#np-go');
+  await page.waitForSelector('#title:has-text("Third")');
+  let third = (await (await fetch(`${base}/api/vic3/state`)).json()).playsets.find(p => p.name === 'Third');
+  assert.deepEqual([third.separate_saves, third.saves_folder], [true, chosen]);
+  await page.click('#cfg');
+  await page.waitForSelector('#sv-card');
+  assert.equal(await page.isChecked('[name=sv-mode][value=folder]'), true);
+  assert.equal(await page.inputValue('#sv-path'), chosen);
+  await page.check('[name=sv-mode][value=own]');
+  await page.click('#c-save');
+  await page.waitForFunction(() => !document.getElementById('dlg').open);
+  third = (await (await fetch(`${base}/api/vic3/state`)).json()).playsets.find(p => p.name === 'Third');
+  assert.deepEqual([third.separate_saves, third.saves_folder], [true, '']);
+  await page.click('.ps >> text=Second');
+  await page.waitForSelector('#title:has-text("Second")');
   await page.click('.ps >> text=Default');
   await page.waitForSelector('#title:has-text("Default")');
   assert.deepEqual(await names(), saved);

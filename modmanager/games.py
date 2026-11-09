@@ -32,6 +32,7 @@ class Game:
     content_dir: object = None   # folder under the install root that holds the base content ("" = the root itself); None = the kind's default
     custom: bool = False         # made by the user in the app (beta), not built in
     playsets_file: str = ""      # the game's own playset list in the user dir; its active playset is what the game starts with
+    saves_dir: str = ""          # save folder in the user dir that a playset can have its own copy of ("" = the kind's default)
 
     @property
     def vanilla_dir_name(self):
@@ -45,8 +46,13 @@ class Game:
         return self.kind == "paradox"
 
     @property
+    def saves_dir_name(self):
+        """The folder in the user dir the game reads its saves from; "" when this app does not switch saves."""
+        return self.saves_dir or ("save games" if self.kind == "paradox" else "")
+
+    @property
     def has_saves(self):
-        return self.kind == "paradox"
+        return bool(self.saves_dir_name)
 
     @property
     def has_launcher_import(self):
@@ -57,7 +63,8 @@ class Game:
         return {"id": self.id, "name": self.name, "app_id": self.app_id, "load_file": self.load_file,
                 "theme": self.theme, "verified": self.verified, "kind": self.kind,
                 "has_conflicts": self.has_conflicts, "has_saves": self.has_saves,
-                "install_marker": "/".join(self.install_marker), "custom": self.custom}
+                "install_marker": "/".join(self.install_marker), "custom": self.custom,
+                "saves_dir": self.saves_dir_name}
 
 
 _COMMON = {"--ink": "#efe6d4", "--mut": "#a1928f"}
@@ -97,6 +104,7 @@ BANNERLORD = Game(
     load_file="(command line)", load_style="modules", def_dirs=(), kind="modules",
     seed_mods=("Native", "SandBoxCore", "BirthAndDeath", "CustomBattle", "Sandbox", "StoryMode", "NavalDLC"),
     exe_rel=("bin", "Win64_Shipping_Client", "Bannerlord.exe"), launch_prefix=("/singleplayer",),
+    saves_dir="Game Saves",   # Documents/Mount and Blade II Bannerlord/Game Saves (seen on a real PC; the switching is unverified)
     theme={**_COMMON, "--bg": "#0f120e", "--side": "#0b0e0a", "--panel": "#171c15", "--line": "#2f3a2b",
            "--acc": "#cfa84a", "--accink": "#1a1405", "--p1": "#4d6b3a", "--p2": "#65884a", "--p3": "#3a5229",
            "--mut": "#97a38f"})

@@ -265,3 +265,4 @@ button#launch.pri:hover:not(:disabled){filter:brightness(1.2);border-color:#fff}
 .mnote{color:var(--acc);margin-left:4px;cursor:help}#d-note{width:100%;box-sizing:border-box}.undo-btns{display:flex;gap:4px}
 .cf-tools{display:flex;gap:10px;align-items:center;margin:6px 0 10px}.cf-tools select{max-width:320px}
 a.btn{display:inline-block;font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:5px 10px;text-decoration:none;cursor:pointer}a.btn:hover{border-color:var(--acc)}
+.srow input[type=radio]{flex:none;width:20px;height:20px;margin:0;accent-color:var(--acc);cursor:pointer}

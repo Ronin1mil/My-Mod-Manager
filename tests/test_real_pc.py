@@ -139,12 +139,49 @@ class SavesPerPlayset(Base):
             a.launch("nomods", ack_version=True)       # 'No mods' plays with the game's own saves too
             self.assertEqual(seen(), ["old.ck3"])
 
-    def test_bannerlord_keeps_its_saves_itself(self):
-        a = GameApp(games.BANNERLORD, user_dir=self.r / "u", workshop_dir=self.r / "ws", autodetect=False,
+    def test_a_playset_can_keep_its_saves_in_a_folder_the_user_chose(self):
+        root = self.install(games.CK3, {"rawVersion": "1.20.1.2"}, exe=None)
+        user = self.r / "user"
+        mkmod(user, "A")
+        (user / "save games").mkdir(parents=True)
+        (user / "save games/old.ck3").write_text("old")
+        mine = self.r / "D drive" / "My campaign"
+        mine.mkdir(parents=True)
+        (mine / "kept.ck3").write_text("from before")
+        a = GameApp(games.CK3, user_dir=user, workshop_dir=self.r / "ws", game_dir=str(root), autodetect=False,
+                    store=Store(self.r / "p.json"), library=Library(self.r / "l.json"))
+        home = a.store.create("home", ["local:A"], separate_saves=False)
+        away = a.store.create("away", ["local:A"], separate_saves=True, saves_folder=str(mine))
+        seen = lambda: sorted(f.name for f in (user / "save games").iterdir())
+        with mock.patch("modmanager.launch.start", return_value={"via": "exe"}):
+            a.launch(away, ack_version=True)
+            self.assertEqual(seen(), ["kept.ck3"], "the chosen folder's saves come with it")
+            (user / "save games/new.ck3").write_text("new")
+            self.assertTrue((mine / "new.ck3").is_file(), "a new save lands in the chosen folder")
+            a.launch(home, ack_version=True)
+            self.assertEqual(seen(), ["old.ck3"])
+            self.assertEqual(sorted(f.name for f in mine.iterdir()), ["kept.ck3", "new.ck3"], "nothing in it was removed")
+
+    def test_a_chosen_folder_that_would_loop_into_the_games_saves_is_refused(self):
+        user = self.r / "user"
+        (user / "save games").mkdir(parents=True)
+        a = GameApp(games.CK3, user_dir=user, workshop_dir=self.r / "ws", autodetect=False,
                     store=Store(self.r / "p.json"), library=Library(self.r / "l.json"))
         pid = a.store.create("x")
+        for bad in (user / "save games", user / "save games" / "inner", user / "save games (shared)", user, self.r):
+            with self.assertRaises(ValueError, msg=bad):
+                a.update(pid, {"saves_folder": str(bad)})
         with self.assertRaises(ValueError):
-            a.saves_home(pid)
+            a.update(pid, {"saves_folder": "relative/path"})
+        a.update(pid, {"saves_folder": str(self.r / "elsewhere")})
+        self.assertEqual(a.store.get(pid)["saves_folder"], str(self.r / "elsewhere"))
+
+    def test_bannerlord_switches_its_game_saves_folder_too(self):
+        a = GameApp(games.BANNERLORD, user_dir=self.r / "u", workshop_dir=self.r / "ws", autodetect=False,
+                    store=Store(self.r / "p.json"), library=Library(self.r / "l.json"))
+        pid, other = a.store.create("x"), a.store.create("y")
+        self.assertEqual(a.saves_home(pid)["own"], [other])
+        self.assertEqual(a.saves_location(pid)[0], self.r / "u" / "Game Saves")
 
 
 class NoRealLinks(unittest.TestCase):
