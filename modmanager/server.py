@@ -188,6 +188,8 @@ class GameApp:
         files, sets = [src[0]], src[1]
         have = {ps.get("origin") for ps in self.store.data["playsets"].values()}
         seen = self.store.launcher_seen()
+        mine = {ps["name"] for ps in self.store.data["playsets"].values()}   # the app's own playsets, which it also writes into the launcher
+        have |= {f"launcher:{s['id']}" for s in sets if s["name"] in mine}
         return {"found": True, "db": str(files[0]), "error": "", "message": "",
                 "playsets": [{"id": s["id"], "name": s["name"], "mods": len(s["mods"]), "active": s["active"],
                               "imported": f"launcher:{s['id']}" in have, "offered": f"launcher:{s['id']}" in seen} for s in sets]}
@@ -204,14 +206,19 @@ class GameApp:
         seen = self.store.launcher_seen()
         was_blank = all(not ps["mods"] for ps in self.store.data["playsets"].values())
         names = {ps["name"] for ps in self.store.data["playsets"].values()}
+        mine = set(names)   # playsets that were here before this import
         done, skipped, lost, activate = [], 0, [], None
         for s in sets:
             origin = f"launcher:{s['id']}"
             if (ids is not None and s["id"] not in ids) or origin in have or (only_unseen and origin in seen):
                 skipped += 1
                 continue
+            if s["name"] in mine:   # the launcher's copy of a playset that is already here: the app writes its playsets into the
+                self.store.mark_launcher_seen(origin)   # launcher by name, so importing it back only made "<name> (launcher)" copies
+                skipped += 1
+                continue
             order_, off, gone = launcherdb.convert(s, self.mods)
-            name = s["name"] if s["name"] not in names else f"{s['name']} (launcher)"
+            name = s["name"] if s["name"] not in names else f"{s['name']} (launcher)"   # two launcher playsets with one name
             pid = self.store.create(name, order_, off)
             self.store.set_origin(pid, origin)
             names.add(name)

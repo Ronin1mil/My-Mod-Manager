@@ -160,6 +160,14 @@ class Store:
             del seen[:-500]
         self.save()
 
+    def mark_launcher_seen(self, origin):
+        """Remember a launcher playset as offered without making a playset of it (it is the launcher's copy of one that is here)."""
+        seen = self.data.setdefault("launcher_seen", [])
+        if origin not in seen:
+            seen.append(origin)
+            del seen[:-500]
+            self.save()
+
     def launcher_seen(self):
         return set(self.data.get("launcher_seen", []))
 

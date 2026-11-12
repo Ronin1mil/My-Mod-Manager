@@ -152,11 +152,17 @@ class Importing(GameCase):
         self.assertEqual(self.req("POST", "/api/launcher/import", {"ids": "p1"})[0], 400)
         self.assertEqual(self.req("POST", "/api/launcher/import", {"ids": [1]})[0], 400)
 
-    def test_a_name_clash_does_not_overwrite(self):
+    def test_the_launchers_copy_of_a_playset_that_is_here_is_not_imported_again(self):
+        # the app writes its playsets into the launcher by name; importing them back used to make "Main (launcher)" copies
         self.new_playset([], game=self.GAME)  # named "T"
         self.post(f"/api/playsets/{list(self.names().values())[0]['id']}/update", {"name": "Main"})
-        self.post("/api/launcher/import", {"ids": ["p1"]})
-        self.assertEqual(sorted(self.names()), ["Main", "Main (launcher)"])
+        res = self.post("/api/launcher/import", {"ids": ["p1"]})[1]
+        self.assertEqual(res["imported"], [])
+        self.assertEqual(sorted(self.names()), ["Main"])
+        self.assertIn("launcher:p1", self.hub.app(self.GAME.id).store.launcher_seen())
+        self.assertTrue(next(p for p in self.req("GET", "/api/launcher")[1]["playsets"] if p["id"] == "p1")["imported"])
+        self.hub.app(self.GAME.id).auto_import()   # the automatic import does not bring it back either
+        self.assertEqual(sorted(self.names()), ["Main"])
 
     def test_the_automatic_import_runs_once_and_respects_deletions(self):
         app = self.hub.app(self.GAME.id)
