@@ -187,7 +187,7 @@ class Playing(GameCase):
         self.assertEqual(self.req("GET", f"/api/conflicts/{pid}")[1]["conflicts"], [])
 
     def test_play_starts_the_game_with_the_module_list_in_order(self):
-        pid = self.post("/api/playsets", {"name": "P", "mods": self.L("Native", "SandBoxCore", "Bannerlord.Harmony", "MyMod")})[1]["id"]
+        pid = self.post("/api/playsets", {"name": "P", "separate_saves": False, "mods": self.L("Native", "SandBoxCore", "Bannerlord.Harmony", "MyMod")})[1]["id"]
         self.post(f"/api/playsets/{pid}/update", {"launch_args": ["-debug_mode"]})
         exe = self.root / "bin/Win64_Shipping_Client/Bannerlord.exe"
         exe.parent.mkdir(parents=True)
@@ -211,7 +211,7 @@ class Playing(GameCase):
         game_saves = self.user() / "Game Saves"
         (game_saves / "Native").mkdir(parents=True)
         (game_saves / "Native/old.sav").write_text("my campaign")
-        with mock.patch("modmanager.launch.subprocess.Popen"):
+        with mock.patch("modmanager.launch.start", return_value={"via": "exe"}):   # not Popen: the folder link is made by a subprocess too
             res = self.post(f"/api/playsets/{fresh}/launch")[1]
             self.assertTrue(res["saves"].startswith("linked_after_moving"), res)
             self.assertEqual(list(game_saves.iterdir()), [], "a fresh playset sees no saves")
@@ -222,7 +222,7 @@ class Playing(GameCase):
             self.assertEqual([p.name for p in game_saves.iterdir()], ["new.sav"])
 
     def test_a_disabled_module_is_left_out_and_a_partial_launch_uses_the_subset(self):
-        pid = self.post("/api/playsets", {"name": "P", "mods": self.L("Native", "SandBoxCore", "Bannerlord.Harmony", "MyMod")})[1]["id"]
+        pid = self.post("/api/playsets", {"name": "P", "separate_saves": False, "mods": self.L("Native", "SandBoxCore", "Bannerlord.Harmony", "MyMod")})[1]["id"]
         self.post(f"/api/playsets/{pid}/update", {"disabled": ["local:Bannerlord.Harmony"]})
         exe = self.root / "bin/Win64_Shipping_Client/Bannerlord.exe"
         exe.parent.mkdir(parents=True)

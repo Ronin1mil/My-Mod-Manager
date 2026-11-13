@@ -123,7 +123,7 @@ def show(url, title=TITLE, pywebview=None, chromium=None):
 
 def message(title, text):
     """Tell the user something when there is no console to print it to (the Windows app has none)."""
-    if sys.platform == "win32":
+    if sys.platform == "win32" and os.environ.get("MODMANAGER_NO_DIALOG") != "1":   # the switch is for tests: a box waits for a click
         try:
             import ctypes
             ctypes.windll.user32.MessageBoxW(None, str(text), str(title), 0x10)

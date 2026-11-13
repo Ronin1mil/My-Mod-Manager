@@ -1,7 +1,6 @@
 """A playset's own desktop shortcut: `--game <id> --play <playset>` starts the game with it without opening the app."""
 import json
 import os
-import stat
 import subprocess
 import sys
 import unittest
@@ -50,13 +49,14 @@ class Playing(GameCase):
         pid = self.new_playset(["local:a"])
         self.post(f"/api/playsets/{first}/activate")
         app = self.hub.app("ck3")
-        exe = self.r / "game.sh"
-        exe.write_text(f"#!/bin/sh\necho started > '{self.r}/ran.txt'\n")
-        exe.chmod(exe.stat().st_mode | stat.S_IEXEC)
+        exe = self.r / "game.exe"
+        exe.write_bytes(b"")
         app.game_exe = str(exe)
         with self.assertRaises(ValueError):   # two playsets are called "T"
             play_playset("ck3", "T", hub=self.hub)
-        res = play_playset("ck3", pid, hub=self.hub)
+        with mock.patch("modmanager.launch.start", return_value={"via": "exe"}) as start:   # a real program is not started
+            res = play_playset("ck3", pid, hub=self.hub)
+        self.assertEqual(start.call_args[0][1], str(exe))
         self.assertEqual((res["written"], res["playset"]), (1, "T"))
         self.assertEqual(json.loads((self.user() / "dlc_load.json").read_text())["enabled_mods"], ["mod/a.mod"])
         self.assertEqual(app.store.data["active"], pid)
@@ -97,7 +97,7 @@ class CommandLine(unittest.TestCase):
         import tempfile
         with tempfile.TemporaryDirectory() as t:
             env = {**os.environ, "MODMANAGER_CONFIG_DIR": str(Path(t) / "cfg"), "MODMANAGER_LOG_DIR": str(Path(t) / "log"),
-                   "MODMANAGER_FETCH_LOGOS": "0", "MODMANAGER_AUTO_IMPORT": "0"}
+                   "MODMANAGER_FETCH_LOGOS": "0", "MODMANAGER_AUTO_IMPORT": "0", "MODMANAGER_NO_DIALOG": "1"}
             r = subprocess.run([sys.executable, "-m", "modmanager", "--play", "x"], capture_output=True, text=True, env=env, timeout=60)
             self.assertEqual(r.returncode, 2)
             self.assertIn("--play needs --game", r.stderr)
